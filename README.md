@@ -220,11 +220,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 4.1 |
+| **Version** | 4.2 |
 | **Created** | March 10, 2026 |
 | **Last Updated** | March 10, 2026 |
 | **Author** | Noonnoir Dev Team |
-| **Status** | **🎉 Full Feature Complete + Setup Audit** — 22 routes, 28 modules, 22 server action files, 10 user stories implemented |
+| **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
+| **Status** | **🎉 Full Feature Complete + Setup Audit + UX Polish** — 22 routes, 28 modules, 22 server action files, 10 user stories implemented |
 
 ---
 
@@ -253,7 +254,8 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-10 | **v3.9** | **🔔 Notifications & Alerts** (US-5.1): 10 mock alerts, 3 priorities (CRITICAL/WARNING/INFO), 5 categories, bell icon with unread badge on POS, dropdown panel, alert rules |
 | 2026-03-10 | **v4.0** | **🎉 Full Feature Complete** — (1) **QR Payment** (US-8.1): VietQR API integration, dynamic QR code generation, bank info display, confirm/cancel flow, 10-min expiry. (2) **Wine Serving Notes** (US-2.5): 5 wines with tasting profiles, serving temp/glass/decant, food pairing, staff tips, upsell suggestions. **22 routes, 27 modules, 10 User Stories** |
 | 2026-03-10 | **v4.1** | **🔧 Setup Audit + POS Table Orders** — (1) **Table/Zone CRUD**: AddTableModal, ZoneManagerModal, delete table. (2) **Promotion CRUD**: CreatePromoModal (type, %, schedule, days, limits) + delete. (3) **Settings 3 new sections**: Service Charge (toggle, rate, dine-in only), QR Payment/Bank config (bank name, BIN, account, template), Operational (discount threshold, 86 status). (4) **Consignment Create**: CreateConsignmentModal (supplier, commission, dynamic item list). (5) **Staff updateStaff** action. (6) **POS Table Order Management**: occupied tables now clickable → view order detail panel → add items to existing order via `addItemsToOrder` action. Visual mode indicator on Send to Kitchen button |
+| 2026-03-10 | **v4.2** | **✨ UX Polish + Staff Edit + 86 Toggle** — (1) **POS Table Order UX**: instant query (removed delay), single-click close modal (merged panel X → modal X), "← Quay lại" back button. (2) **Mock order data**: 4 seeded orders matching occupied tables (T02, T04, T08, B01). (3) **Staff Edit Modal**: EditStaffModal with pre-filled data (name, role, phone, email, shift), integrated into action bar. (4) **86 Out of Stock Toggle**: right-click context menu on POS product cards → mark/unmark 86, instant visual overlay. (5) **GitHub repo**: pushed to posnoonnoir-lang/pos-noonnoir |
 
 ---
 
-*Last updated: March 10, 2026 — Setup Audit + POS Table Orders v4.1*
+*Last updated: March 10, 2026 — UX Polish + Staff Edit + 86 Toggle v4.2*
