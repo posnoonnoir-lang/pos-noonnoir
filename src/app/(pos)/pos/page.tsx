@@ -1,0 +1,2631 @@
+"use client"
+
+import { useState, useMemo, useEffect, useCallback } from "react"
+import {
+    Search,
+    Plus,
+    Minus,
+    Trash2,
+    Wine,
+    ShoppingCart,
+    Receipt,
+    CreditCard,
+    Banknote,
+    QrCode,
+    X,
+    MessageSquare,
+    Armchair,
+    Hash,
+    Loader2,
+    CheckCircle2,
+    CreditCard as TabIcon,
+    User,
+    AlertTriangle,
+    Clock,
+    UserPlus,
+    Star,
+    Timer,
+    DollarSign,
+    CircleMinus,
+    Bell,
+    Pause,
+    Play,
+    ArrowRightLeft,
+    ShieldCheck,
+    Percent,
+    Copy,
+    CalendarDays,
+} from "lucide-react"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { useCartStore } from "@/stores/cart-store"
+import { useAuthStore } from "@/stores/auth-store"
+import { createOrder, processOrderWithCOGS, getActiveOrderByTable, addItemsToOrder, type PaymentMethod, type Order } from "@/actions/orders"
+import {
+    searchCustomers,
+    createQuickCustomer,
+    openTab,
+    getOpenTabs,
+    addMultipleTabItems,
+    closeTab,
+    removeTabItem,
+} from "@/actions/tabs"
+import { MOCK_CATEGORIES, MOCK_PRODUCTS, MOCK_TABLES, MOCK_ZONES } from "@/lib/mock-data"
+import { getAllGlassStatuses, sellWineGlass, sellWineBottle, type GlassStatus } from "@/actions/wine"
+import { getCurrentShift, openShift, closeShift, addShiftExpense, type Shift } from "@/actions/shifts"
+import { getUnreadNotifications, markAsRead, markAllAsRead, type Notification } from "@/actions/notifications"
+import { generateQRPayment, confirmQRPayment, cancelQRPayment, getBankConfig, type QRPaymentRequest, type QRPaymentConfig } from "@/actions/qr-payment"
+import {
+    get86ProductIds,
+    markProduct86,
+    unmark86,
+    calculateServiceCharge,
+    holdOrder,
+    getHeldOrders,
+    recallHeldOrder,
+    deleteHeldOrder,
+    authorizeDiscount,
+    getDiscountThreshold,
+    transferTable,
+    type HeldOrder,
+} from "@/actions/operational"
+import { getUpcomingReservations, type Reservation } from "@/actions/reservations"
+import type { Product, Customer, CustomerTab } from "@/types"
+import type { FloorTable } from "@/lib/mock-data"
+
+function formatPrice(amount: number): string {
+    return new Intl.NumberFormat("vi-VN").format(amount)
+}
+
+// ============================================================
+// TABLE SELECTOR MODAL — supports viewing occupied tables & adding items
+// ============================================================
+function TableSelector({
+    open,
+    onClose,
+    onSelect,
+    onSelectOccupied,
+}: {
+    open: boolean
+    onClose: () => void
+    onSelect: (table: FloorTable) => void
+    onSelectOccupied?: (table: FloorTable, order: Order) => void
+}) {
+    const [selectedZone, setSelectedZone] = useState(MOCK_ZONES[0]?.id)
+    const [viewingOrder, setViewingOrder] = useState<{ table: FloorTable; order: Order } | null>(null)
+    const [loadingOrder, setLoadingOrder] = useState(false)
+
+    if (!open) return null
+
+    const filteredTables = MOCK_TABLES.filter(
+        (t) => t.zoneId === selectedZone && t.isActive
+    )
+
+    const statusColors: Record<string, string> = {
+        AVAILABLE: "border-green-400 bg-green-50 hover:bg-green-100 hover:border-green-600 cursor-pointer",
+        OCCUPIED: "border-wine-300 bg-wine-50 hover:bg-wine-100 hover:border-wine-500 cursor-pointer ring-1 ring-wine-200",
+        RESERVED: "border-amber-300 bg-amber-50 opacity-60 cursor-not-allowed",
+        CLEANING: "border-cream-400 bg-cream-200 opacity-60 cursor-not-allowed",
+        MERGED: "border-cream-400 bg-cream-200 opacity-40 cursor-not-allowed",
+    }
+
+    const statusLabels: Record<string, string> = {
+        AVAILABLE: "Trống",
+        OCCUPIED: "Đang dùng",
+        RESERVED: "Đặt trước",
+        CLEANING: "Dọn dẹp",
+        MERGED: "Ghép",
+    }
+
+    const handleTableClick = async (table: FloorTable) => {
+        if (table.status === "AVAILABLE") {
+            onSelect(table)
+            onClose()
+        } else if (table.status === "OCCUPIED") {
+            setLoadingOrder(true)
+            const order = await getActiveOrderByTable(table.id)
+            setLoadingOrder(false)
+            if (order) {
+                setViewingOrder({ table, order })
+            } else {
+                // No active order found — allow creating new
+                onSelect(table)
+                onClose()
+            }
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className={cn(
+                "max-h-[85vh] rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden transition-all",
+                viewingOrder ? "w-[840px] grid grid-cols-[1fr_320px]" : "w-[600px]"
+            )}>
+                <div className="flex flex-col">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-cream-300 px-5 py-4">
+                        <div>
+                            <h2 className="font-display text-lg font-bold text-green-900">Chọn bàn</h2>
+                            <p className="text-xs text-cream-500">Bàn trống → tạo đơn mới · Bàn đang dùng → xem / thêm món</p>
+                        </div>
+                        <button onClick={() => { setViewingOrder(null); onClose() }} className="rounded-lg p-2 hover:bg-cream-200 transition-all">
+                            <X className="h-4 w-4 text-cream-500" />
+                        </button>
+                    </div>
+
+                    {/* Zone tabs */}
+                    <div className="flex gap-1 border-b border-cream-300 px-4 py-2 overflow-x-auto">
+                        {MOCK_ZONES.map((zone) => (
+                            <button
+                                key={zone.id}
+                                onClick={() => { setSelectedZone(zone.id); setViewingOrder(null) }}
+                                className={cn(
+                                    "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                                    selectedZone === zone.id
+                                        ? "bg-green-900 text-cream-50"
+                                        : "text-cream-500 hover:bg-cream-200"
+                                )}
+                            >
+                                {zone.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Table grid */}
+                    <div className="grid grid-cols-4 gap-3 p-5 max-h-[50vh] overflow-y-auto">
+                        {filteredTables.map((table) => {
+                            const isViewing = viewingOrder?.table.id === table.id
+                            return (
+                                <button
+                                    key={table.id}
+                                    onClick={() => handleTableClick(table)}
+                                    disabled={!["AVAILABLE", "OCCUPIED"].includes(table.status) || loadingOrder}
+                                    className={cn(
+                                        "flex flex-col items-center justify-center rounded-xl border-2 p-4 transition-all",
+                                        statusColors[table.status],
+                                        isViewing && "ring-2 ring-wine-500 scale-[1.03] shadow-lg"
+                                    )}
+                                >
+                                    <span className="font-display text-lg font-bold text-green-900">
+                                        {table.tableNumber}
+                                    </span>
+                                    <span className="text-[10px] text-cream-500">
+                                        {table.seats} chỗ
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "mt-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                            table.status === "AVAILABLE" ? "bg-green-100 text-green-700" :
+                                                table.status === "OCCUPIED" ? "bg-wine-100 text-wine-700" :
+                                                    "bg-cream-200 text-cream-500"
+                                        )}
+                                    >
+                                        {statusLabels[table.status]}
+                                    </span>
+                                    {table.status === "OCCUPIED" && table.currentOrderTotal && (
+                                        <span className="mt-1 font-mono text-[10px] font-bold text-wine-600">
+                                            ₫{formatPrice(table.currentOrderTotal)}
+                                        </span>
+                                    )}
+                                    {table.status === "OCCUPIED" && table.guestCount && (
+                                        <span className="text-[9px] text-cream-400">
+                                            👤 {table.guestCount} khách
+                                        </span>
+                                    )}
+                                </button>
+                            )
+                        })}
+                    </div>
+
+                    {/* Legend */}
+                    <div className="flex justify-center gap-4 border-t border-cream-300 px-4 py-2.5">
+                        <span className="flex items-center gap-1 text-[10px] text-cream-500">
+                            <span className="h-2.5 w-2.5 rounded-full bg-green-400" /> Trống — tạo đơn
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] text-cream-500">
+                            <span className="h-2.5 w-2.5 rounded-full bg-wine-400" /> Đang dùng — xem/thêm món
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] text-cream-500">
+                            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Đặt trước
+                        </span>
+                    </div>
+                </div>
+
+                {/* ========== ORDER DETAIL PANEL ========== */}
+                {viewingOrder && (
+                    <div className="border-l border-cream-300 bg-white flex flex-col">
+                        <div className="px-4 py-3 border-b border-cream-200 bg-wine-50">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-display text-sm font-bold text-wine-800">
+                                        {viewingOrder.table.tableNumber}
+                                    </h3>
+                                    <p className="text-[10px] text-wine-500">
+                                        {viewingOrder.order.orderNumber} · {viewingOrder.order.items.length} món
+                                    </p>
+                                </div>
+                                <button onClick={() => setViewingOrder(null)} className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-wine-500 hover:bg-wine-100 hover:text-wine-700 transition-all">
+                                    ← Quay lại
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                            <p className="text-[9px] font-bold uppercase text-cream-400 tracking-wider mb-1">Đang order</p>
+                            {viewingOrder.order.items.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between rounded-lg bg-cream-50 border border-cream-200 px-2.5 py-2">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] font-medium text-green-900 truncate">{item.productName}</p>
+                                        {item.note && <p className="text-[9px] text-amber-600 italic">💬 {item.note}</p>}
+                                    </div>
+                                    <div className="text-right ml-2 shrink-0">
+                                        <span className="text-[10px] text-cream-500">×{item.quantity}</span>
+                                        <p className="font-mono text-[10px] font-bold text-green-800">₫{formatPrice(item.unitPrice * item.quantity)}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="border-t border-cream-200 p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-cream-500">Tổng hiện tại</span>
+                                <span className="font-mono text-sm font-bold text-wine-700">₫{formatPrice(viewingOrder.order.total)}</span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    if (onSelectOccupied) {
+                                        onSelectOccupied(viewingOrder.table, viewingOrder.order)
+                                    }
+                                    onClose()
+                                }}
+                                className="w-full rounded-lg bg-wine-700 py-2 text-xs font-bold text-white hover:bg-wine-600 transition-all flex items-center justify-center gap-1.5"
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                Thêm món cho bàn này
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ============================================================
+// POS PAGE
+// ============================================================
+export default function POSPage() {
+    const [activeCategory, setActiveCategory] = useState<string>("all")
+    const [searchTerm, setSearchTerm] = useState("")
+    const [tableModalOpen, setTableModalOpen] = useState(false)
+    const [noteItemId, setNoteItemId] = useState<string | null>(null)
+    const [noteText, setNoteText] = useState("")
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [lastOrder, setLastOrder] = useState<{ orderNumber: string; total: number } | null>(null)
+    const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
+
+    // Tab state
+    const [openTabModal, setOpenTabModal] = useState(false)
+    const [tabDetailModal, setTabDetailModal] = useState<string | null>(null)
+    const [activeTabs, setActiveTabs] = useState<CustomerTab[]>([])
+    const [tabsLoading, setTabsLoading] = useState(false)
+
+    // Wine glass tracking state
+    const [glassStatuses, setGlassStatuses] = useState<Record<string, GlassStatus>>({})
+
+    // Shift state
+    const [currentShift, setCurrentShift] = useState<Shift | null>(null)
+    const [shiftModalOpen, setShiftModalOpen] = useState(false)
+    const [shiftElapsed, setShiftElapsed] = useState("")
+
+    // Notification state
+    const [notifications, setNotifications] = useState<Notification[]>([])
+    const [notifOpen, setNotifOpen] = useState(false)
+
+    // QR Payment state
+    const [qrModalOpen, setQrModalOpen] = useState(false)
+    const [qrPayment, setQrPayment] = useState<QRPaymentRequest | null>(null)
+    const [qrBankConfig, setQrBankConfig] = useState<QRPaymentConfig | null>(null)
+
+    // Phase 8A: Operational
+    const [product86Ids, setProduct86Ids] = useState<string[]>([])
+    const [serviceCharge, setServiceCharge] = useState(0)
+    const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([])
+    const [holdModalOpen, setHoldModalOpen] = useState(false)
+    const [discountModalOpen, setDiscountModalOpen] = useState(false)
+    const [discountPct, setDiscountPct] = useState(0)
+    const [upcomingReservations, setUpcomingReservations] = useState<Reservation[]>([])
+    const [qrLoading, setQrLoading] = useState(false)
+
+    const { staff } = useAuthStore()
+    const cart = useCartStore()
+
+    // Load active tabs
+    const refreshTabs = useCallback(async () => {
+        setTabsLoading(true)
+        const tabs = await getOpenTabs()
+        setActiveTabs(tabs)
+        setTabsLoading(false)
+    }, [])
+
+    useEffect(() => {
+        refreshTabs()
+    }, [refreshTabs])
+
+    // Load wine glass statuses
+    const refreshGlassStatuses = useCallback(async () => {
+        const statuses = await getAllGlassStatuses()
+        setGlassStatuses(statuses)
+    }, [])
+
+    useEffect(() => {
+        refreshGlassStatuses()
+    }, [refreshGlassStatuses])
+
+    // Load current shift
+    const refreshShift = useCallback(async () => {
+        const shift = await getCurrentShift()
+        setCurrentShift(shift)
+    }, [])
+
+    useEffect(() => {
+        refreshShift()
+    }, [refreshShift])
+
+    // Load notifications
+    const refreshNotifications = useCallback(async () => {
+        const list = await getUnreadNotifications()
+        setNotifications(list)
+    }, [])
+
+    useEffect(() => {
+        refreshNotifications()
+        const interval = setInterval(refreshNotifications, 60000)
+        return () => clearInterval(interval)
+    }, [refreshNotifications])
+
+    // Shift timer — update elapsed time every 30s
+    useEffect(() => {
+        if (!currentShift) { setShiftElapsed(""); return }
+        const update = () => {
+            const diff = Date.now() - new Date(currentShift.openedAt).getTime()
+            const h = Math.floor(diff / 3600000)
+            const m = Math.floor((diff % 3600000) / 60000)
+            setShiftElapsed(`${h}h${String(m).padStart(2, "0")}m`)
+        }
+        update()
+        const interval = setInterval(update, 30000)
+        return () => clearInterval(interval)
+    }, [currentShift])
+
+    // Phase 8A: Load 86 products
+    const refresh86 = useCallback(async () => {
+        const ids = await get86ProductIds()
+        setProduct86Ids(ids)
+    }, [])
+    useEffect(() => { refresh86() }, [refresh86])
+
+    // Phase 8A: Load held orders
+    const refreshHeld = useCallback(async () => {
+        const list = await getHeldOrders()
+        setHeldOrders(list)
+    }, [])
+    useEffect(() => { refreshHeld() }, [refreshHeld])
+
+    // Phase 8A: Load upcoming reservations
+    useEffect(() => {
+        getUpcomingReservations().then((list) => setUpcomingReservations(list))
+    }, [])
+
+    // Phase 8A: Calculate service charge when cart changes
+    useEffect(() => {
+        if (cart.items.length > 0) {
+            calculateServiceCharge(cart.subtotal(), cart.orderType).then((sc) => setServiceCharge(sc.amount))
+        } else {
+            setServiceCharge(0)
+        }
+    }, [cart.items, cart.orderType, cart.subtotal])
+
+    // Filter products
+    const filteredProducts = useMemo(() => {
+        let products = MOCK_PRODUCTS.filter((p) => p.isActive)
+
+        if (activeCategory !== "all") {
+            products = products.filter((p) => p.categoryId === activeCategory)
+        }
+        if (searchTerm) {
+            const q = searchTerm.toLowerCase()
+            products = products.filter(
+                (p) =>
+                    p.name.toLowerCase().includes(q) ||
+                    p.nameVi?.toLowerCase().includes(q) ||
+                    p.sku?.toLowerCase().includes(q)
+            )
+        }
+        return products
+    }, [activeCategory, searchTerm])
+
+    const handleAddToCart = (product: Product) => {
+        if (product86Ids.includes(product.id)) {
+            toast.error(`❌ 86: ${product.name} đã hết`, { description: "Sản phẩm không còn phục vụ", duration: 3000 })
+            return
+        }
+        cart.addItem(product)
+        toast.success(`+1 ${product.name}`, { duration: 1500 })
+    }
+
+    // 86 toggle via right-click
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; product: Product } | null>(null)
+
+    const handleProductContextMenu = (e: React.MouseEvent, product: Product) => {
+        e.preventDefault()
+        setContextMenu({ x: e.clientX, y: e.clientY, product })
+    }
+
+    const handle86Toggle = async (product: Product) => {
+        setContextMenu(null)
+        const is86 = product86Ids.includes(product.id)
+        if (is86) {
+            await unmark86(product.id)
+            setProduct86Ids((prev) => prev.filter((id) => id !== product.id))
+            toast.success(`✅ ${product.name} — đã mở lại`, { duration: 2000 })
+        } else {
+            await markProduct86({
+                productId: product.id,
+                productName: product.name,
+                reason: "Hết nguyên liệu",
+                staffId: staff?.id ?? "unknown",
+                staffName: staff?.fullName ?? "Staff",
+            })
+            setProduct86Ids((prev) => [...prev, product.id])
+            toast.warning(`🚫 86: ${product.name} — đã đánh dấu hết`, { duration: 2000 })
+        }
+    }
+
+    // Phase 8A: Hold order
+    const handleHoldOrder = async () => {
+        if (cart.items.length === 0) { toast.error("Giỏ hàng trống"); return }
+        const result = await holdOrder({
+            tableId: cart.selectedTable?.id ?? null,
+            tableNumber: cart.selectedTable?.tableNumber ?? null,
+            orderType: cart.orderType,
+            items: cart.items.map((item) => ({
+                productId: item.product.id,
+                productName: item.product.name,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                note: item.note,
+            })),
+            subtotal: cart.subtotal(),
+            staffId: staff?.id ?? "unknown",
+            staffName: staff?.fullName ?? "Staff",
+            label: cart.selectedTable?.tableNumber ?? `Hold #${heldOrders.length + 1}`,
+        })
+        if (result.success) {
+            toast.success(`⏸️ Đã giữ đơn: ${result.heldOrder?.label}`, { duration: 3000 })
+            cart.clearCart()
+            refreshHeld()
+        } else {
+            toast.error(result.error ?? "Lỗi")
+        }
+    }
+
+    // Phase 8A: Recall held order
+    const handleRecallHeld = async (id: string) => {
+        const result = await recallHeldOrder(id)
+        if (result.success && result.order) {
+            // Restore cart items
+            cart.clearCart()
+            for (const item of result.order.items) {
+                const product = MOCK_PRODUCTS.find((p) => p.id === item.productId)
+                if (product) {
+                    for (let i = 0; i < item.quantity; i++) cart.addItem(product)
+                    if (item.note) {
+                        const cartItem = cart.items.find((ci) => ci.product.id === item.productId)
+                        if (cartItem) cart.updateNote(cartItem.id, item.note)
+                    }
+                }
+            }
+            if (result.order.tableId) {
+                const table = MOCK_TABLES.find((t) => t.id === result.order!.tableId)
+                if (table) cart.selectTable(table)
+            }
+            toast.success(`▶️ Đã khôi phục: ${result.order.label}`)
+            refreshHeld()
+        }
+    }
+
+    const handleNoteSubmit = (itemId: string) => {
+        cart.updateNote(itemId, noteText)
+        setNoteItemId(null)
+        setNoteText("")
+        toast.success("Đã lưu ghi chú")
+    }
+
+    const sendToKitchen = async () => {
+        if (cart.items.length === 0) {
+            toast.error("Giỏ hàng trống")
+            return
+        }
+        if (cart.orderType === "DINE_IN" && !cart.selectedTable) {
+            toast.error("Chọn bàn trước khi gửi bếp")
+            setTableModalOpen(true)
+            return
+        }
+
+        setIsSubmitting(true)
+        try {
+            // Case 1: Adding items to existing order (occupied table)
+            if (activeOrderId) {
+                const result = await addItemsToOrder(activeOrderId, cart.items)
+                if (result.success && result.order) {
+                    setLastOrder({
+                        orderNumber: result.order.orderNumber,
+                        total: result.order.total,
+                    })
+                    toast.success(
+                        `✅ Đã thêm ${cart.items.length} món vào ${result.order.orderNumber}`,
+                        {
+                            description: `${cart.selectedTable?.tableNumber} · Tổng mới: ₫${formatPrice(result.order.total)}`,
+                            duration: 4000,
+                        }
+                    )
+                    cart.clearCart()
+                    setActiveOrderId(null)
+                    setTimeout(() => setLastOrder(null), 5000)
+                } else {
+                    toast.error(result.error ?? "Không thể thêm món")
+                }
+            } else {
+                // Case 2: Create new order
+                const result = await createOrder({
+                    tableId: cart.selectedTable?.id ?? null,
+                    tableNumber: cart.selectedTable?.tableNumber ?? null,
+                    orderType: cart.orderType,
+                    items: cart.items,
+                    staffId: staff?.id ?? "unknown",
+                    staffName: staff?.fullName ?? "Staff",
+                })
+
+                if (result.success && result.order) {
+                    setLastOrder({
+                        orderNumber: result.order.orderNumber,
+                        total: result.order.total,
+                    })
+                    toast.success(
+                        `🍳 Gửi bếp: ${result.order.orderNumber}`,
+                        {
+                            description: `${cart.selectedTable?.tableNumber ?? "Takeaway"} · ₫${formatPrice(result.order.total)} · ${cart.items.length} món`,
+                            duration: 4000,
+                        }
+                    )
+                    cart.clearCart()
+                    setTimeout(() => setLastOrder(null), 5000)
+                } else {
+                    toast.error(result.error ?? "Không thể tạo đơn")
+                }
+            }
+        } catch {
+            toast.error("Lỗi hệ thống")
+        }
+        setIsSubmitting(false)
+    }
+
+    const handleCheckout = async (paymentMethod: PaymentMethod = "CASH") => {
+        if (cart.items.length === 0) {
+            toast.error("Giỏ hàng trống")
+            return
+        }
+        if (cart.orderType === "DINE_IN" && !cart.selectedTable) {
+            toast.error("Chọn bàn trước khi thanh toán")
+            setTableModalOpen(true)
+            return
+        }
+
+        setIsSubmitting(true)
+        try {
+            const result = await createOrder({
+                tableId: cart.selectedTable?.id ?? null,
+                tableNumber: cart.selectedTable?.tableNumber ?? null,
+                orderType: cart.orderType,
+                items: cart.items,
+                staffId: staff?.id ?? "unknown",
+                staffName: staff?.fullName ?? "Staff",
+            })
+
+            if (result.success && result.order) {
+                // Pay + auto deduct NPL + COGS tracking
+                const cogsResult = await processOrderWithCOGS(result.order.id, paymentMethod)
+
+                setLastOrder({
+                    orderNumber: result.order.orderNumber,
+                    total: result.order.total,
+                })
+
+                // Main success toast
+                const deductionInfo = cogsResult.deductions.length > 0
+                    ? ` · Trừ NPL: ${cogsResult.deductions.length} SP`
+                    : ""
+                toast.success(
+                    `✅ ${result.order.orderNumber}`,
+                    {
+                        description: `${cart.selectedTable?.tableNumber ?? "Takeaway"} · ₫${formatPrice(result.order.total)} · ${paymentMethod}${deductionInfo}`,
+                        duration: 4000,
+                    }
+                )
+
+                // Stock warnings
+                if (cogsResult.stockWarnings.length > 0) {
+                    for (const w of cogsResult.stockWarnings) {
+                        if (w.level === "OUT") {
+                            toast.error(`🚨 Hết hàng: ${w.materialName}`, {
+                                description: "Cần nhập thêm nguyên liệu ngay!",
+                                duration: 8000,
+                            })
+                        } else {
+                            toast.warning(`⚠️ Sắp hết: ${w.materialName}`, {
+                                description: `Còn ${w.remaining} ${w.unit}`,
+                                duration: 6000,
+                            })
+                        }
+                    }
+                }
+
+                // Deduction errors (not enough stock)
+                if (cogsResult.errors.length > 0) {
+                    for (const err of cogsResult.errors) {
+                        toast.error(`❌ NPL: ${err}`, { duration: 6000 })
+                    }
+                }
+
+                // Wine bottle/glass tracking
+                for (const item of cart.items) {
+                    if (item.product.type === "WINE_GLASS" || item.product.isByGlass) {
+                        const wineResult = await sellWineGlass({
+                            productId: item.product.id,
+                            quantity: item.quantity,
+                            staffName: staff?.fullName ?? "Staff",
+                        })
+                        if (wineResult.success) {
+                            if (wineResult.bottlesConsumed.length > 0) {
+                                toast.info(`🍷 Chai hết: ${wineResult.bottlesConsumed.join(", ")}`, {
+                                    duration: 5000,
+                                })
+                            }
+                            if (wineResult.newBottleOpened) {
+                                toast.info(`🔓 Mở chai mới: ${wineResult.newBottleOpened.batchCode}`, {
+                                    description: `${wineResult.currentStatus?.glassesRemaining ?? 0} ly còn lại`,
+                                    duration: 5000,
+                                })
+                            }
+                        } else if (wineResult.error) {
+                            toast.error(`🍷 ${wineResult.error}`, { duration: 6000 })
+                        }
+                    } else if (item.product.type === "WINE_BOTTLE") {
+                        const bottleResult = await sellWineBottle({
+                            productId: item.product.id,
+                            quantity: item.quantity,
+                        })
+                        if (bottleResult.success) {
+                            toast.info(`🍷 Bán chai: ${bottleResult.bottlesSold.join(", ")}`, {
+                                duration: 4000,
+                            })
+                        } else if (bottleResult.error) {
+                            toast.warning(`🍷 ${bottleResult.error}`, { duration: 6000 })
+                        }
+                    }
+                }
+
+                // Refresh glass statuses after wine operations
+                refreshGlassStatuses()
+
+                cart.clearCart()
+                setTimeout(() => setLastOrder(null), 5000)
+            } else {
+                toast.error(result.error ?? "Không thể tạo đơn")
+            }
+        } catch {
+            toast.error("Lỗi hệ thống")
+        }
+        setIsSubmitting(false)
+    }
+
+    // Add cart items to a tab
+    const handleAddToTab = async (tabId: string) => {
+        if (cart.items.length === 0) {
+            toast.error("Giỏ hàng trống")
+            return
+        }
+
+        setIsSubmitting(true)
+        const result = await addMultipleTabItems({
+            tabId,
+            items: cart.items.map((item) => ({
+                productId: item.product.id,
+                productName: item.product.name,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+            })),
+            tableId: cart.selectedTable?.id,
+            tableNumber: cart.selectedTable?.tableNumber,
+            staffId: staff?.id ?? "unknown",
+            staffName: staff?.fullName ?? "Staff",
+        })
+
+        if (result.success && result.data) {
+            toast.success(`✅ Đã thêm ${cart.items.length} món vào tab`, {
+                description: `${result.data.customer.fullName} · ₫${formatPrice(result.data.currentTotal)} / ₫${formatPrice(result.data.tabLimit)}`,
+            })
+            cart.clearCart()
+            refreshTabs()
+
+            // Warn at 80%
+            if (result.data.currentTotal > result.data.tabLimit * 0.8) {
+                toast.warning(`⚠️ Tab gần đạt giới hạn`, {
+                    description: `${result.data.customer.fullName}: ${Math.round((result.data.currentTotal / result.data.tabLimit) * 100)}%`,
+                    duration: 6000,
+                })
+            }
+        } else {
+            toast.error(result.error?.message ?? "Không thể thêm vào tab")
+        }
+        setIsSubmitting(false)
+    }
+
+    return (
+        <div className="flex h-screen overflow-hidden bg-cream-50">
+            {/* ============ LEFT: Product Grid ============ */}
+            <div className="flex-1 flex flex-col min-w-0">
+                {/* Top Bar */}
+                <div className="flex items-center gap-3 border-b border-cream-300 bg-cream-100 px-4 py-3">
+                    {/* Table / Takeaway toggle */}
+                    <div className="flex items-center gap-1 rounded-lg border border-cream-300 bg-cream-50 p-0.5">
+                        <button
+                            onClick={() => {
+                                cart.setOrderType("DINE_IN")
+                                if (!cart.selectedTable) setTableModalOpen(true)
+                            }}
+                            className={cn(
+                                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                                cart.orderType === "DINE_IN"
+                                    ? "bg-green-900 text-cream-50 shadow-sm"
+                                    : "text-cream-500 hover:text-green-900"
+                            )}
+                        >
+                            <Armchair className="h-3.5 w-3.5" />
+                            Tại bàn
+                        </button>
+                        <button
+                            onClick={() => cart.setOrderType("TAKEAWAY")}
+                            className={cn(
+                                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                                cart.orderType === "TAKEAWAY"
+                                    ? "bg-green-900 text-cream-50 shadow-sm"
+                                    : "text-cream-500 hover:text-green-900"
+                            )}
+                        >
+                            <ShoppingCart className="h-3.5 w-3.5" />
+                            Mang đi
+                        </button>
+                    </div>
+
+                    {/* Table indicator */}
+                    {cart.orderType === "DINE_IN" && (
+                        <button
+                            onClick={() => setTableModalOpen(true)}
+                            className={cn(
+                                "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
+                                cart.selectedTable
+                                    ? "border-green-600 bg-green-50 text-green-900"
+                                    : "border-cream-400 bg-cream-200 text-cream-500 animate-pulse"
+                            )}
+                        >
+                            <Armchair className="h-3.5 w-3.5" />
+                            {cart.selectedTable ? (
+                                <>
+                                    {cart.selectedTable.tableNumber}
+                                    <span className="text-cream-500">· {cart.selectedTable.seats} chỗ</span>
+                                </>
+                            ) : (
+                                "Chọn bàn..."
+                            )}
+                        </button>
+                    )}
+
+                    {/* Open Tabs indicator */}
+                    <button
+                        onClick={() => setOpenTabModal(true)}
+                        className={cn(
+                            "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
+                            activeTabs.length > 0
+                                ? "border-amber-500 bg-amber-50 text-amber-800"
+                                : "border-cream-300 bg-cream-50 text-cream-500 hover:border-green-600 hover:text-green-700"
+                        )}
+                    >
+                        <TabIcon className="h-3.5 w-3.5" />
+                        {activeTabs.length > 0 ? (
+                            <>
+                                Tab
+                                <Badge className="bg-amber-600 text-white text-[9px] px-1 py-0 ml-0.5">
+                                    {activeTabs.length}
+                                </Badge>
+                            </>
+                        ) : (
+                            "Mở tab"
+                        )}
+                    </button>
+
+                    {/* Search */}
+                    <div className="relative flex-1 max-w-xs ml-auto">
+                        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-400" />
+                        <Input
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Tìm sản phẩm..."
+                            className="h-8 pl-8 text-xs border-cream-300 bg-cream-50"
+                        />
+                    </div>
+
+                    {/* Shift indicator */}
+                    <button
+                        onClick={() => setShiftModalOpen(true)}
+                        className={cn(
+                            "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all",
+                            currentShift
+                                ? "border-green-600 bg-green-50 text-green-800"
+                                : "border-red-300 bg-red-50 text-red-700 animate-pulse"
+                        )}
+                    >
+                        <Timer className="h-3.5 w-3.5" />
+                        {currentShift ? (
+                            <>
+                                <span className="font-mono">{shiftElapsed}</span>
+                                <span className="hidden xl:inline text-[10px] text-green-600">· ₫{formatPrice(currentShift.totalSales)}</span>
+                            </>
+                        ) : (
+                            "Mở ca"
+                        )}
+                    </button>
+
+                    {/* Notification bell */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setNotifOpen(!notifOpen)}
+                            className="relative rounded-lg border border-cream-300 bg-cream-50 p-1.5 text-cream-500 hover:text-green-700 hover:border-green-600 transition-all"
+                        >
+                            <Bell className="h-4 w-4" />
+                            {notifications.length > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
+                                    {notifications.length}
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Notification dropdown */}
+                        {notifOpen && (
+                            <div className="absolute right-0 top-10 z-50 w-80 rounded-xl border border-cream-200 bg-white shadow-xl">
+                                <div className="flex items-center justify-between px-4 py-2.5 border-b border-cream-200">
+                                    <span className="text-xs font-bold text-green-900">🔔 Thông báo</span>
+                                    {notifications.length > 0 && (
+                                        <button
+                                            onClick={async () => { await markAllAsRead(); refreshNotifications(); toast.success("Đã đọc tất cả") }}
+                                            className="text-[9px] text-blue-600 hover:underline"
+                                        >
+                                            Đánh dấu đã đọc
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="max-h-72 overflow-y-auto divide-y divide-cream-100">
+                                    {notifications.length === 0 ? (
+                                        <p className="text-center text-xs text-cream-400 py-6">Không có thông báo mới</p>
+                                    ) : notifications.slice(0, 8).map((n) => (
+                                        <div
+                                            key={n.id}
+                                            className={cn(
+                                                "px-4 py-2.5 cursor-pointer hover:bg-cream-50 transition-all",
+                                                !n.isRead && "bg-green-50/50"
+                                            )}
+                                            onClick={async () => { await markAsRead(n.id); refreshNotifications() }}
+                                        >
+                                            <div className="flex items-start gap-2">
+                                                <span className={cn(
+                                                    "mt-0.5 flex h-2 w-2 rounded-full shrink-0",
+                                                    n.priority === "CRITICAL" ? "bg-red-500" :
+                                                        n.priority === "WARNING" ? "bg-amber-500" : "bg-blue-400"
+                                                )} />
+                                                <div className="min-w-0">
+                                                    <p className="text-[11px] font-bold text-green-900 leading-tight">{n.title}</p>
+                                                    <p className="text-[10px] text-cream-500 mt-0.5 leading-snug">{n.message}</p>
+                                                    <p className="text-[9px] text-cream-400 mt-1">
+                                                        {new Date(n.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Category Tabs */}
+                <div className="flex items-center gap-1.5 overflow-x-auto border-b border-cream-300 bg-cream-100 px-4 py-2">
+                    <button
+                        onClick={() => setActiveCategory("all")}
+                        className={cn(
+                            "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                            activeCategory === "all"
+                                ? "bg-green-900 text-cream-50 shadow-sm"
+                                : "bg-cream-200 text-cream-500 hover:bg-cream-300 hover:text-green-900"
+                        )}
+                    >
+                        <Hash className="h-3 w-3" />
+                        Tất cả
+                    </button>
+                    {MOCK_CATEGORIES.filter((c) => c.isActive).map((cat) => (
+                        <button
+                            key={cat.id}
+                            onClick={() => setActiveCategory(cat.id)}
+                            className={cn(
+                                "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                                activeCategory === cat.id
+                                    ? "bg-green-900 text-cream-50 shadow-sm"
+                                    : "bg-cream-200 text-cream-500 hover:bg-cream-300 hover:text-green-900"
+                            )}
+                        >
+                            <span>{cat.icon}</span>
+                            {cat.name}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Product Grid */}
+                <div className="flex-1 overflow-y-auto p-4">
+                    {filteredProducts.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20">
+                            <Wine className="h-10 w-10 text-cream-300 mb-2" />
+                            <p className="text-sm text-cream-400">Không có sản phẩm</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-3 gap-3 xl:grid-cols-4 2xl:grid-cols-5">
+                            {filteredProducts.map((product) => {
+                                const displayPrice =
+                                    product.isByGlass && product.glassPrice
+                                        ? product.glassPrice
+                                        : product.sellPrice
+                                const inCart = cart.items.find(
+                                    (item) => item.product.id === product.id
+                                )
+                                const gs = glassStatuses[product.id]
+                                const is86 = product86Ids.includes(product.id)
+
+                                return (
+                                    <button
+                                        key={product.id}
+                                        onClick={() => handleAddToCart(product)}
+                                        onContextMenu={(e) => handleProductContextMenu(e, product)}
+                                        disabled={is86}
+                                        className={cn(
+                                            "group relative flex flex-col rounded-xl border bg-cream-100 p-3 text-left transition-all hover:shadow-md hover:border-green-600 active:scale-[0.97]",
+                                            is86 ? "opacity-40 border-red-300 cursor-not-allowed" :
+                                                inCart ? "border-green-600 ring-1 ring-green-600/30" : "border-cream-300"
+                                        )}
+                                    >
+                                        {/* 86 overlay */}
+                                        {is86 && (
+                                            <span className="absolute inset-0 flex items-center justify-center z-10">
+                                                <span className="rounded-lg bg-red-600 px-3 py-1 text-xs font-bold text-white rotate-[-12deg] shadow-lg">86 — HếT</span>
+                                            </span>
+                                        )}
+                                        {/* Badge — quantity in cart */}
+                                        {inCart && (
+                                            <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-green-700 text-[10px] font-bold text-cream-50">
+                                                {inCart.quantity}
+                                            </span>
+                                        )}
+
+                                        {/* Type badge */}
+                                        <div className="mb-2 flex items-center gap-1.5">
+                                            <span className="text-lg">
+                                                {product.type === "WINE_BOTTLE" ? "🍷" :
+                                                    product.type === "WINE_GLASS" ? "🥂" :
+                                                        product.type === "FOOD" ? "🍽️" :
+                                                            product.type === "DRINK" ? "🍸" : "📦"}
+                                            </span>
+                                            {product.isByGlass && gs && (
+                                                <Badge className={cn(
+                                                    "text-[9px] px-1.5 py-0",
+                                                    gs.glassesRemaining <= 2
+                                                        ? "bg-red-100 text-red-700"
+                                                        : gs.glassesRemaining <= 4
+                                                            ? "bg-amber-100 text-amber-700"
+                                                            : "bg-green-100 text-green-700"
+                                                )}>
+                                                    {gs.glassesRemaining}/{gs.glassesTotal} ly
+                                                </Badge>
+                                            )}
+                                            {product.isByGlass && !gs && (
+                                                <Badge className="bg-green-100 text-green-700 text-[9px] px-1.5 py-0">
+                                                    By Glass
+                                                </Badge>
+                                            )}
+                                            {product.type === "WINE_BOTTLE" && gs && (
+                                                <Badge className="bg-cream-200 text-cream-600 text-[9px] px-1.5 py-0">
+                                                    {gs.bottlesInStock} chai
+                                                </Badge>
+                                            )}
+                                        </div>
+
+                                        {/* Name */}
+                                        <h3 className="text-sm font-semibold text-green-900 leading-tight line-clamp-2">
+                                            {product.name}
+                                        </h3>
+                                        {product.nameVi && (
+                                            <p className="mt-0.5 text-[10px] text-cream-400 line-clamp-1">
+                                                {product.nameVi}
+                                            </p>
+                                        )}
+                                        {product.vintage && (
+                                            <p className="text-[10px] text-cream-400">
+                                                {product.vintage} · {product.country}
+                                            </p>
+                                        )}
+
+                                        {/* Price */}
+                                        <div className="mt-auto pt-2">
+                                            <span className="font-mono text-sm font-bold text-green-900">
+                                                ₫{formatPrice(displayPrice)}
+                                            </span>
+                                            {product.isByGlass && product.glassPrice && (
+                                                <span className="ml-1 text-[10px] text-cream-400">/ly</span>
+                                            )}
+                                        </div>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ============ RIGHT: Cart ============ */}
+            <div className="flex w-[340px] flex-col border-l border-cream-300 bg-cream-100">
+                {/* Cart Header */}
+                <div className="flex items-center justify-between border-b border-cream-300 px-4 py-3">
+                    <div className="flex items-center gap-2">
+                        <Receipt className="h-4 w-4 text-green-700" />
+                        <h2 className="font-display text-sm font-bold text-green-900">
+                            Đơn hàng
+                        </h2>
+                        {cart.itemCount() > 0 && (
+                            <Badge className="bg-green-700 text-cream-50 text-[10px] px-1.5 py-0">
+                                {cart.itemCount()}
+                            </Badge>
+                        )}
+                    </div>
+                    {cart.items.length > 0 && (
+                        <button
+                            onClick={() => {
+                                cart.clearCart()
+                                toast("Đã xóa đơn hàng")
+                            }}
+                            className="rounded-md p-1 text-cream-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Cart Items */}
+                <div className="flex-1 overflow-y-auto">
+                    {cart.items.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-cream-400">
+                            <ShoppingCart className="h-8 w-8 mb-2" />
+                            <p className="text-xs">Chưa có sản phẩm</p>
+                            <p className="text-[10px] mt-1">Chọn sản phẩm bên trái</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-cream-300">
+                            {cart.items.map((item) => (
+                                <div key={item.id} className="px-4 py-2.5 group">
+                                    <div className="flex items-start gap-2">
+                                        {/* Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-semibold text-green-900 truncate">
+                                                {item.product.name}
+                                            </p>
+                                            <p className="font-mono text-[10px] text-cream-400">
+                                                ₫{formatPrice(item.unitPrice)} × {item.quantity}
+                                            </p>
+                                            {item.note && (
+                                                <p className="mt-0.5 text-[10px] text-wine-600 italic">
+                                                    📝 {item.note}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Line total */}
+                                        <span className="font-mono text-xs font-bold text-green-900 whitespace-nowrap">
+                                            ₫{formatPrice(item.unitPrice * item.quantity)}
+                                        </span>
+                                    </div>
+
+                                    {/* Qty controls */}
+                                    <div className="mt-1.5 flex items-center gap-1">
+                                        <button
+                                            onClick={() => cart.updateQuantity(item.id, item.quantity - 1)}
+                                            className="rounded-md border border-cream-300 p-1 hover:bg-cream-200 transition-all"
+                                        >
+                                            <Minus className="h-3 w-3 text-cream-500" />
+                                        </button>
+                                        <span className="w-6 text-center font-mono text-xs font-bold text-green-900">
+                                            {item.quantity}
+                                        </span>
+                                        <button
+                                            onClick={() => cart.updateQuantity(item.id, item.quantity + 1)}
+                                            className="rounded-md border border-cream-300 p-1 hover:bg-cream-200 transition-all"
+                                        >
+                                            <Plus className="h-3 w-3 text-cream-500" />
+                                        </button>
+
+                                        {/* Note button */}
+                                        <button
+                                            onClick={() => {
+                                                setNoteItemId(item.id)
+                                                setNoteText(item.note ?? "")
+                                            }}
+                                            className="ml-auto rounded-md p-1 text-cream-400 hover:text-green-700 hover:bg-cream-200 transition-all"
+                                        >
+                                            <MessageSquare className="h-3 w-3" />
+                                        </button>
+
+                                        {/* Delete */}
+                                        <button
+                                            onClick={() => cart.removeItem(item.id)}
+                                            className="rounded-md p-1 text-cream-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </button>
+                                    </div>
+
+                                    {/* Inline note input */}
+                                    {noteItemId === item.id && (
+                                        <div className="mt-2 flex gap-1">
+                                            <Input
+                                                value={noteText}
+                                                onChange={(e) => setNoteText(e.target.value)}
+                                                placeholder="Ghi chú..."
+                                                className="h-7 text-xs border-cream-300"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") handleNoteSubmit(item.id)
+                                                    if (e.key === "Escape") setNoteItemId(null)
+                                                }}
+                                                autoFocus
+                                            />
+                                            <Button
+                                                onClick={() => handleNoteSubmit(item.id)}
+                                                size="sm"
+                                                className="h-7 px-2 bg-green-700 text-cream-50 text-xs"
+                                            >
+                                                OK
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Cart Footer — Totals + Actions */}
+                {cart.items.length > 0 && (
+                    <div className="border-t border-cream-300 bg-cream-50">
+                        {/* Summary */}
+                        <div className="px-4 py-3 space-y-1">
+                            <div className="flex justify-between text-xs text-cream-500">
+                                <span>Tạm tính ({cart.itemCount()} items)</span>
+                                <span className="font-mono">₫{formatPrice(cart.subtotal())}</span>
+                            </div>
+                            {serviceCharge > 0 && (
+                                <div className="flex justify-between text-xs text-cream-500">
+                                    <span>Phí dịch vụ (5%)</span>
+                                    <span className="font-mono">₫{formatPrice(serviceCharge)}</span>
+                                </div>
+                            )}
+                            {discountPct > 0 && (
+                                <div className="flex justify-between text-xs text-green-600">
+                                    <span>Giảm giá ({discountPct}%)</span>
+                                    <span className="font-mono">-₫{formatPrice(Math.round(cart.subtotal() * discountPct / 100))}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between text-sm font-bold text-green-900 pt-1 border-t border-cream-200">
+                                <span>Tổng cộng</span>
+                                <span className="font-mono text-lg">₫{formatPrice(Math.round(cart.subtotal() * (1 - discountPct / 100)) + serviceCharge)}</span>
+                            </div>
+                        </div>
+
+                        {/* Quick Cash + Hold + Discount */}
+                        <div className="flex items-center gap-1 px-4 pb-1.5">
+                            <span className="text-[9px] font-bold uppercase text-cream-400 mr-1">Nhanh:</span>
+                            {[100000, 200000, 500000].map((amt) => (
+                                <button
+                                    key={amt}
+                                    onClick={() => handleCheckout("CASH")}
+                                    className="rounded-md bg-cream-200 px-2 py-1 text-[9px] font-mono font-bold text-cream-600 hover:bg-green-100 hover:text-green-800 transition-all"
+                                >
+                                    {amt >= 1000000 ? `${amt / 1000000}M` : `${amt / 1000}K`}
+                                </button>
+                            ))}
+                            <button
+                                onClick={handleHoldOrder}
+                                className="ml-auto rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700 hover:bg-amber-100 transition-all flex items-center gap-0.5"
+                            >
+                                <Pause className="h-2.5 w-2.5" /> Giữ
+                            </button>
+                            <button
+                                onClick={() => setDiscountModalOpen(true)}
+                                className="rounded-md border border-cream-300 bg-cream-100 px-2 py-1 text-[9px] font-bold text-cream-600 hover:border-green-600 hover:text-green-700 transition-all flex items-center gap-0.5"
+                            >
+                                <Percent className="h-2.5 w-2.5" /> Giảm
+                            </button>
+                        </div>
+
+                        {/* Held Orders Quick List */}
+                        {heldOrders.length > 0 && (
+                            <div className="px-4 pb-1.5">
+                                <div className="flex flex-wrap gap-1">
+                                    {heldOrders.map((h) => (
+                                        <button
+                                            key={h.id}
+                                            onClick={() => handleRecallHeld(h.id)}
+                                            className="flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-medium text-blue-700 hover:bg-blue-100 transition-all"
+                                        >
+                                            <Play className="h-2 w-2" />
+                                            {h.label} · ₫{formatPrice(h.subtotal)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Payment Buttons */}
+                        <div className="grid grid-cols-3 gap-2 px-4 pb-2">
+                            <button
+                                onClick={() => handleCheckout("CASH")}
+                                disabled={isSubmitting}
+                                className="flex flex-col items-center gap-1 rounded-xl border border-cream-300 bg-cream-100 py-2.5 text-[10px] font-medium text-cream-500 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
+                            >
+                                <Banknote className="h-4 w-4" />
+                                Tiền mặt
+                            </button>
+                            <button
+                                onClick={() => handleCheckout("CARD")}
+                                disabled={isSubmitting}
+                                className="flex flex-col items-center gap-1 rounded-xl border border-cream-300 bg-cream-100 py-2.5 text-[10px] font-medium text-cream-500 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
+                            >
+                                <CreditCard className="h-4 w-4" />
+                                Thẻ
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (cart.items.length === 0) { toast.error("Giỏ hàng trống"); return }
+                                    setQrLoading(true)
+                                    try {
+                                        const config = await getBankConfig()
+                                        setQrBankConfig(config)
+                                        const orderNum = `ORD-${Date.now().toString().slice(-6)}`
+                                        const result = await generateQRPayment({
+                                            orderId: orderNum,
+                                            amount: cart.subtotal(),
+                                            description: `${orderNum} NoonNoir`,
+                                        })
+                                        if (result.success && result.data) {
+                                            setQrPayment(result.data)
+                                            setQrModalOpen(true)
+                                        }
+                                    } catch { toast.error("Lỗi tạo QR") }
+                                    setQrLoading(false)
+                                }}
+                                disabled={isSubmitting || qrLoading}
+                                className="flex flex-col items-center gap-1 rounded-xl border border-cream-300 bg-cream-100 py-2.5 text-[10px] font-medium text-cream-500 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
+                            >
+                                <QrCode className="h-4 w-4" />
+                                {qrLoading ? "Đang tạo..." : "QR Pay"}
+                            </button>
+                        </div>
+
+                        {/* Add to Tab */}
+                        {activeTabs.length > 0 && (
+                            <div className="px-4 pb-1">
+                                <div className="grid grid-cols-1 gap-1">
+                                    {activeTabs.slice(0, 2).map((tab) => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => handleAddToTab(tab.id)}
+                                            disabled={isSubmitting}
+                                            className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 transition-all disabled:opacity-50"
+                                        >
+                                            <TabIcon className="h-3 w-3" />
+                                            <span className="truncate">→ Tab {tab.customer.fullName.split(' ').pop()}</span>
+                                            <span className="ml-auto font-mono text-[10px] text-amber-600">
+                                                ₫{formatPrice(tab.currentTotal)}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Active order indicator */}
+                        {activeOrderId && cart.selectedTable && (
+                            <div className="mx-4 mb-2 rounded-lg bg-wine-50 border border-wine-200 px-3 py-2 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] font-bold text-wine-700">🍽 Thêm món vào bàn {cart.selectedTable.tableNumber}</p>
+                                    <p className="text-[9px] text-wine-500">Các món mới sẽ được thêm vào đơn hiện tại</p>
+                                </div>
+                                <button onClick={() => { setActiveOrderId(null); cart.clearCart() }} className="text-[10px] text-wine-400 hover:text-wine-700 font-medium">Hủy</button>
+                            </div>
+                        )}
+
+                        {/* Send to Kitchen */}
+                        <div className="px-4 pb-3">
+                            <Button
+                                onClick={sendToKitchen}
+                                disabled={isSubmitting}
+                                className={cn(
+                                    "w-full font-semibold disabled:opacity-70",
+                                    activeOrderId
+                                        ? "bg-wine-700 text-white hover:bg-wine-600"
+                                        : "bg-green-900 text-cream-50 hover:bg-green-800"
+                                )}
+                                size="lg"
+                            >
+                                {isSubmitting ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Receipt className="mr-2 h-4 w-4" />
+                                )}
+                                {isSubmitting
+                                    ? "Đang gửi..."
+                                    : activeOrderId
+                                        ? `➕ Thêm ${cart.itemCount()} món · ₫${formatPrice(cart.subtotal())}`
+                                        : `🍳 Gửi bếp · ₫${formatPrice(cart.subtotal())}`}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* 86 Context Menu */}
+            {contextMenu && (
+                <>
+                    <div className="fixed inset-0 z-50" onClick={() => setContextMenu(null)} />
+                    <div
+                        className="fixed z-50 min-w-[180px] rounded-xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden"
+                        style={{ left: contextMenu.x, top: contextMenu.y }}
+                    >
+                        <div className="px-3 py-2 border-b border-cream-200 bg-cream-100">
+                            <p className="text-[10px] font-bold text-green-900 truncate">{contextMenu.product.name}</p>
+                        </div>
+                        <button
+                            onClick={() => handle86Toggle(contextMenu.product)}
+                            className={cn(
+                                "w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium transition-all",
+                                product86Ids.includes(contextMenu.product.id)
+                                    ? "text-green-700 hover:bg-green-50"
+                                    : "text-red-700 hover:bg-red-50"
+                            )}
+                        >
+                            {product86Ids.includes(contextMenu.product.id) ? (
+                                <><span>✅</span> Mở lại — bỏ 86</>
+                            ) : (
+                                <><span>🚫</span> Đánh dấu 86 — Hết</>
+                            )}
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {/* Table Selector Modal */}
+            <TableSelector
+                open={tableModalOpen}
+                onClose={() => setTableModalOpen(false)}
+                onSelect={(table) => { cart.selectTable(table); setActiveOrderId(null) }}
+                onSelectOccupied={(table, order) => {
+                    cart.selectTable(table)
+                    setActiveOrderId(order.id)
+                    toast.info(`🍽 Bàn ${table.tableNumber} — thêm món vào đơn ${order.orderNumber}`)
+                }}
+            />
+
+            {/* Open Tab Modal */}
+            {openTabModal && (
+                <OpenTabModal
+                    activeTabs={activeTabs}
+                    onClose={() => setOpenTabModal(false)}
+                    onTabOpened={() => { setOpenTabModal(false); refreshTabs() }}
+                    onViewTab={(id) => { setOpenTabModal(false); setTabDetailModal(id) }}
+                    staffId={staff?.id ?? "unknown"}
+                    staffName={staff?.fullName ?? "Staff"}
+                />
+            )}
+
+            {/* Tab Detail Modal */}
+            {tabDetailModal && (
+                <TabDetailModal
+                    tabId={tabDetailModal}
+                    onClose={() => { setTabDetailModal(null); refreshTabs() }}
+                />
+            )}
+
+            {/* Shift Modal */}
+            {shiftModalOpen && (
+                <ShiftModal
+                    currentShift={currentShift}
+                    staffId={staff?.id ?? "unknown"}
+                    staffName={staff?.fullName ?? "Staff"}
+                    staffRole={staff?.role ?? "OWNER"}
+                    onClose={() => setShiftModalOpen(false)}
+                    onShiftChange={() => { setShiftModalOpen(false); refreshShift() }}
+                />
+            )}
+
+            {/* Success Flash */}
+            {lastOrder && (
+                <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right fade-in duration-300">
+                    <div className="flex items-center gap-3 rounded-xl border border-green-300 bg-green-50 px-4 py-3 shadow-lg">
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        <div>
+                            <p className="text-sm font-bold text-green-900">{lastOrder.orderNumber}</p>
+                            <p className="font-mono text-xs text-green-600">₫{formatPrice(lastOrder.total)}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============ QR Payment Modal ============ */}
+            {qrModalOpen && qrPayment && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                    <div className="w-[380px] rounded-2xl border border-cream-300 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="bg-green-900 text-cream-50 px-5 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <QrCode className="h-5 w-5" />
+                                <span className="font-display text-sm font-bold">Thanh toán QR</span>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    if (qrPayment) await cancelQRPayment(qrPayment.id)
+                                    setQrModalOpen(false)
+                                    setQrPayment(null)
+                                }}
+                                className="text-cream-300 hover:text-white transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {/* Bank Info */}
+                        {qrBankConfig && (
+                            <div className="px-5 py-3 border-b border-cream-200 bg-cream-50">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-lg">{qrBankConfig.bankLogo}</span>
+                                    <span className="text-xs font-bold text-green-900">{qrBankConfig.bankName}</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-1 text-[10px] text-cream-500">
+                                    <span>STK: <span className="font-mono font-bold text-green-800">{qrBankConfig.accountNumber}</span></span>
+                                    <span>Chủ TK: <span className="font-bold text-green-800">{qrBankConfig.accountName}</span></span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* QR Code */}
+                        <div className="px-5 py-4 flex flex-col items-center">
+                            <div className="rounded-xl border-2 border-green-200 bg-white p-2 shadow-inner">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={qrPayment.qrDataUrl}
+                                    alt="VietQR Code"
+                                    className="w-52 h-52 object-contain"
+                                />
+                            </div>
+                            <div className="mt-3 text-center">
+                                <p className="text-[10px] text-cream-400">Số tiền thanh toán</p>
+                                <p className="font-mono text-2xl font-bold text-green-800">₫{new Intl.NumberFormat("vi-VN").format(qrPayment.amount)}</p>
+                                <p className="text-[10px] text-cream-400 mt-1">Nội dung: <span className="font-mono font-bold">{qrPayment.description}</span></p>
+                            </div>
+                            <div className="mt-2 text-[9px] text-cream-400 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Hết hạn: {new Date(qrPayment.expiresAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="px-5 pb-4 flex gap-2">
+                            <button
+                                onClick={async () => {
+                                    if (qrPayment) await cancelQRPayment(qrPayment.id)
+                                    setQrModalOpen(false)
+                                    setQrPayment(null)
+                                }}
+                                className="flex-1 rounded-xl border border-cream-300 py-2.5 text-xs font-medium text-cream-500 hover:bg-cream-100 transition-all"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (qrPayment) {
+                                        await confirmQRPayment(qrPayment.id)
+                                        setQrModalOpen(false)
+                                        setQrPayment(null)
+                                        await handleCheckout("QR")
+                                    }
+                                }}
+                                disabled={isSubmitting}
+                                className="flex-1 rounded-xl bg-green-700 py-2.5 text-xs font-bold text-white hover:bg-green-800 transition-all disabled:opacity-50 flex items-center justify-center gap-1"
+                            >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Xác nhận đã nhận tiền
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============ Discount Authorization Modal ============ */}
+            {discountModalOpen && (
+                <DiscountAuthModal
+                    subtotal={cart.subtotal()}
+                    staffId={staff?.id ?? "unknown"}
+                    staffName={staff?.fullName ?? "Staff"}
+                    onClose={() => setDiscountModalOpen(false)}
+                    onAuthorized={(pct: number) => {
+                        setDiscountPct(pct)
+                        setDiscountModalOpen(false)
+                        toast.success(`✅ Giảm giá ${pct}% đã được duyệt`)
+                    }}
+                />
+            )}
+
+            {/* ============ Upcoming Reservations Indicator ============ */}
+            {upcomingReservations.length > 0 && (
+                <div className="fixed bottom-4 left-4 z-40">
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 shadow-lg px-4 py-2.5 max-w-xs">
+                        <div className="flex items-center gap-2 mb-1.5">
+                            <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+                            <span className="text-[10px] font-bold uppercase text-blue-700">Đặt bàn sắp tới</span>
+                            <Badge className="bg-blue-600 text-white text-[8px] px-1 py-0">{upcomingReservations.length}</Badge>
+                        </div>
+                        <div className="space-y-1">
+                            {upcomingReservations.slice(0, 3).map((r) => (
+                                <div key={r.id} className="flex items-center gap-2 text-[10px]">
+                                    <span className="font-mono font-bold text-blue-800">{r.time}</span>
+                                    <span className="text-blue-600 truncate">{r.customerName}</span>
+                                    <span className="text-blue-400">{r.guestCount}👤</span>
+                                    {r.tableNumber && <span className="font-bold text-blue-700">{r.tableNumber}</span>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ============================================================
+// OPEN TAB MODAL — List tabs + Create new tab
+// ============================================================
+
+function OpenTabModal({
+    activeTabs,
+    onClose,
+    onTabOpened,
+    onViewTab,
+    staffId,
+    staffName,
+}: {
+    activeTabs: CustomerTab[]
+    onClose: () => void
+    onTabOpened: () => void
+    onViewTab: (id: string) => void
+    staffId: string
+    staffName: string
+}) {
+    const [mode, setMode] = useState<"list" | "create">("list")
+    const [search, setSearch] = useState("")
+    const [customers, setCustomers] = useState<Customer[]>([])
+    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+    const [tabLimit, setTabLimit] = useState("")
+    const [notes, setNotes] = useState("")
+    const [newName, setNewName] = useState("")
+    const [newPhone, setNewPhone] = useState("")
+    const [loading, setLoading] = useState(false)
+
+    const handleSearch = useCallback(async (q: string) => {
+        setSearch(q)
+        const results = await searchCustomers(q)
+        setCustomers(results)
+    }, [])
+
+    useEffect(() => {
+        handleSearch("")
+    }, [handleSearch])
+
+    const handleOpenTab = async () => {
+        if (!selectedCustomer) return
+        setLoading(true)
+        const result = await openTab({
+            customerId: selectedCustomer.id,
+            staffId,
+            staffName,
+            tabLimit: tabLimit ? parseInt(tabLimit) : undefined,
+            notes: notes || undefined,
+        })
+        if (result.success) {
+            toast.success(`🍷 Mở tab: ${selectedCustomer.fullName}`, {
+                description: `Limit: ₫${formatPrice(result.data!.tabLimit)}`,
+            })
+            onTabOpened()
+        } else {
+            toast.error(result.error?.message)
+        }
+        setLoading(false)
+    }
+
+    const handleCreateCustomer = async () => {
+        if (!newName) return
+        setLoading(true)
+        const result = await createQuickCustomer({ fullName: newName, phone: newPhone || undefined })
+        if (result.success && result.data) {
+            setSelectedCustomer(result.data)
+            setMode("list")
+            toast.success(`Đã tạo khách: ${result.data.fullName}`)
+            handleSearch("")
+        }
+        setLoading(false)
+    }
+
+    const tierColors: Record<string, string> = {
+        REGULAR: "bg-cream-200 text-cream-600",
+        SILVER: "bg-gray-200 text-gray-700",
+        GOLD: "bg-amber-100 text-amber-700",
+        PLATINUM: "bg-purple-100 text-purple-700",
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-[560px] max-h-[85vh] rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-cream-300 px-5 py-4">
+                    <div>
+                        <h2 className="font-display text-lg font-bold text-green-900">Customer Tab</h2>
+                        <p className="text-xs text-cream-500">
+                            {activeTabs.length > 0 ? `${activeTabs.length} tab đang mở` : "Mở tab uống trước trả sau"}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="rounded-lg p-2 hover:bg-cream-200 transition-all">
+                        <X className="h-4 w-4 text-cream-500" />
+                    </button>
+                </div>
+
+                {/* Active Tabs List */}
+                {activeTabs.length > 0 && (
+                    <div className="border-b border-cream-200 px-5 py-3 space-y-2">
+                        <p className="text-[10px] font-semibold text-green-900 uppercase">Tab đang mở</p>
+                        {activeTabs.map((tab) => {
+                            const pct = Math.round((tab.currentTotal / tab.tabLimit) * 100)
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => onViewTab(tab.id)}
+                                    className="flex items-center gap-3 w-full rounded-lg border border-cream-200 bg-cream-100 px-3 py-2.5 hover:border-green-600 transition-all text-left"
+                                >
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+                                        <User className="h-4 w-4 text-amber-700" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-semibold text-green-900 truncate">
+                                            {tab.customer.fullName}
+                                        </p>
+                                        <p className="text-[10px] text-cream-500">
+                                            {tab.items.length} món · mở lúc {tab.openedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-mono text-xs font-bold text-green-900">₫{formatPrice(tab.currentTotal)}</p>
+                                        <div className="mt-0.5 h-1.5 w-16 rounded-full bg-cream-200 overflow-hidden">
+                                            <div
+                                                className={cn(
+                                                    "h-full rounded-full transition-all",
+                                                    pct > 80 ? "bg-red-500" : pct > 50 ? "bg-amber-500" : "bg-green-500"
+                                                )}
+                                                style={{ width: `${Math.min(pct, 100)}%` }}
+                                            />
+                                        </div>
+                                        <p className={cn("text-[9px] font-medium mt-0.5", pct > 80 ? "text-red-600" : "text-cream-400")}>
+                                            {pct}% limit
+                                        </p>
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
+
+                {/* Create Tab Section */}
+                <div className="flex-1 overflow-y-auto px-5 py-4">
+                    {mode === "list" ? (
+                        <>
+                            <p className="text-[10px] font-semibold text-green-900 uppercase mb-2">Mở tab mới — Chọn khách</p>
+
+                            {/* Customer Search */}
+                            <div className="relative mb-3">
+                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-400" />
+                                <Input
+                                    value={search}
+                                    onChange={(e) => handleSearch(e.target.value)}
+                                    placeholder="Tìm tên, SĐT, email..."
+                                    className="h-8 pl-8 text-xs border-cream-300"
+                                />
+                            </div>
+
+                            {/* Customer List */}
+                            <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                                {customers.map((c) => (
+                                    <button
+                                        key={c.id}
+                                        onClick={() => setSelectedCustomer(c)}
+                                        className={cn(
+                                            "flex items-center gap-3 w-full rounded-lg border px-3 py-2 text-left transition-all",
+                                            selectedCustomer?.id === c.id
+                                                ? "border-green-600 bg-green-50 ring-1 ring-green-600/30"
+                                                : "border-cream-200 bg-cream-100 hover:border-green-400"
+                                        )}
+                                    >
+                                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-cream-200">
+                                            <User className="h-3.5 w-3.5 text-cream-500" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-xs font-semibold text-green-900">{c.fullName}</span>
+                                                <span className={cn("rounded px-1 py-0 text-[8px] font-bold", tierColors[c.tier])}>
+                                                    {c.tier}
+                                                </span>
+                                            </div>
+                                            <p className="text-[10px] text-cream-400">
+                                                {c.phone ?? "Chưa có SĐT"} · {c.visitCount} lần ghé
+                                            </p>
+                                        </div>
+                                        {selectedCustomer?.id === c.id && (
+                                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Quick Create Customer */}
+                            <button
+                                onClick={() => setMode("create")}
+                                className="flex items-center gap-2 w-full mt-2 rounded-lg border border-dashed border-cream-300 px-3 py-2 text-xs text-cream-500 hover:border-green-600 hover:text-green-700 transition-all"
+                            >
+                                <UserPlus className="h-3.5 w-3.5" />
+                                Tạo khách mới nhanh
+                            </button>
+
+                            {/* Selected Customer → Set Limit */}
+                            {selectedCustomer && (
+                                <div className="mt-3 rounded-lg bg-green-50 border border-green-200 p-3 space-y-2">
+                                    <p className="text-xs font-semibold text-green-900">
+                                        Mở tab cho: {selectedCustomer.fullName}
+                                        {selectedCustomer.tier !== "REGULAR" && (
+                                            <Star className="inline h-3 w-3 ml-1 text-amber-500" />
+                                        )}
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <div className="flex-1">
+                                            <label className="text-[10px] text-green-700 mb-0.5 block">Tab limit (₫)</label>
+                                            <Input
+                                                type="number"
+                                                value={tabLimit}
+                                                onChange={(e) => setTabLimit(e.target.value)}
+                                                placeholder="Mặc định theo tier"
+                                                className="h-7 text-xs border-green-200"
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[10px] text-green-700 mb-0.5 block">Ghi chú</label>
+                                            <Input
+                                                value={notes}
+                                                onChange={(e) => setNotes(e.target.value)}
+                                                placeholder="VD: tiệc sinh nhật"
+                                                className="h-7 text-xs border-green-200"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        /* Quick Create Customer */
+                        <div className="space-y-3">
+                            <p className="text-[10px] font-semibold text-green-900 uppercase">Tạo khách mới nhanh</p>
+                            <Input
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                placeholder="Tên khách hàng *"
+                                className="h-8 text-xs border-cream-300"
+                                autoFocus
+                            />
+                            <Input
+                                value={newPhone}
+                                onChange={(e) => setNewPhone(e.target.value)}
+                                placeholder="Số điện thoại"
+                                className="h-8 text-xs border-cream-300"
+                            />
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setMode("list")}
+                                    className="flex-1 text-xs h-8 border-cream-300"
+                                >
+                                    Quay lại
+                                </Button>
+                                <Button
+                                    onClick={handleCreateCustomer}
+                                    disabled={!newName || loading}
+                                    className="flex-1 bg-green-900 text-cream-50 hover:bg-green-800 text-xs h-8"
+                                >
+                                    {loading ? "Đang tạo..." : "Tạo & chọn"}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                {mode === "list" && (
+                    <div className="border-t border-cream-300 px-5 py-3 flex gap-2">
+                        <Button variant="outline" onClick={onClose} className="flex-1 text-xs h-9 border-cream-300">
+                            Đóng
+                        </Button>
+                        <Button
+                            onClick={handleOpenTab}
+                            disabled={!selectedCustomer || loading}
+                            className="flex-1 bg-green-900 text-cream-50 hover:bg-green-800 text-xs h-9"
+                        >
+                            {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <TabIcon className="mr-1.5 h-3.5 w-3.5" />}
+                            {loading ? "Đang mở..." : "Mở Tab"}
+                        </Button>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ============================================================
+// TAB DETAIL MODAL — View items, close tab
+// ============================================================
+
+function TabDetailModal({
+    tabId,
+    onClose,
+}: {
+    tabId: string
+    onClose: () => void
+}) {
+    const [tab, setTab] = useState<CustomerTab | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [closing, setClosing] = useState(false)
+
+    useEffect(() => {
+        (async () => {
+            const { getTabById } = await import("@/actions/tabs")
+            const data = await getTabById(tabId)
+            setTab(data)
+            setLoading(false)
+        })()
+    }, [tabId])
+
+    const handleRemoveItem = async (itemId: string) => {
+        const result = await removeTabItem({ tabId, itemId })
+        if (result.success && result.data) {
+            setTab(result.data)
+            toast.success("Đã xoá item")
+        }
+    }
+
+    const handleCloseTab = async (method: string) => {
+        setClosing(true)
+        const result = await closeTab({ tabId, paymentMethod: method })
+        if (result.success) {
+            toast.success(`✅ Đã đóng tab: ₫${formatPrice(result.data!.currentTotal)}`, {
+                description: `${result.data!.customer.fullName} · ${method}`,
+            })
+            onClose()
+        } else {
+            toast.error(result.error?.message)
+        }
+        setClosing(false)
+    }
+
+    if (loading) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div className="rounded-xl bg-cream-50 p-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-green-700" />
+                </div>
+            </div>
+        )
+    }
+
+    if (!tab) return null
+
+    const pct = Math.round((tab.currentTotal / tab.tabLimit) * 100)
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-[520px] max-h-[85vh] rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-cream-300 px-5 py-4">
+                    <div>
+                        <h2 className="font-display text-lg font-bold text-green-900">
+                            Tab: {tab.customer.fullName}
+                        </h2>
+                        <p className="text-xs text-cream-500">
+                            Mở lúc {tab.openedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                            {" · "}bởi {tab.openedByName}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="rounded-lg p-2 hover:bg-cream-200 transition-all">
+                        <X className="h-4 w-4 text-cream-500" />
+                    </button>
+                </div>
+
+                {/* Summary Bar */}
+                <div className="px-5 py-3 border-b border-cream-200 flex items-center gap-4">
+                    <div className="flex-1">
+                        <p className="text-[10px] text-cream-500">Tổng tab</p>
+                        <p className="font-mono text-lg font-bold text-green-900">₫{formatPrice(tab.currentTotal)}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] text-cream-500">Limit</p>
+                        <p className="font-mono text-xs text-cream-500">₫{formatPrice(tab.tabLimit)}</p>
+                    </div>
+                    <div className="w-20">
+                        <div className="h-2 rounded-full bg-cream-200 overflow-hidden">
+                            <div
+                                className={cn(
+                                    "h-full rounded-full",
+                                    pct > 80 ? "bg-red-500" : pct > 50 ? "bg-amber-500" : "bg-green-500"
+                                )}
+                                style={{ width: `${Math.min(pct, 100)}%` }}
+                            />
+                        </div>
+                        <p className={cn("text-[10px] text-center mt-0.5 font-medium", pct > 80 ? "text-red-600" : "text-cream-400")}>
+                            {pct}%
+                        </p>
+                    </div>
+                </div>
+
+                {/* Items */}
+                <div className="flex-1 overflow-y-auto">
+                    {tab.items.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-cream-400">
+                            <ShoppingCart className="h-8 w-8 mb-2" />
+                            <p className="text-xs">Tab chưa có item nào</p>
+                            <p className="text-[10px] mt-1">Thêm từ giỏ hàng POS</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-cream-200">
+                            {tab.items.map((item) => (
+                                <div key={item.id} className="flex items-center gap-3 px-5 py-2.5">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-semibold text-green-900 truncate">{item.productName}</p>
+                                        <p className="text-[10px] text-cream-400">
+                                            ₫{formatPrice(item.unitPrice)} × {item.quantity}
+                                            {item.tableNumber && ` · ${item.tableNumber}`}
+                                            {" · "}{item.addedAt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                                        </p>
+                                    </div>
+                                    <span className="font-mono text-xs font-bold text-green-900">
+                                        ₫{formatPrice(item.subtotal)}
+                                    </span>
+                                    <button
+                                        onClick={() => handleRemoveItem(item.id)}
+                                        className="rounded-md p-1 text-cream-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                                    >
+                                        <Trash2 className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Close Tab Footer */}
+                {tab.items.length > 0 && tab.status !== "CLOSED" && (
+                    <div className="border-t border-cream-300 px-5 py-3">
+                        <p className="text-[10px] font-semibold text-green-900 mb-2">Đóng tab & thanh toán</p>
+                        <div className="grid grid-cols-3 gap-2">
+                            <button
+                                onClick={() => handleCloseTab("CASH")}
+                                disabled={closing}
+                                className="flex flex-col items-center gap-1 rounded-xl border border-cream-300 bg-cream-100 py-2.5 text-[10px] font-medium text-cream-500 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
+                            >
+                                <Banknote className="h-4 w-4" />
+                                Tiền mặt
+                            </button>
+                            <button
+                                onClick={() => handleCloseTab("CARD")}
+                                disabled={closing}
+                                className="flex flex-col items-center gap-1 rounded-xl border border-cream-300 bg-cream-100 py-2.5 text-[10px] font-medium text-cream-500 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
+                            >
+                                <CreditCard className="h-4 w-4" />
+                                Thẻ
+                            </button>
+                            <button
+                                onClick={() => handleCloseTab("QR")}
+                                disabled={closing}
+                                className="flex flex-col items-center gap-1 rounded-xl border border-cream-300 bg-cream-100 py-2.5 text-[10px] font-medium text-cream-500 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
+                            >
+                                <QrCode className="h-4 w-4" />
+                                QR Pay
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {tab.status === "CLOSED" && (
+                    <div className="border-t border-green-200 bg-green-50 px-5 py-3 text-center">
+                        <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto mb-1" />
+                        <p className="text-xs font-semibold text-green-700">Tab đã đóng</p>
+                        <p className="text-[10px] text-green-600">
+                            {tab.closedAt?.toLocaleString("vi-VN")}
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ============================================================
+// SHIFT MODAL — Open/Close shift + Cash reconciliation
+// ============================================================
+
+function ShiftModal({
+    currentShift,
+    staffId,
+    staffName,
+    staffRole,
+    onClose,
+    onShiftChange,
+}: {
+    currentShift: Shift | null
+    staffId: string
+    staffName: string
+    staffRole: string
+    onClose: () => void
+    onShiftChange: () => void
+}) {
+    const [openingCash, setOpeningCash] = useState("")
+    const [closingCash, setClosingCash] = useState("")
+    const [closeNotes, setCloseNotes] = useState("")
+    const [expenseDesc, setExpenseDesc] = useState("")
+    const [expenseAmount, setExpenseAmount] = useState("")
+    const [loading, setLoading] = useState(false)
+    const [showClose, setShowClose] = useState(false)
+
+    const handleOpenShift = async () => {
+        if (!openingCash) { toast.error("Nhập quỹ mở ca"); return }
+        setLoading(true)
+        const result = await openShift({
+            staffId,
+            staffName,
+            staffRole,
+            openingCash: parseInt(openingCash),
+        })
+        setLoading(false)
+        if (result.success) {
+            toast.success(`✅ Mở ca thành công — Quỹ: ₫${formatPrice(parseInt(openingCash))}`)
+            onShiftChange()
+        } else {
+            toast.error(result.error ?? "Không thể mở ca")
+        }
+    }
+
+    const handleCloseShift = async () => {
+        if (!currentShift) return
+        if (!closingCash) { toast.error("Nhập tiền mặt thực tế cuối ca"); return }
+        setLoading(true)
+        const result = await closeShift({
+            shiftId: currentShift.id,
+            closingCash: parseInt(closingCash),
+            notes: closeNotes || undefined,
+        })
+        setLoading(false)
+        if (result.success && result.data) {
+            const diff = result.data.cashDifference ?? 0
+            if (Math.abs(diff) <= 10000) {
+                toast.success("✅ Đóng ca thành công — Không chênh lệch!")
+            } else if (diff > 0) {
+                toast.warning(`⚠️ Đóng ca — Thừa ₫${formatPrice(diff)}`)
+            } else {
+                toast.error(`❌ Đóng ca — Thiếu ₫${formatPrice(Math.abs(diff))}`)
+            }
+            onShiftChange()
+        }
+    }
+
+    const handleAddExpense = async () => {
+        if (!currentShift || !expenseDesc || !expenseAmount) return
+        await addShiftExpense({
+            shiftId: currentShift.id,
+            description: expenseDesc,
+            amount: parseInt(expenseAmount),
+            staffName,
+        })
+        toast.success(`📝 Ghi nhận chi phí: ₫${formatPrice(parseInt(expenseAmount))}`)
+        setExpenseDesc("")
+        setExpenseAmount("")
+        onShiftChange()
+    }
+
+    const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n)
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl border border-cream-200 bg-white shadow-2xl max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-cream-200">
+                    <div>
+                        <h2 className="text-lg font-bold text-green-900">
+                            {currentShift ? `⏱ Ca ${currentShift.shiftNumber}` : "🔓 Mở ca mới"}
+                        </h2>
+                        <p className="text-xs text-cream-500">
+                            {currentShift
+                                ? `Mở lúc ${new Date(currentShift.openedAt).toLocaleTimeString("vi-VN")} · ${staffName}`
+                                : "Nhập quỹ mở ca để bắt đầu bán hàng"
+                            }
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="rounded-lg p-2 hover:bg-cream-100 transition-all">
+                        <X className="h-4 w-4 text-cream-400" />
+                    </button>
+                </div>
+
+                {/* ── NO SHIFT: Open shift form ── */}
+                {!currentShift && (
+                    <div className="p-6 space-y-4">
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-cream-400 mb-1.5 block">Quỹ mở ca (Opening Cash) *</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-cream-400 font-mono">₫</span>
+                                <Input
+                                    value={openingCash}
+                                    onChange={(e) => setOpeningCash(e.target.value.replace(/\D/g, ""))}
+                                    placeholder="2,000,000"
+                                    className="h-11 pl-7 text-lg font-mono font-bold border-cream-300 text-green-900"
+                                    autoFocus
+                                />
+                            </div>
+                            {openingCash && (
+                                <p className="text-[10px] text-cream-500 mt-1">= ₫{fmt(parseInt(openingCash) || 0)}</p>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            {[1000000, 2000000, 3000000, 5000000].map((v) => (
+                                <button
+                                    key={v}
+                                    onClick={() => setOpeningCash(String(v))}
+                                    className="flex-1 rounded-lg border border-cream-300 bg-cream-50 py-2 text-xs font-medium text-cream-600 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all"
+                                >
+                                    ₫{fmt(v)}
+                                </button>
+                            ))}
+                        </div>
+                        <Button
+                            onClick={handleOpenShift}
+                            disabled={loading || !openingCash}
+                            className="w-full h-11 bg-green-900 text-white hover:bg-green-800 text-sm font-bold"
+                        >
+                            <Timer className="mr-2 h-4 w-4" />
+                            {loading ? "Đang mở..." : "Mở ca"}
+                        </Button>
+                    </div>
+                )}
+
+                {/* ── SHIFT OPEN: Dashboard ── */}
+                {currentShift && !showClose && (
+                    <div className="p-5 space-y-4">
+                        {/* Stats grid */}
+                        <div className="grid grid-cols-3 gap-2.5">
+                            <div className="rounded-lg border border-cream-200 bg-cream-50 p-3 text-center">
+                                <p className="text-[9px] font-bold uppercase text-cream-400 mb-0.5">Doanh thu</p>
+                                <p className="font-mono text-lg font-bold text-green-900">₫{fmt(currentShift.totalSales)}</p>
+                            </div>
+                            <div className="rounded-lg border border-cream-200 bg-cream-50 p-3 text-center">
+                                <p className="text-[9px] font-bold uppercase text-cream-400 mb-0.5">Đơn hàng</p>
+                                <p className="font-mono text-lg font-bold text-blue-700">{currentShift.orderCount}</p>
+                            </div>
+                            <div className="rounded-lg border border-cream-200 bg-cream-50 p-3 text-center">
+                                <p className="text-[9px] font-bold uppercase text-cream-400 mb-0.5">SP bán</p>
+                                <p className="font-mono text-lg font-bold text-wine-700">{currentShift.itemsSold}</p>
+                            </div>
+                        </div>
+
+                        {/* Payment breakdown */}
+                        <div className="rounded-lg border border-cream-200 bg-white p-3 space-y-1.5">
+                            <p className="text-[9px] font-bold uppercase text-cream-400">PHƯƠNG THỨC THANH TOÁN</p>
+                            <div className="flex justify-between text-xs"><span className="flex items-center gap-1.5"><Banknote className="h-3 w-3 text-green-600" /> Tiền mặt</span><span className="font-mono font-bold text-green-700">₫{fmt(currentShift.totalCash)}</span></div>
+                            <div className="flex justify-between text-xs"><span className="flex items-center gap-1.5"><CreditCard className="h-3 w-3 text-blue-600" /> Thẻ</span><span className="font-mono font-bold text-blue-700">₫{fmt(currentShift.totalCard)}</span></div>
+                            <div className="flex justify-between text-xs"><span className="flex items-center gap-1.5"><QrCode className="h-3 w-3 text-wine-600" /> QR Pay</span><span className="font-mono font-bold text-wine-700">₫{fmt(currentShift.totalQR)}</span></div>
+                            <div className="border-t border-cream-200 pt-1.5 flex justify-between text-xs font-bold">
+                                <span>Quỹ hiện tại (expected)</span>
+                                <span className="font-mono text-green-900">₫{fmt(currentShift.expectedCash)}</span>
+                            </div>
+                        </div>
+
+                        {/* Quick expense */}
+                        <div className="rounded-lg border border-cream-200 bg-white p-3">
+                            <p className="text-[9px] font-bold uppercase text-cream-400 mb-2">GHI NHẬN CHI PHÍ</p>
+                            <div className="flex gap-2">
+                                <Input
+                                    value={expenseDesc}
+                                    onChange={(e) => setExpenseDesc(e.target.value)}
+                                    placeholder="Mô tả chi phí..."
+                                    className="flex-1 h-8 text-xs border-cream-300"
+                                />
+                                <Input
+                                    value={expenseAmount}
+                                    onChange={(e) => setExpenseAmount(e.target.value.replace(/\D/g, ""))}
+                                    placeholder="Số tiền"
+                                    className="w-24 h-8 text-xs text-right font-mono border-cream-300"
+                                />
+                                <Button
+                                    onClick={handleAddExpense}
+                                    disabled={!expenseDesc || !expenseAmount}
+                                    size="sm"
+                                    className="h-8 bg-wine-600 hover:bg-wine-700 text-white px-3"
+                                >
+                                    <CircleMinus className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Recent transactions */}
+                        {currentShift.transactions.length > 0 && (
+                            <div className="rounded-lg border border-cream-200 bg-white">
+                                <p className="text-[9px] font-bold uppercase text-cream-400 px-3 pt-3 pb-1">GIAO DỊCH GẦN ĐÂY</p>
+                                <div className="max-h-32 overflow-y-auto divide-y divide-cream-100">
+                                    {[...currentShift.transactions].reverse().slice(0, 5).map((tx) => (
+                                        <div key={tx.id} className="flex items-center justify-between px-3 py-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className={cn(
+                                                    "rounded-full px-1.5 py-0.5 text-[8px] font-bold",
+                                                    tx.type === "SALE" ? "bg-green-100 text-green-700" :
+                                                        tx.type === "EXPENSE" ? "bg-red-100 text-red-700" :
+                                                            "bg-blue-100 text-blue-700"
+                                                )}>
+                                                    {tx.type === "SALE" ? "BÁN" : tx.type === "EXPENSE" ? "CHI" : "TIP"}
+                                                </span>
+                                                <span className="text-[11px] text-cream-600 truncate">{tx.description}</span>
+                                            </div>
+                                            <span className={cn(
+                                                "font-mono text-[11px] font-bold whitespace-nowrap ml-2",
+                                                tx.amount >= 0 ? "text-green-700" : "text-red-600"
+                                            )}>
+                                                {tx.amount >= 0 ? "+" : ""}₫{fmt(Math.abs(tx.amount))}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Close shift button */}
+                        <Button
+                            onClick={() => setShowClose(true)}
+                            variant="outline"
+                            className="w-full h-10 border-red-300 text-red-600 hover:bg-red-50 font-bold"
+                        >
+                            <Clock className="mr-2 h-4 w-4" />
+                            Đóng ca
+                        </Button>
+                    </div>
+                )}
+
+                {/* ── CLOSE SHIFT: Cash reconciliation ── */}
+                {currentShift && showClose && (
+                    <div className="p-5 space-y-4">
+                        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                            <p className="text-sm font-bold text-amber-800 mb-1">⚠️ Đối soát tiền mặt cuối ca</p>
+                            <p className="text-[11px] text-amber-700">
+                                Quỹ kỳ vọng: <span className="font-mono font-bold">₫{fmt(currentShift.expectedCash)}</span>
+                            </p>
+                            <p className="text-[10px] text-amber-600 mt-0.5">
+                                (Quỹ mở ₫{fmt(currentShift.openingCash)} + Tiền mặt thu ₫{fmt(currentShift.totalCash - currentShift.openingCash)})
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-cream-400 mb-1.5 block">Tiền mặt thực tế đếm được *</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-cream-400 font-mono">₫</span>
+                                <Input
+                                    value={closingCash}
+                                    onChange={(e) => setClosingCash(e.target.value.replace(/\D/g, ""))}
+                                    placeholder="Nhập số tiền mặt..."
+                                    className="h-11 pl-7 text-lg font-mono font-bold border-cream-300 text-green-900"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+
+                        {/* Live difference calculation */}
+                        {closingCash && (
+                            <div className={cn(
+                                "rounded-lg border p-3",
+                                (() => {
+                                    const diff = parseInt(closingCash) - currentShift.expectedCash
+                                    if (Math.abs(diff) <= 10000) return "border-green-300 bg-green-50"
+                                    return diff > 0 ? "border-amber-300 bg-amber-50" : "border-red-300 bg-red-50"
+                                })()
+                            )}>
+                                {(() => {
+                                    const diff = parseInt(closingCash) - currentShift.expectedCash
+                                    const isOk = Math.abs(diff) <= 10000
+                                    return (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs font-bold">
+                                                {isOk ? "✅ Khớp" : diff > 0 ? "⚠️ Thừa" : "❌ Thiếu"}
+                                            </span>
+                                            <span className={cn(
+                                                "font-mono text-lg font-bold",
+                                                isOk ? "text-green-700" : diff > 0 ? "text-amber-700" : "text-red-700"
+                                            )}>
+                                                {diff >= 0 ? "+" : ""}₫{fmt(diff)}
+                                            </span>
+                                        </div>
+                                    )
+                                })()}
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-cream-400 mb-1.5 block">Ghi chú đóng ca</label>
+                            <Input
+                                value={closeNotes}
+                                onChange={(e) => setCloseNotes(e.target.value)}
+                                placeholder="VD: Thiếu do trả tiền thừa cho khách..."
+                                className="h-9 text-xs border-cream-300"
+                            />
+                        </div>
+
+                        <div className="flex gap-2">
+                            <Button onClick={() => setShowClose(false)} variant="outline" className="flex-1 border-cream-300 text-cream-500">
+                                ← Quay lại
+                            </Button>
+                            <Button
+                                onClick={handleCloseShift}
+                                disabled={loading || !closingCash}
+                                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold"
+                            >
+                                {loading ? "Đang đóng..." : "Xác nhận đóng ca"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// ============================================================
+// DISCOUNT AUTHORIZATION MODAL
+// ============================================================
+
+function DiscountAuthModal({
+    subtotal,
+    staffId,
+    staffName,
+    onClose,
+    onAuthorized,
+}: {
+    subtotal: number
+    staffId: string
+    staffName: string
+    onClose: () => void
+    onAuthorized: (pct: number) => void
+}) {
+    const [selectedPct, setSelectedPct] = useState(5)
+    const [customPct, setCustomPct] = useState("")
+    const [needsPin, setNeedsPin] = useState(false)
+    const [pin, setPin] = useState("")
+    const [reason, setReason] = useState("")
+    const [submitting, setSubmitting] = useState(false)
+    const [error, setError] = useState("")
+
+    const activePct = customPct ? Number(customPct) : selectedPct
+    const discountAmount = Math.round(subtotal * activePct / 100)
+    const finalTotal = subtotal - discountAmount
+
+    const handleApply = async () => {
+        setError("")
+
+        // Under threshold — auto approve
+        if (activePct <= 10) {
+            onAuthorized(activePct)
+            return
+        }
+
+        // Above threshold — need manager PIN
+        setNeedsPin(true)
+    }
+
+    const handlePinSubmit = async () => {
+        if (!pin || pin.length < 4) { setError("Nhập mã PIN 4 số"); return }
+        if (!reason.trim()) { setError("Nhập lý do giảm giá"); return }
+
+        setSubmitting(true)
+        const result = await authorizeDiscount({
+            managerPin: pin,
+            orderId: null,
+            discountType: "PERCENTAGE",
+            discountValue: activePct,
+            originalTotal: subtotal,
+            reason: reason.trim(),
+            requestedBy: staffId,
+            requestedByName: staffName,
+        })
+        setSubmitting(false)
+
+        if (result.success && result.authorized) {
+            onAuthorized(activePct)
+        } else {
+            setError(result.error ?? "Không thể xác nhận")
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-[360px] rounded-2xl border border-cream-200 bg-white shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200">
+                    <div>
+                        <h2 className="text-lg font-bold text-green-900">🏷️ Giảm giá</h2>
+                        <p className="text-xs text-cream-500">
+                            {needsPin ? "Cần xác nhận Manager/Owner" : "Chọn mức giảm giá"}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="rounded-lg p-2 hover:bg-cream-100">
+                        <X className="h-4 w-4 text-cream-400" />
+                    </button>
+                </div>
+
+                {!needsPin ? (
+                    <div className="p-5 space-y-4">
+                        {/* Preset percentages */}
+                        <div className="grid grid-cols-4 gap-2">
+                            {[5, 10, 15, 20].map((pct) => (
+                                <button
+                                    key={pct}
+                                    onClick={() => { setSelectedPct(pct); setCustomPct("") }}
+                                    className={cn(
+                                        "rounded-xl border-2 py-3 text-center font-mono text-lg font-bold transition-all",
+                                        !customPct && selectedPct === pct
+                                            ? "border-green-600 bg-green-50 text-green-800"
+                                            : "border-cream-300 text-cream-500 hover:border-green-400"
+                                    )}
+                                >
+                                    {pct}%
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Custom */}
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-cream-400 mb-1 block">Hoặc nhập tùy chỉnh</label>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    type="number"
+                                    value={customPct}
+                                    onChange={(e) => setCustomPct(e.target.value)}
+                                    placeholder="VD: 25"
+                                    className="h-9 text-xs border-cream-300 flex-1"
+                                    min={1}
+                                    max={100}
+                                />
+                                <span className="text-sm font-bold text-cream-500">%</span>
+                            </div>
+                        </div>
+
+                        {/* Preview */}
+                        <div className="rounded-lg bg-cream-50 border border-cream-200 p-3 space-y-1">
+                            <div className="flex justify-between text-xs text-cream-500">
+                                <span>Tạm tính</span>
+                                <span className="font-mono">₫{formatPrice(subtotal)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-green-600">
+                                <span>Giảm {activePct}%</span>
+                                <span className="font-mono">-₫{formatPrice(discountAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm font-bold text-green-900 pt-1 border-t border-cream-200">
+                                <span>Sau giảm</span>
+                                <span className="font-mono">₫{formatPrice(finalTotal)}</span>
+                            </div>
+                        </div>
+
+                        {activePct > 10 && (
+                            <p className="text-[10px] text-amber-600 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+                                ⚠️ Giảm giá &gt; 10% cần xác nhận Manager PIN
+                            </p>
+                        )}
+
+                        <div className="flex gap-2">
+                            <Button onClick={onClose} variant="outline" size="sm" className="flex-1 border-cream-300 text-cream-500">Hủy</Button>
+                            <Button onClick={handleApply} size="sm" className="flex-1 bg-green-900 text-white hover:bg-green-800">
+                                <ShieldCheck className="mr-1 h-3 w-3" />
+                                {activePct > 10 ? "Nhập PIN" : "Áp dụng"}
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="p-5 space-y-4">
+                        <div className="text-center">
+                            <p className="text-sm font-bold text-green-900">Giảm {activePct}%</p>
+                            <p className="font-mono text-2xl font-bold text-green-800 mt-1">-₫{formatPrice(discountAmount)}</p>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-cream-400 mb-1 block">Manager PIN *</label>
+                            <Input
+                                type="password"
+                                value={pin}
+                                onChange={(e) => { setPin(e.target.value); setError("") }}
+                                placeholder="Nhập mã PIN 4 số"
+                                className="h-10 text-center text-lg font-mono border-cream-300 tracking-widest"
+                                maxLength={4}
+                                autoFocus
+                                onKeyDown={(e) => { if (e.key === "Enter") handlePinSubmit() }}
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-cream-400 mb-1 block">Lý do giảm giá *</label>
+                            <Input
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                placeholder="VD: Khách VIP, sinh nhật, khiếu nại..."
+                                className="h-9 text-xs border-cream-300"
+                            />
+                        </div>
+
+                        {error && (
+                            <p className="text-[11px] text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-200">
+                                ❌ {error}
+                            </p>
+                        )}
+
+                        <p className="text-[9px] text-cream-400 text-center">
+                            Test PINs: 1234 (Manager), 0000 (Owner), 9999 (Manager)
+                        </p>
+
+                        <div className="flex gap-2">
+                            <Button onClick={() => setNeedsPin(false)} variant="outline" size="sm" className="flex-1 border-cream-300 text-cream-500">Quay lại</Button>
+                            <Button onClick={handlePinSubmit} disabled={submitting} size="sm" className="flex-1 bg-green-900 text-white hover:bg-green-800">
+                                <ShieldCheck className="mr-1 h-3 w-3" />
+                                {submitting ? "Đang xác nhận..." : "Xác nhận"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}

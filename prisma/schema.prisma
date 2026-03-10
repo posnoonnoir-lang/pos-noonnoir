@@ -1,0 +1,762 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum ProductType {
+  WINE_BOTTLE
+  WINE_GLASS
+  WINE_TASTING
+  FOOD
+  DRINK
+  OTHER
+}
+
+enum BottleOwnership {
+  PURCHASED
+  CONSIGNED
+}
+
+enum BottleStatus {
+  IN_STOCK
+  OPENED
+  SOLD
+  RETURNED
+  DAMAGED
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+  GRAB
+}
+
+enum OrderStatus {
+  OPEN
+  PREPARING
+  SERVED
+  PAID
+  CANCELLED
+  VOID
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  MOMO
+  VNPAY
+}
+
+enum PaymentState {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum OrderItemStatus {
+  PENDING
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+  MERGED
+}
+
+enum StaffRole {
+  OWNER
+  MANAGER
+  CASHIER
+  BARTENDER
+  KITCHEN
+  WAITER
+}
+
+enum TabStatus {
+  OPEN
+  CLOSED
+  EXCEEDED
+}
+
+enum StockMovementType {
+  PURCHASE
+  CONSIGNMENT_IN
+  SALE
+  WASTE
+  SPOILAGE
+  BREAKAGE
+  ADJUSTMENT
+  RETURN
+}
+
+enum ConsignmentStatus {
+  ACTIVE
+  PARTIALLY_SETTLED
+  SETTLED
+  RETURNED
+}
+
+enum SettlementStatus {
+  DRAFT
+  CONFIRMED
+  PAID
+}
+
+enum DebtType {
+  PAYABLE
+  RECEIVABLE
+}
+
+enum DebtStatus {
+  OUTSTANDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  LEAVE
+}
+
+enum TransactionType {
+  REVENUE
+  EXPENSE
+  TRANSFER
+}
+
+// ============================================================
+// SYSTEM
+// ============================================================
+
+model StoreSettings {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeName        String   @default("Noon & Noir Wine Alley") @map("store_name")
+  tagline          String   @default("drink slowly · laugh quietly · stay longer")
+  address          String?
+  phone            String?
+  email            String?
+  taxId            String?  @map("tax_id")
+  taxEnabled       Boolean  @default(false) @map("tax_enabled")
+  taxInclusive     Boolean  @default(true) @map("tax_inclusive")
+  currency         String   @default("VND")
+  defaultTabLimit  Decimal  @default(2000000) @map("default_tab_limit") @db.Decimal(12, 2)
+  telegramBotToken String?  @map("telegram_bot_token")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("store_settings")
+}
+
+// ============================================================
+// TAX RATES (VAT)
+// ============================================================
+
+model TaxRate {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  code        String   @unique
+  rate        Decimal  @db.Decimal(5, 2)
+  description String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  products   Product[]
+  orderItems OrderItem[]
+
+  @@map("tax_rate")
+}
+
+// ============================================================
+// STAFF & AUTH
+// ============================================================
+
+model Staff {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authUserId  String?   @unique @map("auth_user_id")
+  fullName    String    @map("full_name")
+  phone       String?
+  email       String?
+  role        StaffRole
+  baseSalary  Decimal   @default(0) @map("base_salary") @db.Decimal(12, 2)
+  pinCode     String?   @map("pin_code")
+  avatarUrl   String?   @map("avatar_url")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  orders       Order[]
+  attendances  Attendance[]
+  tabsOpened   CustomerTab[] @relation("TabOpenedBy")
+  tabItems     TabItem[]
+  shifts       ShiftRecord[]
+  notifications NotificationConfig[]
+
+  @@map("staff")
+}
+
+// ============================================================
+// PRODUCT & CATEGORY
+// ============================================================
+
+model Category {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  nameVi      String?   @map("name_vi")
+  icon        String?
+  sortOrder   Int       @default(0) @map("sort_order")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("category")
+}
+
+model Product {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String
+  nameVi           String?     @map("name_vi")
+  sku              String?     @unique
+  categoryId       String      @map("category_id") @db.Uuid
+  type             ProductType
+  taxRateId        String?     @map("tax_rate_id") @db.Uuid
+  vintage          Int?
+  appellation      String?
+  grapeVariety     String?     @map("grape_variety")
+  country          String?
+  region           String?
+  alcoholPct       Decimal?    @map("alcohol_pct") @db.Decimal(4, 2)
+  tastingNotes     String?     @map("tasting_notes")
+  costPrice        Decimal     @default(0) @map("cost_price") @db.Decimal(12, 2)
+  sellPrice        Decimal     @map("sell_price") @db.Decimal(12, 2)
+  glassPrice       Decimal?    @map("glass_price") @db.Decimal(12, 2)
+  isByGlass        Boolean     @default(false) @map("is_by_glass")
+  glassesPerBottle Int         @default(0) @map("glasses_per_bottle")
+  tastingPortions  Int         @default(0) @map("tasting_portions")
+  servingTemp      String?     @map("serving_temp")
+  decantingTime    String?     @map("decanting_time")
+  glassType        String?     @map("glass_type")
+  trackInventory   Boolean     @default(true) @map("track_inventory")
+  lowStockAlert    Int         @default(5) @map("low_stock_alert")
+  imageUrl         String?     @map("image_url")
+  description      String?
+  isActive         Boolean     @default(true) @map("is_active")
+  sortOrder        Int         @default(0) @map("sort_order")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  category     Category          @relation(fields: [categoryId], references: [id])
+  taxRate      TaxRate?          @relation(fields: [taxRateId], references: [id])
+  orderItems   OrderItem[]
+  wineBottles  WineBottle[]
+  glassConfigs WineGlassConfig[] @relation("BottleProduct")
+  glassOf      WineGlassConfig[] @relation("GlassProduct")
+  tabItems     TabItem[]
+  recipes      ProductRecipe[]
+
+  @@index([categoryId])
+  @@index([type])
+  @@index([isActive])
+  @@index([taxRateId])
+  @@map("product")
+}
+
+// ============================================================
+// WINE TRACKING
+// ============================================================
+
+model WineBottle {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId       String          @map("product_id") @db.Uuid
+  batchCode       String?         @map("batch_code")
+  ownershipType   BottleOwnership @default(PURCHASED) @map("ownership_type")
+  consignmentId   String?         @map("consignment_id") @db.Uuid
+  status          BottleStatus    @default(IN_STOCK)
+  glassesRemaining Int?           @map("glasses_remaining")
+  openedAt        DateTime?       @map("opened_at")
+  soldAt          DateTime?       @map("sold_at")
+  costPrice       Decimal?        @map("cost_price") @db.Decimal(12, 2)
+  receivedAt      DateTime        @default(now()) @map("received_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  product     Product      @relation(fields: [productId], references: [id])
+  consignment Consignment? @relation(fields: [consignmentId], references: [id])
+  orderItems  OrderItem[]
+  activeFor   WineGlassConfig[] @relation("ActiveBottle")
+
+  @@index([productId, status])
+  @@index([consignmentId])
+  @@index([status])
+  @@map("wine_bottle")
+}
+
+model WineGlassConfig {
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bottleProductId   String  @map("bottle_product_id") @db.Uuid
+  glassProductId    String  @map("glass_product_id") @db.Uuid
+  glassesPerBottle  Int     @default(8) @map("glasses_per_bottle")
+  currentGlassesSold Int    @default(0) @map("current_glasses_sold")
+  activeBottleId    String? @map("active_bottle_id") @db.Uuid
+
+  bottleProduct Product     @relation("BottleProduct", fields: [bottleProductId], references: [id])
+  glassProduct  Product     @relation("GlassProduct", fields: [glassProductId], references: [id])
+  activeBottle  WineBottle? @relation("ActiveBottle", fields: [activeBottleId], references: [id])
+
+  @@map("wine_glass_config")
+}
+
+// ============================================================
+// FLOOR & TABLES
+// ============================================================
+
+model TableZone {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tables FloorTable[]
+
+  @@map("table_zone")
+}
+
+model FloorTable {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  zoneId       String      @map("zone_id") @db.Uuid
+  tableNumber  String      @map("table_number")
+  seats        Int         @default(4)
+  status       TableStatus @default(AVAILABLE)
+  shape        String      @default("square")
+  posX         Int         @default(0) @map("pos_x")
+  posY         Int         @default(0) @map("pos_y")
+  mergedIntoId String?     @map("merged_into_id") @db.Uuid
+  isActive     Boolean     @default(true) @map("is_active")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  zone       TableZone   @relation(fields: [zoneId], references: [id])
+  mergedInto FloorTable? @relation("MergedTables", fields: [mergedIntoId], references: [id])
+  mergedFrom FloorTable[] @relation("MergedTables")
+  orders     Order[]
+  tabItems   TabItem[]
+
+  @@unique([zoneId, tableNumber])
+  @@index([status])
+  @@map("floor_table")
+}
+
+// ============================================================
+// ORDERS & PAYMENTS
+// ============================================================
+
+model Customer {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  phone       String?
+  email       String?
+  birthday    DateTime? @db.Date
+  tier        String    @default("REGULAR")
+  totalSpent  Decimal   @default(0) @map("total_spent") @db.Decimal(12, 2)
+  loyaltyPts  Int       @default(0) @map("loyalty_pts")
+  notes       String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  orders      Order[]
+  tabs        CustomerTab[]
+  debts       DebtRecord[]
+
+  @@map("customer")
+}
+
+model Order {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNo         String        @unique @map("order_no")
+  tableId         String?       @map("table_id") @db.Uuid
+  orderType       OrderType     @default(DINE_IN) @map("order_type")
+  customerId      String?       @map("customer_id") @db.Uuid
+  createdBy       String        @map("created_by") @db.Uuid
+  subtotal        Decimal       @default(0) @db.Decimal(12, 2)
+  discountAmount  Decimal       @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  discountPct     Decimal       @default(0) @map("discount_pct") @db.Decimal(5, 2)
+  taxAmount       Decimal       @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  totalAmount     Decimal       @default(0) @map("total_amount") @db.Decimal(12, 2)
+  status          OrderStatus   @default(OPEN)
+  paymentStatus   PaymentStatus @default(UNPAID) @map("payment_status")
+  parentOrderId   String?       @map("parent_order_id") @db.Uuid
+  isMerged        Boolean       @default(false) @map("is_merged")
+  notes           String?
+  openedAt        DateTime      @default(now()) @map("opened_at")
+  closedAt        DateTime?     @map("closed_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  table       FloorTable?  @relation(fields: [tableId], references: [id])
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  staff       Staff        @relation(fields: [createdBy], references: [id])
+  parentOrder Order?       @relation("SplitOrders", fields: [parentOrderId], references: [id])
+  childOrders Order[]      @relation("SplitOrders")
+  items       OrderItem[]
+  payments    Payment[]
+  tabs        CustomerTab[]
+
+  @@index([tableId])
+  @@index([status])
+  @@index([createdBy])
+  @@index([openedAt])
+  @@map("order")
+}
+
+model OrderItem {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String          @map("order_id") @db.Uuid
+  productId     String          @map("product_id") @db.Uuid
+  taxRateId     String?         @map("tax_rate_id") @db.Uuid
+  quantity      Int             @default(1)
+  unitPrice     Decimal         @map("unit_price") @db.Decimal(12, 2)
+  discountPct   Decimal         @default(0) @map("discount_pct") @db.Decimal(5, 2)
+  subtotal      Decimal         @db.Decimal(12, 2)
+  taxRatePct    Decimal         @default(0) @map("tax_rate_pct") @db.Decimal(5, 2)
+  taxAmount     Decimal         @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  wineBottleId  String?         @map("wine_bottle_id") @db.Uuid
+  isGlassPour   Boolean         @default(false) @map("is_glass_pour")
+  status        OrderItemStatus @default(PENDING)
+  sentToKitchen Boolean         @default(false) @map("sent_to_kitchen")
+  sentAt        DateTime?       @map("sent_at")
+  notes         String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  order      Order       @relation(fields: [orderId], references: [id])
+  product    Product     @relation(fields: [productId], references: [id])
+  taxRate    TaxRate?    @relation(fields: [taxRateId], references: [id])
+  wineBottle WineBottle? @relation(fields: [wineBottleId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+  @@map("order_item")
+}
+
+model Payment {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId        String       @map("order_id") @db.Uuid
+  method         PaymentMethod
+  amount         Decimal      @db.Decimal(12, 2)
+  receivedAmount Decimal?     @map("received_amount") @db.Decimal(12, 2)
+  changeAmount   Decimal      @default(0) @map("change_amount") @db.Decimal(12, 2)
+  transactionRef String?      @map("transaction_ref")
+  status         PaymentState @default(COMPLETED)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("payment")
+}
+
+// ============================================================
+// CUSTOMER TAB
+// ============================================================
+
+model CustomerTab {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId   String    @map("customer_id") @db.Uuid
+  openedBy     String    @map("opened_by") @db.Uuid
+  tabLimit     Decimal   @default(2000000) @map("tab_limit") @db.Decimal(12, 2)
+  currentTotal Decimal   @default(0) @map("current_total") @db.Decimal(12, 2)
+  status       TabStatus @default(OPEN)
+  notes        String?
+  openedAt     DateTime  @default(now()) @map("opened_at")
+  closedAt     DateTime? @map("closed_at")
+  orderId      String?   @map("order_id") @db.Uuid
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  openedByStaff Staff @relation("TabOpenedBy", fields: [openedBy], references: [id])
+  order    Order?   @relation(fields: [orderId], references: [id])
+  items    TabItem[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("customer_tab")
+}
+
+model TabItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tabId     String   @map("tab_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  quantity  Int      @default(1)
+  unitPrice Decimal  @map("unit_price") @db.Decimal(12, 2)
+  subtotal  Decimal  @db.Decimal(12, 2)
+  tableId   String?  @map("table_id") @db.Uuid
+  addedBy   String   @map("added_by") @db.Uuid
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  tab     CustomerTab @relation(fields: [tabId], references: [id])
+  product Product     @relation(fields: [productId], references: [id])
+  table   FloorTable? @relation(fields: [tableId], references: [id])
+  staff   Staff       @relation(fields: [addedBy], references: [id])
+
+  @@index([tabId])
+  @@map("tab_item")
+}
+
+// ============================================================
+// CONSIGNMENT
+// ============================================================
+
+model Supplier {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  contactName String?  @map("contact_name")
+  phone       String?
+  email       String?
+  address     String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  consignments Consignment[]
+  debts        DebtRecord[]
+
+  @@map("supplier")
+}
+
+model Consignment {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  supplierId   String            @map("supplier_id") @db.Uuid
+  consignmentNo String           @unique @map("consignment_no")
+  receivedDate DateTime          @map("received_date") @db.Date
+  status       ConsignmentStatus @default(ACTIVE)
+  totalBottles Int               @default(0) @map("total_bottles")
+  soldBottles  Int               @default(0) @map("sold_bottles")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  supplier    Supplier              @relation(fields: [supplierId], references: [id])
+  bottles     WineBottle[]
+  settlements ConsignmentSettlement[]
+
+  @@index([supplierId])
+  @@map("consignment")
+}
+
+model ConsignmentSettlement {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  consignmentId String           @map("consignment_id") @db.Uuid
+  periodStart   DateTime         @map("period_start") @db.Date
+  periodEnd     DateTime         @map("period_end") @db.Date
+  totalSold     Int              @default(0) @map("total_sold")
+  totalRevenue  Decimal          @default(0) @map("total_revenue") @db.Decimal(12, 2)
+  commission    Decimal          @default(0) @db.Decimal(12, 2)
+  amountDue     Decimal          @default(0) @map("amount_due") @db.Decimal(12, 2)
+  status        SettlementStatus @default(DRAFT)
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  consignment Consignment @relation(fields: [consignmentId], references: [id])
+
+  @@index([consignmentId])
+  @@map("consignment_settlement")
+}
+
+// ============================================================
+// INGREDIENTS & RECIPES
+// ============================================================
+
+model Ingredient {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  unit         String
+  currentStock Decimal  @default(0) @map("current_stock") @db.Decimal(12, 3)
+  minStock     Decimal  @default(0) @map("min_stock") @db.Decimal(12, 3)
+  costPerUnit  Decimal  @default(0) @map("cost_per_unit") @db.Decimal(12, 2)
+  expiryDate   DateTime? @map("expiry_date") @db.Date
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  recipes ProductRecipe[]
+
+  @@map("ingredient")
+}
+
+model ProductRecipe {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId    String  @map("product_id") @db.Uuid
+  ingredientId String  @map("ingredient_id") @db.Uuid
+  quantity     Decimal @db.Decimal(12, 3)
+  unit         String
+
+  product    Product    @relation(fields: [productId], references: [id])
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id])
+
+  @@unique([productId, ingredientId])
+  @@map("product_recipe")
+}
+
+// ============================================================
+// FINANCE
+// ============================================================
+
+model ShiftRecord {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staffId      String    @map("staff_id") @db.Uuid
+  openingCash  Decimal   @map("opening_cash") @db.Decimal(12, 2)
+  closingCash  Decimal?  @map("closing_cash") @db.Decimal(12, 2)
+  expectedCash Decimal?  @map("expected_cash") @db.Decimal(12, 2)
+  variance     Decimal?  @db.Decimal(12, 2)
+  totalRevenue Decimal?  @map("total_revenue") @db.Decimal(12, 2)
+  openedAt     DateTime  @default(now()) @map("opened_at")
+  closedAt     DateTime? @map("closed_at")
+
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@index([staffId])
+  @@map("shift_record")
+}
+
+model FundTransaction {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transactionType TransactionType @map("transaction_type")
+  category        String
+  amount          Decimal         @db.Decimal(12, 2)
+  description     String?
+  orderId         String?         @map("order_id") @db.Uuid
+  date            DateTime        @default(now()) @db.Date
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  @@index([date])
+  @@index([transactionType])
+  @@map("fund_transaction")
+}
+
+model DebtRecord {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  debtType   DebtType   @map("debt_type")
+  supplierId String?    @map("supplier_id") @db.Uuid
+  customerId String?    @map("customer_id") @db.Uuid
+  amount     Decimal    @db.Decimal(12, 2)
+  paidAmount Decimal    @default(0) @map("paid_amount") @db.Decimal(12, 2)
+  dueDate    DateTime?  @map("due_date") @db.Date
+  status     DebtStatus @default(OUTSTANDING)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([debtType, status])
+  @@map("debt_record")
+}
+
+// ============================================================
+// HR
+// ============================================================
+
+model Attendance {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staffId     String           @map("staff_id") @db.Uuid
+  date        DateTime         @db.Date
+  checkIn     DateTime?        @map("check_in")
+  checkOut    DateTime?        @map("check_out")
+  hoursWorked Decimal?         @map("hours_worked") @db.Decimal(5, 2)
+  status      AttendanceStatus @default(PRESENT)
+
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@unique([staffId, date])
+  @@map("attendance")
+}
+
+// ============================================================
+// STOCK MOVEMENT
+// ============================================================
+
+model StockMovement {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type            StockMovementType
+  productId       String?           @map("product_id") @db.Uuid
+  bottleId        String?           @map("bottle_id") @db.Uuid
+  quantity        Decimal           @db.Decimal(12, 3)
+  unitCost        Decimal?          @map("unit_cost") @db.Decimal(12, 2)
+  inputTaxRatePct Decimal?          @map("input_tax_rate_pct") @db.Decimal(5, 2)
+  inputTaxAmount  Decimal?          @map("input_tax_amount") @db.Decimal(12, 2)
+  reason          String?
+  createdBy       String?           @map("created_by") @db.Uuid
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  @@index([type])
+  @@index([productId])
+  @@index([createdAt])
+  @@map("stock_movement")
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model NotificationConfig {
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staffId           String  @map("staff_id") @db.Uuid
+  telegramChatId    String  @map("telegram_chat_id")
+  alertVoid         Boolean @default(true) @map("alert_void")
+  alertLowStock     Boolean @default(true) @map("alert_low_stock")
+  alertShiftClose   Boolean @default(true) @map("alert_shift_close")
+  alertCashVariance Boolean @default(true) @map("alert_cash_variance")
+  alertOxidation    Boolean @default(true) @map("alert_oxidation")
+  alertDailyPl      Boolean @default(true) @map("alert_daily_pl")
+  quietStart        String  @default("00:00") @map("quiet_start")
+  quietEnd          String  @default("07:00") @map("quiet_end")
+  isActive          Boolean @default(true) @map("is_active")
+
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@map("notification_config")
+}
+
+// ============================================================
+// AUDIT LOG
+// ============================================================
+
+model AuditLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  action    String
+  tableName String   @map("table_name")
+  recordId  String   @map("record_id") @db.Uuid
+  oldData   Json?    @map("old_data")
+  newData   Json?    @map("new_data")
+  staffId   String?  @map("staff_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tableName, recordId])
+  @@index([createdAt])
+  @@map("audit_log")
+}

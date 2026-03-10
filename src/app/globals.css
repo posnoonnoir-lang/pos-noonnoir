@@ -1,129 +1,249 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* ===== Noon & Noir Brand Colors ===== */
+
+  /* Primary — Forest Green */
+  --color-green-50: #EDF5F0;
+  --color-green-100: #E8F0EB;
+  --color-green-200: #C2D9CA;
+  --color-green-300: #8BB89D;
+  --color-green-400: #5A9A73;
+  --color-green-500: #3A7A5C;
+  --color-green-600: #2D5E48;
+  --color-green-700: #234A39;
+  --color-green-800: #1E3D30;
+  --color-green-900: #1B3A2D;
+
+  /* Warm Background — Cream */
+  --color-cream-50: #FAF6F0;
+  --color-cream-100: #F5EDE0;
+  --color-cream-200: #EDE3D2;
+  --color-cream-300: #DDD0BB;
+  --color-cream-400: #C4B59E;
+  --color-cream-500: #A89880;
+
+  /* Accent — Wine/Burgundy */
+  --color-wine-50: #FCF5F6;
+  --color-wine-100: #F5E6E8;
+  --color-wine-200: #E8C5CA;
+  --color-wine-300: #D4949C;
+  --color-wine-400: #B8636E;
+  --color-wine-500: #A4454E;
+  --color-wine-600: #8B3A42;
+  --color-wine-700: #722F37;
+  --color-wine-800: #5C2028;
+  --color-wine-900: #4A1219;
+
+  /* Fonts */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-script: 'Caveat', 'Dancing Script', cursive;
+  --font-sans: 'DM Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, monospace;
+
+  /* Spacing */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
+/* ===== CSS Variables for shadcn/ui ===== */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.58 0.22 27);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: var(--color-cream-50);
+  --foreground: var(--color-green-900);
+
+  --card: var(--color-cream-100);
+  --card-foreground: var(--color-green-900);
+
+  --popover: var(--color-cream-50);
+  --popover-foreground: var(--color-green-900);
+
+  --primary: var(--color-green-900);
+  --primary-foreground: var(--color-cream-50);
+
+  --secondary: var(--color-cream-200);
+  --secondary-foreground: var(--color-green-900);
+
+  --muted: var(--color-cream-200);
+  --muted-foreground: var(--color-cream-500);
+
+  --accent: var(--color-wine-700);
+  --accent-foreground: #FFFFFF;
+
+  --destructive: #C0392B;
+  --destructive-foreground: #FFFFFF;
+
+  --border: var(--color-cream-300);
+  --input: var(--color-cream-200);
+  --ring: var(--color-green-700);
+
+  --chart-1: var(--color-green-700);
+  --chart-2: var(--color-wine-700);
+  --chart-3: var(--color-green-500);
+  --chart-4: var(--color-wine-500);
+  --chart-5: var(--color-cream-400);
+
+  --sidebar: var(--color-green-900);
+  --sidebar-foreground: var(--color-cream-50);
+  --sidebar-accent: var(--color-green-700);
+  --sidebar-accent-foreground: var(--color-cream-50);
+  --sidebar-border: var(--color-green-800);
+
+  /* Status */
+  --success: var(--color-green-600);
+  --warning: #D4A035;
+  --danger: #C0392B;
+  --info: #2980B9;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.87 0.00 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.371 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* ===== Global Styles ===== */
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-cream-50);
+  color: var(--color-green-900);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
+/* Display / Brand headings */
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Handwritten / Script accent */
+.font-script {
+  font-family: var(--font-script);
+}
+
+/* Monospace for prices */
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ===== Brand Pattern — Checkered ===== */
+.pattern-checkered {
+  background: repeating-conic-gradient(var(--color-green-900) 0% 25%,
+      var(--color-cream-50) 0% 50%) 0 0 / 16px 16px;
+}
+
+.pattern-checkered-sm {
+  background: repeating-conic-gradient(var(--color-green-900) 0% 25%,
+      var(--color-cream-50) 0% 50%) 0 0 / 10px 10px;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-cream-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-cream-400);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-green-700);
+}
+
+/* ===== POS Specific ===== */
+.pos-button-touch {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Glass indicator */
+.glass-indicator {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Price display */
+.price {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--color-green-900);
+}
+
+.price-large {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 24px;
+}
+
+/* ===== Animations ===== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
-  body {
-    @apply bg-background text-foreground;
+
+  to {
+    opacity: 1;
   }
-  html {
-    @apply font-sans;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
   }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-status {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 200ms ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 300ms ease-out;
+}
+
+.animate-pulse-status {
+  animation: pulse-status 500ms ease-in-out;
+}
+
+@keyframes shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20%,
+  60% {
+    transform: translateX(-8px);
+  }
+
+  40%,
+  80% {
+    transform: translateX(8px);
+  }
+}
+
+.animate-shake {
+  animation: shake 400ms ease-in-out;
 }
