@@ -1,433 +1,322 @@
 "use server"
 
-import type { OrderItem } from "@/stores/cart-store"
+import { prisma } from "@/lib/prisma"
+import { revalidatePath } from "next/cache"
+import type { OrderStatus, PaymentMethod } from "@prisma/client"
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-export type OrderStatus = "PENDING" | "PREPARING" | "READY" | "SERVED" | "COMPLETED" | "CANCELLED"
-export type PaymentMethod = "CASH" | "CARD" | "QR" | "MIXED"
+export type { OrderStatus, PaymentMethod } from "@prisma/client"
 
 export type Order = {
     id: string
     orderNumber: string
     tableId: string | null
     tableNumber: string | null
-    orderType: "DINE_IN" | "TAKEAWAY"
+    orderType: string
     status: OrderStatus
-    items: {
+    items: Array<{
         id: string
         productId: string
         productName: string
         quantity: number
         unitPrice: number
-        note?: string
-    }[]
+        subtotal: number
+        notes: string | null
+        status: string
+    }>
     subtotal: number
     discount: number
     tax: number
     total: number
-    paymentMethod: PaymentMethod | null
+    paymentMethod: string | null
     paidAt: Date | null
-    staffId: string
+    staffId: string | null
     staffName: string
-    guestCount?: number
+    guestCount: number
     createdAt: Date
     updatedAt: Date
 }
 
-// In-memory store for demo — pre-seeded with active orders for occupied tables
-const now = new Date()
-const ORDERS: Order[] = [
-    {
-        id: "order-seed-1",
-        orderNumber: "ORD-0310-001",
-        tableId: "t-02",
-        tableNumber: "T02",
-        orderType: "DINE_IN",
-        status: "SERVED",
-        items: [
-            { id: "oi-s1-1", productId: "p-1", productName: "Château Margaux 2018", quantity: 1, unitPrice: 5_900_000 },
-            { id: "oi-s1-2", productId: "p-12", productName: "Cheese Board", quantity: 1, unitPrice: 250_000 },
-            { id: "oi-s1-3", productId: "p-9", productName: "Negroni", quantity: 2, unitPrice: 150_000 },
-        ],
-        subtotal: 6_450_000,
-        discount: 0,
-        tax: 0,
-        total: 6_450_000,
-        paymentMethod: null,
-        paidAt: null,
-        staffId: "staff-3",
-        staffName: "Minh Le",
-        guestCount: 3,
-        createdAt: new Date(now.getTime() - 45 * 60000),
-        updatedAt: new Date(now.getTime() - 10 * 60000),
-    },
-    {
-        id: "order-seed-2",
-        orderNumber: "ORD-0310-002",
-        tableId: "t-04",
-        tableNumber: "T04",
-        orderType: "DINE_IN",
-        status: "PREPARING",
-        items: [
-            { id: "oi-s2-1", productId: "p-2", productName: "Opus One 2019", quantity: 1, unitPrice: 9_800_000 },
-            { id: "oi-s2-2", productId: "p-8", productName: "Aperol Spritz", quantity: 3, unitPrice: 120_000 },
-            { id: "oi-s2-3", productId: "p-14", productName: "Truffle Fries", quantity: 1, unitPrice: 150_000 },
-            { id: "oi-s2-4", productId: "p-11", productName: "Bruschetta", quantity: 2, unitPrice: 120_000, note: "Thêm phô mai" },
-        ],
-        subtotal: 10_550_000,
-        discount: 0,
-        tax: 0,
-        total: 10_550_000,
-        paymentMethod: null,
-        paidAt: null,
-        staffId: "staff-2",
-        staffName: "Linh Tran",
-        guestCount: 5,
-        createdAt: new Date(now.getTime() - 72 * 60000),
-        updatedAt: new Date(now.getTime() - 5 * 60000),
-    },
-    {
-        id: "order-seed-3",
-        orderNumber: "ORD-0310-003",
-        tableId: "t-08",
-        tableNumber: "T08",
-        orderType: "DINE_IN",
-        status: "SERVED",
-        items: [
-            { id: "oi-s3-1", productId: "p-7", productName: "Chardonnay Glass", quantity: 2, unitPrice: 85_000 },
-            { id: "oi-s3-2", productId: "p-10", productName: "Gin & Tonic", quantity: 1, unitPrice: 110_000 },
-            { id: "oi-s3-3", productId: "p-14", productName: "Truffle Fries", quantity: 1, unitPrice: 150_000 },
-        ],
-        subtotal: 430_000,
-        discount: 0,
-        tax: 0,
-        total: 430_000,
-        paymentMethod: null,
-        paidAt: null,
-        staffId: "staff-4",
-        staffName: "Hoa Pham",
-        guestCount: 2,
-        createdAt: new Date(now.getTime() - 20 * 60000),
-        updatedAt: new Date(now.getTime() - 8 * 60000),
-    },
-    {
-        id: "order-seed-4",
-        orderNumber: "ORD-0310-004",
-        tableId: "t-10",
-        tableNumber: "B01",
-        orderType: "DINE_IN",
-        status: "SERVED",
-        items: [
-            { id: "oi-s4-1", productId: "p-9", productName: "Negroni", quantity: 1, unitPrice: 150_000 },
-            { id: "oi-s4-2", productId: "p-13", productName: "Cold Cut Board", quantity: 1, unitPrice: 320_000, note: "Không hành" },
-        ],
-        subtotal: 470_000,
-        discount: 0,
-        tax: 0,
-        total: 470_000,
-        paymentMethod: null,
-        paidAt: null,
-        staffId: "staff-3",
-        staffName: "Minh Le",
-        guestCount: 1,
-        createdAt: new Date(now.getTime() - 15 * 60000),
-        updatedAt: new Date(now.getTime() - 3 * 60000),
-    },
-]
-let orderCounter = 5
+// ============================================================
+// HELPERS
+// ============================================================
 
-function generateOrderNumber(): string {
-    const date = new Date()
-    const prefix = `ORD-${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`
-    return `${prefix}-${String(orderCounter++).padStart(3, "0")}`
+async function generateOrderNumber(): Promise<string> {
+    const today = new Date()
+    const prefix = `ORD-${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`
+    const todayCount = await prisma.order.count({
+        where: {
+            orderNo: { startsWith: prefix },
+        },
+    })
+    return `${prefix}-${String(todayCount + 1).padStart(3, "0")}`
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+import { serializeOrder } from "@/lib/order-serializer"
+
+// ============================================================
+// ORDERS CRUD
+// ============================================================
 
 export async function createOrder(params: {
     tableId: string | null
     tableNumber: string | null
     orderType: "DINE_IN" | "TAKEAWAY"
-    items: OrderItem[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items: any[]
     staffId: string
     staffName: string
     guestCount?: number
-}): Promise<{ success: boolean; order?: Order; error?: string }> {
-    await delay(300)
-
-    if (params.items.length === 0) {
-        return { success: false, error: "Giỏ hàng trống" }
-    }
-
-    // Import tax calculation
-    const { calculateItemTax, getTaxConfig } = await import("./tax")
-    const taxConfig = await getTaxConfig()
-
-    const subtotal = params.items.reduce(
-        (sum, item) => sum + item.unitPrice * item.quantity,
-        0
-    )
-
-    // Calculate tax for each item
-    let totalTax = 0
-    if (taxConfig.enabled) {
-        for (const item of params.items) {
-            const itemSubtotal = item.unitPrice * item.quantity
-            const taxResult = await calculateItemTax(itemSubtotal, item.product.taxRateId)
-            totalTax += taxResult.taxAmount
-        }
-    }
-
-    const total = taxConfig.enabled && !taxConfig.inclusive
-        ? subtotal + totalTax
-        : subtotal
-
-    const order: Order = {
-        id: `order-${Date.now()}`,
-        orderNumber: generateOrderNumber(),
-        tableId: params.tableId,
-        tableNumber: params.tableNumber,
-        orderType: params.orderType,
-        status: "PENDING",
-        items: params.items.map((item) => ({
-            id: item.id,
-            productId: item.product.id,
-            productName: item.product.name,
+}) {
+    try {
+        const orderNo = await generateOrderNumber()
+        // Normalize items — accept both { productId, price } and { product: { id }, unitPrice }
+        const normalizedItems = params.items.map((item: any) => ({
+            productId: item.productId ?? item.product?.id,
+            name: item.name ?? item.product?.name ?? "",
             quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            note: item.note,
-        })),
-        subtotal,
-        discount: 0,
-        tax: totalTax,
-        total,
-        paymentMethod: null,
-        paidAt: null,
-        staffId: params.staffId,
-        staffName: params.staffName,
-        guestCount: params.guestCount,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+            price: item.price ?? item.unitPrice,
+            notes: item.notes ?? item.note,
+        }))
+        const subtotal = normalizedItems.reduce((s: number, i: any) => s + i.price * i.quantity, 0)
+
+        const order = await prisma.order.create({
+            data: {
+                orderNo,
+                tableId: params.tableId,
+                orderType: params.orderType,
+                createdBy: params.staffId,
+                subtotal,
+                totalAmount: subtotal,
+                status: "OPEN",
+                items: {
+                    create: normalizedItems.map((item: any) => ({
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        unitPrice: item.price,
+                        subtotal: item.price * item.quantity,
+                        notes: item.notes,
+                    })),
+                },
+            },
+            include: {
+                items: { include: { product: true } },
+                table: true,
+                staff: true,
+            },
+        })
+
+        if (params.tableId) {
+            await prisma.floorTable.update({
+                where: { id: params.tableId },
+                data: { status: "OCCUPIED" },
+            })
+        }
+
+        revalidatePath("/pos")
+        revalidatePath("/dashboard/tables")
+        return { success: true, order: serializeOrder(order) }
+    } catch (e) {
+        console.error("createOrder error:", e)
+        return { success: false, error: "Không thể tạo đơn hàng" }
     }
-
-    ORDERS.unshift(order)
-    return { success: true, order }
 }
 
-export async function getOrders(params?: {
-    status?: OrderStatus
-    limit?: number
-}): Promise<Order[]> {
-    await delay(150)
-    let orders = [...ORDERS]
-    if (params?.status) {
-        orders = orders.filter((o) => o.status === params.status)
+export async function getOrders(params?: { status?: OrderStatus; limit?: number }) {
+    const orders = await prisma.order.findMany({
+        where: params?.status ? { status: params.status } : {},
+        include: {
+            items: { include: { product: true } },
+            table: true,
+            staff: true,
+            payments: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: params?.limit ?? 50,
+    })
+    return orders.map(serializeOrder)
+}
+
+export async function getOrderById(orderId: string) {
+    const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+            items: { include: { product: true } },
+            table: true,
+            staff: true,
+            payments: true,
+        },
+    })
+    return serializeOrder(order)
+}
+
+export async function updateOrderStatus(orderId: string, status: OrderStatus) {
+    try {
+        await prisma.order.update({
+            where: { id: orderId },
+            data: {
+                status,
+                ...(status === "PAID" ? { closedAt: new Date() } : {}),
+            },
+        })
+        revalidatePath("/pos")
+        return { success: true }
+    } catch {
+        return { success: false }
     }
-    if (params?.limit) {
-        orders = orders.slice(0, params.limit)
+}
+
+export async function payOrder(orderId: string, method: PaymentMethod) {
+    try {
+        const order = await prisma.order.findUnique({ where: { id: orderId } })
+        if (!order) return { success: false }
+
+        await prisma.$transaction([
+            prisma.payment.create({
+                data: {
+                    orderId,
+                    method,
+                    amount: order.totalAmount,
+                    receivedAmount: order.totalAmount,
+                },
+            }),
+            prisma.order.update({
+                where: { id: orderId },
+                data: {
+                    status: "PAID",
+                    paymentStatus: "PAID",
+                    closedAt: new Date(),
+                },
+            }),
+            ...(order.tableId
+                ? [prisma.floorTable.update({ where: { id: order.tableId }, data: { status: "CLEANING" } })]
+                : []),
+        ])
+
+        revalidatePath("/pos")
+        revalidatePath("/dashboard/tables")
+        return { success: true }
+    } catch {
+        return { success: false }
     }
-    return orders
 }
 
-export async function getOrderById(orderId: string): Promise<Order | null> {
-    await delay(100)
-    return ORDERS.find((o) => o.id === orderId) ?? null
-}
-
-export async function updateOrderStatus(
-    orderId: string,
-    status: OrderStatus
-): Promise<{ success: boolean }> {
-    await delay(200)
-    const order = ORDERS.find((o) => o.id === orderId)
-    if (!order) return { success: false }
-    order.status = status
-    order.updatedAt = new Date()
-    return { success: true }
-}
-
-export async function payOrder(
-    orderId: string,
-    method: PaymentMethod
-): Promise<{ success: boolean }> {
-    await delay(300)
-    const order = ORDERS.find((o) => o.id === orderId)
-    if (!order) return { success: false }
-    order.paymentMethod = method
-    order.paidAt = new Date()
-    order.status = "COMPLETED"
-    order.updatedAt = new Date()
-    return { success: true }
-}
-
-export async function getActiveOrderByTable(tableId: string): Promise<Order | null> {
-    return ORDERS.find(
-        (o) => o.tableId === tableId && !["COMPLETED", "CANCELLED"].includes(o.status)
-    ) ?? null
+export async function getActiveOrderByTable(tableId: string) {
+    const order = await prisma.order.findFirst({
+        where: {
+            tableId,
+            status: { in: ["OPEN", "PREPARING", "SERVED"] },
+        },
+        include: {
+            items: { include: { product: true } },
+            table: true,
+            staff: true,
+            payments: true,
+        },
+        orderBy: { createdAt: "desc" },
+    })
+    return order ? serializeOrder(order) : null
 }
 
 export async function addItemsToOrder(
     orderId: string,
-    newItems: OrderItem[]
-): Promise<{ success: boolean; order?: Order; error?: string }> {
-    await delay(200)
-    const order = ORDERS.find((o) => o.id === orderId)
-    if (!order) return { success: false, error: "Không tìm thấy đơn hàng" }
-    if (["COMPLETED", "CANCELLED"].includes(order.status)) return { success: false, error: "Đơn hàng đã đóng" }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rawItems: any[]
+) {
+    try {
+        const newItems = rawItems.map((item: any) => ({
+            productId: item.productId ?? item.product?.id,
+            quantity: item.quantity,
+            price: item.price ?? item.unitPrice,
+            notes: item.notes ?? item.note,
+        }))
+        const addedSubtotal = newItems.reduce((s: number, i: any) => s + i.price * i.quantity, 0)
 
-    // Import tax calculation
-    const { calculateItemTax, getTaxConfig } = await import("./tax")
-    const taxConfig = await getTaxConfig()
+        await prisma.$transaction([
+            ...newItems.map((item: any) =>
+                prisma.orderItem.create({
+                    data: {
+                        orderId,
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        unitPrice: item.price,
+                        subtotal: item.price * item.quantity,
+                        notes: item.notes,
+                    },
+                })
+            ),
+            prisma.order.update({
+                where: { id: orderId },
+                data: {
+                    subtotal: { increment: addedSubtotal },
+                    totalAmount: { increment: addedSubtotal },
+                },
+            }),
+        ])
 
-    for (const newItem of newItems) {
-        const existing = order.items.find((i) => i.productId === newItem.product.id)
-        if (existing) {
-            existing.quantity += newItem.quantity
-        } else {
-            order.items.push({
-                id: newItem.id,
-                productId: newItem.product.id,
-                productName: newItem.product.name,
-                quantity: newItem.quantity,
-                unitPrice: newItem.unitPrice,
-                note: newItem.note,
-            })
-        }
+        const updated = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                items: { include: { product: true } },
+                table: true,
+                staff: true,
+                payments: true,
+            },
+        })
+
+        revalidatePath("/pos")
+        return { success: true, order: serializeOrder(updated) }
+    } catch {
+        return { success: false, error: "Không thể thêm món" }
     }
-
-    // Recalculate totals
-    order.subtotal = order.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
-    let totalTax = 0
-    if (taxConfig.enabled) {
-        for (const item of order.items) {
-            const itemSubtotal = item.unitPrice * item.quantity
-            const taxResult = await calculateItemTax(itemSubtotal)
-            totalTax += taxResult.taxAmount
-        }
-    }
-    order.tax = totalTax
-    order.total = taxConfig.enabled && !taxConfig.inclusive ? order.subtotal + totalTax : order.subtotal
-    order.updatedAt = new Date()
-
-    return { success: true, order }
 }
 
-export async function getActiveOrders(): Promise<Order[]> {
-    await delay(100)
-    return ORDERS.filter(
-        (o) => !["COMPLETED", "CANCELLED"].includes(o.status)
-    )
+export async function getActiveOrders() {
+    const orders = await prisma.order.findMany({
+        where: { status: { in: ["OPEN", "PREPARING", "SERVED"] } },
+        include: {
+            items: { include: { product: true } },
+            table: true,
+            staff: true,
+        },
+        orderBy: { createdAt: "desc" },
+    })
+    return orders.map(serializeOrder)
 }
 
 export async function getTodayStats() {
-    await delay(100)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    const todayOrders = ORDERS.filter(
-        (o) => o.createdAt >= today
-    )
-    const completed = todayOrders.filter((o) => o.status === "COMPLETED")
+    const orders = await prisma.order.findMany({
+        where: { createdAt: { gte: today } },
+        include: { payments: true },
+    })
+
+    const paidOrders = orders.filter((o) => o.status === "PAID")
 
     return {
-        totalOrders: todayOrders.length,
-        completedOrders: completed.length,
-        totalRevenue: completed.reduce((sum, o) => sum + o.total, 0),
-        averageOrderValue: completed.length > 0
-            ? Math.round(completed.reduce((sum, o) => sum + o.total, 0) / completed.length)
-            : 0,
+        totalOrders: orders.length,
+        paidOrders: paidOrders.length,
+        totalRevenue: paidOrders.reduce((s, o) => s + Number(o.totalAmount), 0),
+        avgOrderValue:
+            paidOrders.length > 0
+                ? Math.round(paidOrders.reduce((s, o) => s + Number(o.totalAmount), 0) / paidOrders.length)
+                : 0,
+        cancelled: orders.filter((o) => o.status === "CANCELLED").length,
+        activeOrders: orders.filter((o) => ["OPEN", "PREPARING", "SERVED"].includes(o.status)).length,
     }
 }
 
-// --- Auto NPL Deduction + COGS on Payment ---
-import { deductRecipeIngredients, type DeductionResult } from "./assets"
-
-export type StockWarning = {
-    materialName: string
-    level: "LOW" | "OUT"
-    remaining: number
-    unit: string
-}
-
-export type OrderCOGSResult = {
-    success: boolean
-    orderId: string
-    deductions: {
-        productName: string
-        qty: number
-        ingredientCost: number
-        sellingPrice: number
-        grossProfit: number
-        marginPct: number
-    }[]
-    stockWarnings: StockWarning[]
-    totalIngredientCost: number
-    errors: string[]
-}
-
-export async function processOrderWithCOGS(
-    orderId: string,
-    paymentMethod: PaymentMethod
-): Promise<OrderCOGSResult> {
-    await delay(100)
-
-    const order = ORDERS.find((o) => o.id === orderId)
-    if (!order) return { success: false, orderId, deductions: [], stockWarnings: [], totalIngredientCost: 0, errors: ["Order not found"] }
-
-    // Pay the order
-    order.paymentMethod = paymentMethod
-    order.paidAt = new Date()
-    order.status = "COMPLETED"
-    order.updatedAt = new Date()
-
-    const deductions: OrderCOGSResult["deductions"] = []
-    const stockWarnings: StockWarning[] = []
-    const errors: string[] = []
-    let totalIngredientCost = 0
-
-    // Process each item — try deducting recipe ingredients
-    for (const item of order.items) {
-        const result: DeductionResult = await deductRecipeIngredients(item.productId, item.quantity)
-
-        if (result.success) {
-            totalIngredientCost += result.totalIngredientCost
-            const grossProfit = (item.unitPrice * item.quantity) - result.totalIngredientCost
-            const marginPct = (item.unitPrice * item.quantity) > 0
-                ? Math.round((grossProfit / (item.unitPrice * item.quantity)) * 1000) / 10
-                : 0
-
-            deductions.push({
-                productName: item.productName,
-                qty: item.quantity,
-                ingredientCost: result.totalIngredientCost,
-                sellingPrice: item.unitPrice * item.quantity,
-                grossProfit,
-                marginPct,
-            })
-
-            // Collect stock warnings
-            for (const d of result.deductions) {
-                if (d.warning) {
-                    stockWarnings.push({
-                        materialName: d.materialName,
-                        level: d.remainingStock === 0 ? "OUT" : "LOW",
-                        remaining: d.remainingStock,
-                        unit: d.unit,
-                    })
-                }
-            }
-        } else if (result.errors.length > 0 && !result.errors[0]?.includes("Không tìm thấy công thức")) {
-            // Only log errors that aren't "no recipe found" (wine bottles, etc. don't have recipes)
-            errors.push(...result.errors)
-        }
-        // Products without recipes (wine bottles, spirits) — COGS comes from FIFO batches directly, handled separately
-    }
-
+// COGS placeholder — will be implemented when assets module is migrated
+export async function processOrderWithCOGS(orderId: string, paymentMethod: PaymentMethod) {
+    const result = await payOrder(orderId, paymentMethod)
     return {
-        success: true,
+        success: result.success,
         orderId,
-        deductions,
-        stockWarnings,
-        totalIngredientCost,
-        errors,
+        deductions: [],
+        stockWarnings: [],
+        totalIngredientCost: 0,
+        errors: [],
     }
 }

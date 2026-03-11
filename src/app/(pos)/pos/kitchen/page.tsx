@@ -341,9 +341,9 @@ function OrderCard({
                             <span className="text-xs font-medium text-green-900 leading-tight">
                                 {item.productName}
                             </span>
-                            {item.note && (
+                            {item.notes && (
                                 <p className="text-[9px] text-wine-600 italic">
-                                    📝 {item.note}
+                                    📝 {item.notes}
                                 </p>
                             )}
                         </div>

@@ -40,12 +40,15 @@ function formatDateTime(date: Date): string {
 }
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; icon: typeof Clock }> = {
+    OPEN: { label: "Mở", color: "bg-blue-100 text-blue-700 border-blue-300", icon: Clock },
     PENDING: { label: "Chờ xử lý", color: "bg-amber-100 text-amber-700 border-amber-300", icon: Clock },
     PREPARING: { label: "Đang làm", color: "bg-orange-100 text-orange-700 border-orange-300", icon: ChefHat },
     READY: { label: "Sẵn sàng", color: "bg-green-100 text-green-700 border-green-300", icon: CheckCircle2 },
     SERVED: { label: "Đã phục vụ", color: "bg-blue-100 text-blue-700 border-blue-300", icon: CheckCircle2 },
     COMPLETED: { label: "Hoàn thành", color: "bg-green-100 text-green-700 border-green-300", icon: CheckCircle2 },
+    PAID: { label: "Đã TT", color: "bg-green-100 text-green-700 border-green-300", icon: CheckCircle2 },
     CANCELLED: { label: "Đã huỷ", color: "bg-red-100 text-red-700 border-red-300", icon: XCircle },
+    VOID: { label: "Hủy", color: "bg-red-100 text-red-700 border-red-300", icon: XCircle },
 }
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
@@ -357,9 +360,9 @@ export default function OrdersPage() {
                                                     <p className="text-xs font-medium text-green-900 truncate">
                                                         {item.productName}
                                                     </p>
-                                                    {item.note && (
+                                                    {item.notes && (
                                                         <p className="text-[9px] text-wine-600 italic truncate">
-                                                            📝 {item.note}
+                                                            📝 {item.notes}
                                                         </p>
                                                     )}
                                                 </div>

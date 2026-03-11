@@ -69,6 +69,7 @@ function fmtK(n: number) {
 
 const PO_STATUS: Record<POStatus, { label: string; cls: string }> = {
     DRAFT: { label: "Nháp", cls: "bg-cream-200 text-cream-600" },
+    ORDERED: { label: "Đã đặt", cls: "bg-blue-100 text-blue-600" },
     SENT: { label: "Đã gửi", cls: "bg-blue-100 text-blue-700" },
     PARTIAL: { label: "Nhận 1 phần", cls: "bg-amber-100 text-amber-700" },
     RECEIVED: { label: "Đã nhận", cls: "bg-green-100 text-green-700" },
@@ -150,7 +151,7 @@ export default function ProcurementPage() {
         const unreceived = po.items.filter((i) => i.receivedQty < i.quantity)
         if (unreceived.length === 0) { toast.info("Đã nhận đủ hàng"); return }
         const receivedItems = unreceived.map((item) => ({ itemId: item.id, receivedQty: item.quantity - item.receivedQty }))
-        const result = await receivePurchaseOrder(po.id, receivedItems, staff?.fullName ?? "Staff", "Nhận đủ hàng")
+        const result = await receivePurchaseOrder(po.id, receivedItems, staff?.fullName ?? "Staff")
         if (result.success) {
             toast.success("Nhận hàng thành công! → Tạo FIFO batch")
             setExpandedPO(null)
@@ -267,7 +268,7 @@ export default function ProcurementPage() {
                                                 <div className="w-[90px] px-3 py-3 text-center">
                                                     <span className={cn("inline-block rounded-full px-2 py-0.5 text-[9px] font-bold leading-tight", cfg.cls)}>{cfg.label}</span>
                                                 </div>
-                                                <div className="w-[90px] px-3 py-3 text-center text-[11px] text-cream-500">{po.expectedDate}</div>
+                                                <div className="w-[90px] px-3 py-3 text-center text-[11px] text-cream-500">{po.expectedDate ? (typeof po.expectedDate === 'string' ? po.expectedDate : new Date(po.expectedDate).toLocaleDateString('vi-VN')) : '—'}</div>
                                                 <div className="w-[60px] px-3 py-3 text-center">
                                                     {isExpanded ? <ChevronUp className="inline h-3.5 w-3.5 text-cream-400" /> : <ChevronDown className="inline h-3.5 w-3.5 text-cream-400" />}
                                                 </div>
@@ -435,7 +436,7 @@ export default function ProcurementPage() {
                                         <div className="space-y-0.5">
                                             {gr.receivedItems.map((item, i) => (
                                                 <p key={i} className="text-[11px] text-cream-600 leading-tight">
-                                                    <span className="text-green-600">✓</span> {item.productName} <span className="font-mono">×{item.receivedQty}</span> <span className="text-cream-400">@₫{fmt(item.unitPrice)}</span>
+                                                    <span className="text-green-600">✓</span> {(item as any).productName} <span className="font-mono">×{(item as any).receivedQty}</span> <span className="text-cream-400">@₫{fmt((item as any).unitPrice ?? 0)}</span>
                                                 </p>
                                             ))}
                                         </div>
@@ -479,7 +480,7 @@ export default function ProcurementPage() {
                                         </td>
                                         <td className={cn(TD, "font-mono text-[11px] text-cream-500")}>{batch.sku}</td>
                                         <td className={cn(TD, "font-mono text-[11px] text-blue-700 font-bold")}>{batch.poNumber}</td>
-                                        <td className={cn(TDC, "text-[11px] text-cream-500")}>{batch.batchDate}</td>
+                                        <td className={cn(TDC, "text-[11px] text-cream-500")}>{batch.batchDate ? (typeof batch.batchDate === 'string' ? batch.batchDate : new Date(batch.batchDate).toLocaleDateString('vi-VN')) : '—'}</td>
                                         <td className={cn(TDC, "text-cream-500")}>{batch.initialQty}</td>
                                         <td className={TDC}>
                                             <span className={cn("font-bold", batch.remainingQty <= 2 ? "text-amber-600" : "text-green-900")}>{batch.remainingQty}</span>
@@ -822,14 +823,16 @@ function CreatePOModal({ suppliers, staffName, onClose, onCreated }: { suppliers
             items: validItems.map((i) => ({
                 productName: i.productName,
                 sku: i.sku || "N/A",
+                qty: parseInt(i.quantity),
                 quantity: parseInt(i.quantity),
+                unitCost: parseInt(i.unitPrice),
                 unitPrice: parseInt(i.unitPrice),
                 totalPrice: parseInt(i.quantity) * parseInt(i.unitPrice),
                 unit: i.unit,
                 category: i.category,
             })),
             notes,
-            expectedDate,
+            expectedDate: new Date(expectedDate),
             createdBy: staffName,
         })
         setSubmitting(false)

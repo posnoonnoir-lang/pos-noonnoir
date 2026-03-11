@@ -89,9 +89,9 @@ export const Receipt = forwardRef<HTMLDivElement, ReceiptProps>(
                                     {formatPrice(item.unitPrice * item.quantity)}
                                 </span>
                             </div>
-                            {item.note && (
+                            {item.notes && (
                                 <p className="text-[8px] text-gray-400 pl-3 italic">
-                                    → {item.note}
+                                    → {item.notes}
                                 </p>
                             )}
                         </div>

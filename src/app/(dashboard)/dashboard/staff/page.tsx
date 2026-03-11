@@ -52,7 +52,8 @@ const ROLE_ICONS: Record<StaffRole, typeof Wine> = {
     OWNER: Wine,
     MANAGER: Shield,
     BARTENDER: Martini,
-    SERVER: HandPlatter,
+    CASHIER: Award,
+    WAITER: HandPlatter,
     KITCHEN: ChefHat,
 }
 
@@ -60,7 +61,8 @@ const ROLE_COLORS: Record<StaffRole, string> = {
     OWNER: "bg-wine-100 text-wine-700 border-wine-300",
     MANAGER: "bg-blue-100 text-blue-700 border-blue-300",
     BARTENDER: "bg-amber-100 text-amber-700 border-amber-300",
-    SERVER: "bg-green-100 text-green-700 border-green-300",
+    CASHIER: "bg-teal-100 text-teal-700 border-teal-300",
+    WAITER: "bg-green-100 text-green-700 border-green-300",
     KITCHEN: "bg-orange-100 text-orange-700 border-orange-300",
 }
 
@@ -407,7 +409,7 @@ function AddStaffModal({
     const [form, setForm] = useState({
         fullName: "",
         pin: "",
-        role: "SERVER" as StaffRole,
+        role: "WAITER" as StaffRole,
         phone: "",
         email: "",
         shiftStart: "10:00",

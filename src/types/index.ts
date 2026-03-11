@@ -81,6 +81,7 @@ export type Product = {
     servingTemp: string | null
     decantingTime: string | null
     glassType: string | null
+    oxidationHours: number | null
     trackInventory: boolean
     lowStockAlert: number
     imageUrl: string | null
@@ -141,7 +142,7 @@ export type Customer = {
     fullName: string
     phone: string | null
     email: string | null
-    tier: "REGULAR" | "SILVER" | "GOLD" | "PLATINUM"
+    tier: string
     totalSpent: number
     visitCount: number
     notes: string | null
@@ -153,7 +154,7 @@ export type Customer = {
 // CUSTOMER TAB (Open Tab — uống trước trả sau)
 // ============================================================
 
-export type TabStatus = "OPEN" | "CLOSED" | "EXCEEDED"
+export type TabStatus = string
 
 export type TabItem = {
     id: string

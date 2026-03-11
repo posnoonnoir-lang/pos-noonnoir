@@ -1,6 +1,13 @@
 import { create } from "zustand"
 import { Product } from "@/types"
-import { FloorTable } from "@/lib/mock-data"
+
+export type FloorTable = {
+    id: string
+    tableNumber: string
+    seats: number
+    status: string
+    zoneId: string
+}
 
 export type OrderItem = {
     id: string
@@ -8,6 +15,11 @@ export type OrderItem = {
     quantity: number
     unitPrice: number
     note?: string
+    // Computed getters for compatibility
+    productId?: string
+    name?: string
+    price?: number
+    notes?: string
 }
 
 export type CartState = {

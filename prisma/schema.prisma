@@ -41,8 +41,11 @@ enum OrderType {
 
 enum OrderStatus {
   OPEN
+  PENDING
   PREPARING
+  READY
   SERVED
+  COMPLETED
   PAID
   CANCELLED
   VOID
@@ -61,6 +64,7 @@ enum PaymentMethod {
   BANK_TRANSFER
   MOMO
   VNPAY
+  QR
 }
 
 enum PaymentState {
@@ -265,6 +269,7 @@ model Product {
   servingTemp      String?     @map("serving_temp")
   decantingTime    String?     @map("decanting_time")
   glassType        String?     @map("glass_type")
+  oxidationHours   Int?        @map("oxidation_hours")
   trackInventory   Boolean     @default(true) @map("track_inventory")
   lowStockAlert    Int         @default(5) @map("low_stock_alert")
   imageUrl         String?     @map("image_url")
@@ -637,7 +642,8 @@ model ShiftRecord {
   openedAt     DateTime  @default(now()) @map("opened_at")
   closedAt     DateTime? @map("closed_at")
 
-  staff Staff @relation(fields: [staffId], references: [id])
+  staff   Staff         @relation(fields: [staffId], references: [id])
+  targets ShiftTarget[]
 
   @@index([staffId])
   @@map("shift_record")
@@ -759,4 +765,100 @@ model AuditLog {
   @@index([tableName, recordId])
   @@index([createdAt])
   @@map("audit_log")
+}
+
+// ============================================================
+// SHIFT TARGET (V2 — Chỉ tiêu ca)
+// ============================================================
+
+model ShiftTarget {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  shiftRecordId   String    @map("shift_record_id") @db.Uuid
+  revenueTarget   Decimal   @default(0) @map("revenue_target") @db.Decimal(12, 2)
+  orderTarget     Int       @default(0) @map("order_target")
+  customerTarget  Int       @default(0) @map("customer_target")
+  pushProducts    Json?     @map("push_products")
+  suggestedBy     String    @default("SYSTEM") @map("suggested_by")
+  approvedBy      String?   @map("approved_by") @db.Uuid
+  approvedAt      DateTime? @map("approved_at")
+  isApproved      Boolean   @default(false) @map("is_approved")
+  actualRevenue   Decimal?  @map("actual_revenue") @db.Decimal(12, 2)
+  actualOrders    Int?      @map("actual_orders")
+  actualCustomers Int?      @map("actual_customers")
+  actualPushSold  Json?     @map("actual_push_sold")
+  evaluation      String?
+  evaluatedAt     DateTime? @map("evaluated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  shift ShiftRecord @relation(fields: [shiftRecordId], references: [id])
+
+  @@index([shiftRecordId])
+  @@map("shift_target")
+}
+
+// ============================================================
+// FORECAST (V2 — Dự báo đặt hàng)
+// ============================================================
+
+model ForecastConfig {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId      String   @unique @map("product_id") @db.Uuid
+  avgWeeklySales Decimal  @default(0) @map("avg_weekly_sales") @db.Decimal(12, 3)
+  seasonFactor   Decimal  @default(1.0) @map("season_factor") @db.Decimal(4, 2)
+  trendFactor    Decimal  @default(1.0) @map("trend_factor") @db.Decimal(4, 2)
+  leadTimeDays   Int      @default(3) @map("lead_time_days")
+  safetyStock    Int      @default(5) @map("safety_stock")
+  lastCalculated DateTime @default(now()) @map("last_calculated")
+
+  @@map("forecast_config")
+}
+
+model ForecastSuggestion {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId       String   @map("product_id") @db.Uuid
+  productName     String   @map("product_name")
+  currentStock    Decimal  @map("current_stock") @db.Decimal(12, 3)
+  predictedDemand Decimal  @map("predicted_demand") @db.Decimal(12, 3)
+  suggestedQty    Decimal  @map("suggested_qty") @db.Decimal(12, 3)
+  confidence      Decimal  @default(0.7) @db.Decimal(3, 2)
+  reason          String?
+  status          String   @default("PENDING")
+  weekOf          DateTime @map("week_of") @db.Date
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([status, weekOf])
+  @@map("forecast_suggestion")
+}
+
+// ============================================================
+// FEEDBACK (V2 — QR Feedback từ khách hàng)
+// ============================================================
+
+model FeedbackSession {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String   @map("order_id") @db.Uuid
+  orderNo   String   @map("order_no")
+  token     String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  items FeedbackItem[]
+
+  @@map("feedback_session")
+}
+
+model FeedbackItem {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId   String    @map("session_id") @db.Uuid
+  productId   String    @map("product_id") @db.Uuid
+  productName String    @map("product_name")
+  rating      Int?
+  comment     String?
+  submittedAt DateTime? @map("submitted_at")
+
+  session FeedbackSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId])
+  @@map("feedback_item")
 }

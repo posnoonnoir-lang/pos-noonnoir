@@ -24,6 +24,9 @@ import {
     ChefHat,
     ClipboardList,
     Handshake,
+    AlertTriangle,
+    TrendingUp,
+    MessageCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
@@ -63,6 +66,14 @@ const navSections = [
             { label: "Khách hàng", href: "/dashboard/customers", icon: Heart },
             { label: "Khuyến mãi", href: "/dashboard/promotions", icon: Tag },
             { label: "Wine Guide", href: "/dashboard/wine-guide", icon: BookOpen },
+            { label: "Feedback", href: "/dashboard/feedback", icon: MessageCircle },
+        ],
+    },
+    {
+        label: "V2",
+        items: [
+            { label: "Cảnh báo", href: "/dashboard/alerts", icon: AlertTriangle },
+            { label: "Forecast", href: "/dashboard/forecast", icon: TrendingUp },
         ],
     },
 ]

@@ -1,164 +1,195 @@
 "use server"
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+import { prisma } from "@/lib/prisma"
+import { revalidatePath } from "next/cache"
 
-export type InventoryStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK"
+// ============================================================
+// INVENTORY — Stock movements, ingredients, wine bottles
+// ============================================================
 
-export type InventoryItem = {
-    id: string
-    productId: string
-    productName: string
-    category: string
-    sku: string
-    currentStock: number
-    minStock: number
-    maxStock: number
-    unit: string
-    costPrice: number
-    lastRestocked: string
-    status: InventoryStatus
-    expiryDate: string | null
+export async function getInventoryItems() {
+    const [products, bottles, ingredients] = await Promise.all([
+        prisma.product.findMany({
+            where: { isActive: true, trackInventory: true },
+            include: { category: true },
+        }),
+        prisma.wineBottle.findMany({
+            include: { product: true, consignment: true },
+            orderBy: { receivedAt: "desc" },
+        }),
+        prisma.ingredient.findMany({
+            where: { isActive: true },
+            orderBy: { name: "asc" },
+        }),
+    ])
+
+    return {
+        products: products.map((p) => ({
+            id: p.id, name: p.name, type: p.type,
+            categoryName: p.category.name,
+            costPrice: Number(p.costPrice),
+            sellPrice: Number(p.sellPrice),
+            lowStockAlert: p.lowStockAlert,
+        })),
+        bottles: bottles.map((b) => ({
+            id: b.id,
+            productName: b.product.name,
+            batchCode: b.batchCode,
+            ownership: b.ownershipType,
+            status: b.status,
+            glassesRemaining: b.glassesRemaining,
+            openedAt: b.openedAt,
+            costPrice: Number(b.costPrice ?? 0),
+            receivedAt: b.receivedAt,
+            consignmentNo: b.consignment?.consignmentNo ?? null,
+        })),
+        ingredients: ingredients.map((i) => ({
+            id: i.id, name: i.name, unit: i.unit,
+            currentStock: Number(i.currentStock),
+            minStock: Number(i.minStock),
+            costPerUnit: Number(i.costPerUnit),
+            isLowStock: Number(i.currentStock) <= Number(i.minStock),
+        })),
+    }
 }
 
-export type StockMovement = {
-    id: string
-    itemId: string
-    productName: string
-    type: "IN" | "OUT" | "ADJUSTMENT" | "WASTE"
+export async function getStockMovements(params?: { limit?: number }) {
+    const movements = await prisma.stockMovement.findMany({
+        orderBy: { createdAt: "desc" },
+        take: params?.limit ?? 50,
+    })
+    return movements.map((m) => ({
+        id: m.id, type: m.type,
+        productId: m.productId,
+        quantity: Number(m.quantity),
+        unitCost: m.unitCost ? Number(m.unitCost) : null,
+        reason: m.reason,
+        createdAt: m.createdAt,
+    }))
+}
+
+export async function createStockMovement(data: {
+    type: "PURCHASE" | "WASTE" | "ADJUSTMENT" | "RETURN"
+    productId?: string
+    bottleId?: string
     quantity: number
-    previousStock: number
-    newStock: number
-    reason: string
-    staffName: string
-    createdAt: string
+    unitCost?: number
+    reason?: string
+    createdBy?: string
+}) {
+    try {
+        await prisma.stockMovement.create({
+            data: {
+                type: data.type,
+                productId: data.productId,
+                bottleId: data.bottleId,
+                quantity: data.quantity,
+                unitCost: data.unitCost,
+                reason: data.reason,
+                createdBy: data.createdBy,
+            },
+        })
+        revalidatePath("/dashboard/inventory")
+        return { success: true }
+    } catch {
+        return { success: false }
+    }
 }
 
-const MOCK_INVENTORY: InventoryItem[] = [
-    {
-        id: "inv-1", productId: "p-1", productName: "Château Margaux 2018", category: "Wine by Bottle",
-        sku: "WB-CM-2018", currentStock: 8, minStock: 3, maxStock: 24, unit: "chai",
-        costPrice: 4_200_000, lastRestocked: "2026-03-08", status: "IN_STOCK", expiryDate: null,
-    },
-    {
-        id: "inv-2", productId: "p-2", productName: "Opus One 2019", category: "Wine by Bottle",
-        sku: "WB-OO-2019", currentStock: 4, minStock: 2, maxStock: 12, unit: "chai",
-        costPrice: 7_800_000, lastRestocked: "2026-03-05", status: "IN_STOCK", expiryDate: null,
-    },
-    {
-        id: "inv-3", productId: "p-3", productName: "Aperol", category: "Spirits",
-        sku: "SP-APR-01", currentStock: 2, minStock: 3, maxStock: 12, unit: "chai",
-        costPrice: 450_000, lastRestocked: "2026-03-01", status: "LOW_STOCK", expiryDate: null,
-    },
-    {
-        id: "inv-4", productId: "p-4", productName: "Cheese Board Mix", category: "Food Ingredients",
-        sku: "FD-CB-01", currentStock: 5, minStock: 2, maxStock: 15, unit: "kg",
-        costPrice: 180_000, lastRestocked: "2026-03-09", status: "IN_STOCK", expiryDate: "2026-03-17",
-    },
-    {
-        id: "inv-5", productId: "p-5", productName: "Truffle Oil", category: "Food Ingredients",
-        sku: "FD-TO-01", currentStock: 1, minStock: 2, maxStock: 6, unit: "chai",
-        costPrice: 320_000, lastRestocked: "2026-02-28", status: "LOW_STOCK", expiryDate: "2026-04-15",
-    },
-    {
-        id: "inv-6", productId: "p-6", productName: "Pinot Noir (House)", category: "Wine by Glass",
-        sku: "WG-PN-01", currentStock: 3, minStock: 2, maxStock: 10, unit: "chai",
-        costPrice: 280_000, lastRestocked: "2026-03-07", status: "IN_STOCK", expiryDate: null,
-    },
-    {
-        id: "inv-7", productId: "p-7", productName: "Tiramisu Mix", category: "Dessert Ingredients",
-        sku: "DS-TM-01", currentStock: 0, minStock: 3, maxStock: 10, unit: "kg",
-        costPrice: 150_000, lastRestocked: "2026-02-25", status: "OUT_OF_STOCK", expiryDate: "2026-03-25",
-    },
-    {
-        id: "inv-8", productId: "p-8", productName: "Campari", category: "Spirits",
-        sku: "SP-CMP-01", currentStock: 5, minStock: 2, maxStock: 8, unit: "chai",
-        costPrice: 520_000, lastRestocked: "2026-03-06", status: "IN_STOCK", expiryDate: null,
-    },
-    {
-        id: "inv-9", productId: "p-9", productName: "Fries (Frozen)", category: "Food Ingredients",
-        sku: "FD-FR-01", currentStock: 8, minStock: 5, maxStock: 20, unit: "kg",
-        costPrice: 45_000, lastRestocked: "2026-03-10", status: "IN_STOCK", expiryDate: "2026-06-10",
-    },
-    {
-        id: "inv-10", productId: "p-10", productName: "Prosecco (Spritz)", category: "Sparkling",
-        sku: "SK-PRO-01", currentStock: 6, minStock: 4, maxStock: 18, unit: "chai",
-        costPrice: 350_000, lastRestocked: "2026-03-04", status: "IN_STOCK", expiryDate: null,
-    },
-]
+export async function createIngredient(data: {
+    name: string; unit: string; currentStock: number; minStock: number; costPerUnit: number
+}) {
+    try {
+        const ingredient = await prisma.ingredient.create({ data })
+        revalidatePath("/dashboard/inventory")
+        return { success: true, data: ingredient }
+    } catch {
+        return { success: false }
+    }
+}
 
-const MOCK_MOVEMENTS: StockMovement[] = [
-    { id: "mv-1", itemId: "inv-1", productName: "Château Margaux 2018", type: "OUT", quantity: 2, previousStock: 10, newStock: 8, reason: "Bán hàng", staffName: "Chien", createdAt: "2026-03-10T13:30:00" },
-    { id: "mv-2", itemId: "inv-3", productName: "Aperol", type: "OUT", quantity: 1, previousStock: 3, newStock: 2, reason: "Bán hàng", staffName: "Linh", createdAt: "2026-03-10T12:15:00" },
-    { id: "mv-3", itemId: "inv-9", productName: "Fries (Frozen)", type: "IN", quantity: 8, previousStock: 0, newStock: 8, reason: "Nhập kho", staffName: "Duc", createdAt: "2026-03-10T09:00:00" },
-    { id: "mv-4", itemId: "inv-7", productName: "Tiramisu Mix", type: "WASTE", quantity: 2, previousStock: 2, newStock: 0, reason: "Hết hạn", staffName: "Duc", createdAt: "2026-03-09T17:00:00" },
-    { id: "mv-5", itemId: "inv-4", productName: "Cheese Board Mix", type: "IN", quantity: 5, previousStock: 0, newStock: 5, reason: "Nhập kho", staffName: "Hoa", createdAt: "2026-03-09T08:30:00" },
-]
-
-export async function getInventory(): Promise<InventoryItem[]> {
-    await delay(150)
-    return [...MOCK_INVENTORY]
+export async function updateIngredientStock(id: string, newStock: number) {
+    try {
+        await prisma.ingredient.update({ where: { id }, data: { currentStock: newStock } })
+        revalidatePath("/dashboard/inventory")
+        return { success: true }
+    } catch {
+        return { success: false }
+    }
 }
 
 export async function getInventoryStats() {
-    await delay(100)
+    const [bottleCount, ingredients] = await Promise.all([
+        prisma.wineBottle.groupBy({
+            by: ["status"],
+            _count: true,
+        }),
+        prisma.ingredient.findMany({ where: { isActive: true } }),
+    ])
+
+    const lowStockIngredients = ingredients.filter((i) => Number(i.currentStock) <= Number(i.minStock))
+
     return {
-        totalItems: MOCK_INVENTORY.length,
-        inStock: MOCK_INVENTORY.filter((i) => i.status === "IN_STOCK").length,
-        lowStock: MOCK_INVENTORY.filter((i) => i.status === "LOW_STOCK").length,
-        outOfStock: MOCK_INVENTORY.filter((i) => i.status === "OUT_OF_STOCK").length,
-        totalValue: MOCK_INVENTORY.reduce((s, i) => s + i.costPrice * i.currentStock, 0),
-        expiringSoon: MOCK_INVENTORY.filter((i) => {
-            if (!i.expiryDate) return false
-            const days = (new Date(i.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-            return days > 0 && days <= 14
-        }).length,
+        totalBottles: bottleCount.reduce((s, b) => s + b._count, 0),
+        inStockBottles: bottleCount.find((b) => b.status === "IN_STOCK")?._count ?? 0,
+        openedBottles: bottleCount.find((b) => b.status === "OPENED")?._count ?? 0,
+        totalIngredients: ingredients.length,
+        lowStockAlerts: lowStockIngredients.length,
+        // backward compat aliases
+        totalItems: bottleCount.reduce((s, b) => s + b._count, 0) + ingredients.length,
+        inStock: bottleCount.find((b) => b.status === "IN_STOCK")?._count ?? 0,
+        lowStock: lowStockIngredients.length,
+        outOfStock: 0,
+        totalValue: 0,
+        expiringSoon: 0,
     }
 }
 
-export async function getStockMovements(): Promise<StockMovement[]> {
-    await delay(100)
-    return [...MOCK_MOVEMENTS]
+// Fixed assets / depreciation stubs
+export async function getFixedAssets() { return [] }
+export async function calculateDepreciation() { return { success: true, processed: 0 } }
+
+// Types for inventory page
+export type InventoryItem = {
+    id: string; name: string; productName?: string; type: string; categoryName: string
+    sku?: string; category?: string; unit?: string
+    costPrice: number; sellPrice: number; currentStock: number
+    lowStockAlert: number; minStock?: number; maxStock?: number
+    expiryDate?: Date | null; status: InventoryStatus
 }
 
-export async function adjustStock(
-    itemId: string,
-    type: "IN" | "OUT" | "ADJUSTMENT" | "WASTE",
-    quantity: number,
-    reason: string,
-    staffName: string
-): Promise<{ success: boolean; error?: string }> {
-    await delay(200)
-    const item = MOCK_INVENTORY.find((i) => i.id === itemId)
-    if (!item) return { success: false, error: "Không tìm thấy sản phẩm" }
+export type InventoryStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK"
 
-    const previousStock = item.currentStock
-    if (type === "IN") {
-        item.currentStock += quantity
+export type StockMovement = {
+    id: string; type: string; productId: string | null; productName?: string
+    quantity: number; unitCost: number | null; reason: string | null
+    staffName?: string; previousStock?: number; newStock?: number
+    createdAt: Date
+}
+
+// Alias functions for backward compat
+export async function getInventory() {
+    const data = await getInventoryItems()
+    return data.products.map((p) => ({
+        ...p, currentStock: 0, status: "IN_STOCK" as InventoryStatus,
+    }))
+}
+
+export async function adjustStock(productId: string, typeOrAdjustment: string | number, quantityOrReason?: number | string, reason?: string, _staffName?: string) {
+    // Accept both (id, adjustment, reason?) and (id, type, qty, reason, staffName)
+    let type: string
+    let quantity: number
+    let reasonStr: string | undefined
+    if (typeof typeOrAdjustment === "number") {
+        type = typeOrAdjustment >= 0 ? "PURCHASE" : "ADJUSTMENT"
+        quantity = Math.abs(typeOrAdjustment)
+        reasonStr = quantityOrReason as string | undefined
     } else {
-        if (item.currentStock < quantity) {
-            return { success: false, error: "Không đủ tồn kho" }
-        }
-        item.currentStock -= quantity
+        type = typeOrAdjustment as string
+        quantity = quantityOrReason as number
+        reasonStr = reason
     }
-
-    if (item.currentStock === 0) item.status = "OUT_OF_STOCK"
-    else if (item.currentStock <= item.minStock) item.status = "LOW_STOCK"
-    else item.status = "IN_STOCK"
-
-    if (type === "IN") item.lastRestocked = new Date().toISOString().split("T")[0]
-
-    MOCK_MOVEMENTS.unshift({
-        id: `mv-${Date.now()}`,
-        itemId,
-        productName: item.productName,
-        type,
-        quantity,
-        previousStock,
-        newStock: item.currentStock,
-        reason,
-        staffName,
-        createdAt: new Date().toISOString(),
-    })
-
-    return { success: true }
+    const result = await createStockMovement({ type: type as any, productId, quantity, reason: reasonStr })
+    return { ...result, error: result.success ? undefined : "Lỗi" }
 }
+

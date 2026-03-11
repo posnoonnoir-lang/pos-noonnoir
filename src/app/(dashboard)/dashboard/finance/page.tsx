@@ -235,7 +235,7 @@ export default function FinancePage() {
                                     <tr key={record.id} className="hover:bg-green-50/50 transition-colors">
                                         <td className={TD}>
                                             <p className="font-medium leading-tight">{record.productName}</p>
-                                            <p className="text-[10px] text-cream-400 leading-tight">{record.batchesUsed.map((b) => b.poNumber).join(", ")} · {record.soldDate}</p>
+                                            <p className="text-[10px] text-cream-400 leading-tight">{Array.isArray(record.batchesUsed) ? record.batchesUsed.map((b: any) => b.poNumber).join(", ") : `${record.batchesUsed} batches`} · {record.soldDate ? (typeof record.soldDate === 'string' ? record.soldDate : new Date(record.soldDate).toLocaleDateString('vi-VN')) : ''}</p>
                                         </td>
                                         <td className={TDR}>₫{fmt(record.sellingPrice)}</td>
                                         <td className={cn(TDR, "text-wine-600")}>₫{fmt(record.fifoCost)}</td>

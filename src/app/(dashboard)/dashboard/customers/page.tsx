@@ -43,13 +43,14 @@ function fmtK(n: number) {
     return String(n)
 }
 
-type TierKey = "REGULAR" | "SILVER" | "GOLD" | "PLATINUM"
+type TierKey = "REGULAR" | "SILVER" | "GOLD" | "PLATINUM" | "VIP"
 
 const TIER_DISPLAY: Record<TierKey, { label: string; cls: string; icon: string; bg: string }> = {
     REGULAR: { label: "Regular", cls: "text-cream-600", icon: "☕", bg: "bg-cream-100 border-cream-300 text-cream-600" },
     SILVER: { label: "Silver", cls: "text-slate-600", icon: "🥈", bg: "bg-slate-100 border-slate-300 text-slate-700" },
     GOLD: { label: "Gold", cls: "text-amber-600", icon: "🥇", bg: "bg-amber-100 border-amber-300 text-amber-700" },
     PLATINUM: { label: "Platinum", cls: "text-indigo-600", icon: "💎", bg: "bg-indigo-100 border-indigo-300 text-indigo-700" },
+    VIP: { label: "VIP", cls: "text-wine-600", icon: "👑", bg: "bg-wine-100 border-wine-300 text-wine-700" },
 }
 
 export default function CustomersPage() {
@@ -153,7 +154,7 @@ export default function CustomersPage() {
             <div className="space-y-2">
                 {filteredCustomers.map((cust) => {
                     const isExpanded = expandedId === cust.id
-                    const tierCfg = TIER_DISPLAY[cust.tier]
+                    const tierCfg = TIER_DISPLAY[(cust.tier as TierKey) in TIER_DISPLAY ? cust.tier as TierKey : "REGULAR"]
 
                     return (
                         <div key={cust.id} className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md">
@@ -178,7 +179,7 @@ export default function CustomersPage() {
                                     <div className="flex items-center gap-3 mt-0.5">
                                         <span className="flex items-center gap-1 text-[11px] text-cream-500"><Phone className="h-3 w-3" /> {cust.phone}</span>
                                         {cust.email && <span className="flex items-center gap-1 text-[11px] text-cream-500"><Mail className="h-3 w-3" /> {cust.email}</span>}
-                                        {cust.birthday && <span className="flex items-center gap-1 text-[11px] text-cream-500"><Calendar className="h-3 w-3" /> {cust.birthday}</span>}
+                                        {cust.birthday && <span className="flex items-center gap-1 text-[11px] text-cream-500"><Calendar className="h-3 w-3" /> {typeof cust.birthday === 'string' ? cust.birthday : new Date(cust.birthday).toLocaleDateString('vi-VN')}</span>}
                                     </div>
                                 </div>
 
@@ -213,7 +214,7 @@ export default function CustomersPage() {
                                                 <div className="rounded-lg bg-white border border-cream-200 p-3 space-y-2 text-xs">
                                                     <div className="flex justify-between"><span className="text-cream-500">SĐT</span><span className="font-mono">{cust.phone}</span></div>
                                                     <div className="flex justify-between"><span className="text-cream-500">Email</span><span>{cust.email ?? "—"}</span></div>
-                                                    <div className="flex justify-between"><span className="text-cream-500">Sinh nhật</span><span>{cust.birthday ?? "—"}</span></div>
+                                                    <div className="flex justify-between"><span className="text-cream-500">Sinh nhật</span><span>{cust.birthday ? (typeof cust.birthday === 'string' ? cust.birthday : new Date(cust.birthday).toLocaleDateString('vi-VN')) : "—"}</span></div>
                                                     <div className="flex justify-between"><span className="text-cream-500">Khách từ</span><span>{new Date(cust.createdAt).toLocaleDateString("vi-VN")}</span></div>
                                                 </div>
                                             </div>
@@ -277,16 +278,16 @@ export default function CustomersPage() {
                                                 <p className="text-[9px] font-bold uppercase text-cream-400 mb-1.5">Tiến trình hạng</p>
                                                 {(() => {
                                                     const tiers: TierKey[] = ["REGULAR", "SILVER", "GOLD", "PLATINUM"]
-                                                    const currentIdx = tiers.indexOf(cust.tier)
+                                                    const currentIdx = tiers.indexOf(cust.tier as TierKey)
                                                     const nextTier = currentIdx < tiers.length - 1 ? tiers[currentIdx + 1] : null
-                                                    const thresholds: Record<TierKey, number> = { REGULAR: 0, SILVER: 10000000, GOLD: 30000000, PLATINUM: 80000000 }
+                                                    const thresholds: Record<TierKey, number> = { REGULAR: 0, SILVER: 10000000, GOLD: 30000000, PLATINUM: 80000000, VIP: 100000000 }
                                                     if (!nextTier) return <p className="text-[10px] text-indigo-600 font-bold">💎 Đã đạt hạng cao nhất!</p>
                                                     const needed = thresholds[nextTier] - cust.totalSpent
                                                     const progress = Math.min(100, (cust.totalSpent / thresholds[nextTier]) * 100)
                                                     return (
                                                         <>
                                                             <div className="flex justify-between text-[10px] mb-1">
-                                                                <span className="text-cream-500">{TIER_DISPLAY[cust.tier].icon} {TIER_DISPLAY[cust.tier].label}</span>
+                                                                <span className="text-cream-500">{TIER_DISPLAY[(cust.tier as TierKey) in TIER_DISPLAY ? cust.tier as TierKey : "REGULAR"].icon} {TIER_DISPLAY[(cust.tier as TierKey) in TIER_DISPLAY ? cust.tier as TierKey : "REGULAR"].label}</span>
                                                                 <span className={cn("font-bold", TIER_DISPLAY[nextTier].cls)}>{TIER_DISPLAY[nextTier].icon} {TIER_DISPLAY[nextTier].label}</span>
                                                             </div>
                                                             <div className="h-2 rounded-full bg-cream-200 overflow-hidden">

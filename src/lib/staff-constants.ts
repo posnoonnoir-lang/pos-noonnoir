@@ -1,10 +1,14 @@
-import type { StaffRole, StaffStatus } from "@/actions/staff"
+import type { StaffRole } from "@prisma/client"
+
+export type { StaffRole } from "@prisma/client"
+export type StaffStatus = "ACTIVE" | "INACTIVE" | "ON_LEAVE"
 
 export const ROLE_LABELS: Record<StaffRole, string> = {
     OWNER: "Chủ quán",
     MANAGER: "Quản lý",
     BARTENDER: "Bartender",
-    SERVER: "Phục vụ",
+    CASHIER: "Thu ngân",
+    WAITER: "Phục vụ",
     KITCHEN: "Bếp",
 }
 

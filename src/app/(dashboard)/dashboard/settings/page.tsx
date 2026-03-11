@@ -208,7 +208,7 @@ function TaxSettings() {
 
     const loadReport = useCallback(async () => {
         const [report, breakdown] = await Promise.all([
-            getTaxReport(2026),
+            getTaxReport("2026"),
             getTaxBreakdownByRate(),
         ])
         setTaxReport(report)
