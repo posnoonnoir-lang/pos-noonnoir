@@ -20,14 +20,15 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getTables, getZones, updateTableStatus, getTableStats, createTable, createZone, deleteTable, deleteZone } from "@/actions/tables"
-import { getActiveOrders } from "@/actions/orders"
+import { updateTableStatus, createTable, createZone, deleteTable, deleteZone } from "@/actions/tables"
+import { getTablesPageData } from "@/actions/tables-loader"
 import dynamic from "next/dynamic"
 
 const FloorPlanEditor = dynamic(() => import("@/components/floor-plan-editor"), { ssr: false })
 
-type FloorTable = Awaited<ReturnType<typeof getTables>>[number]
-type TableZone = Awaited<ReturnType<typeof getZones>>[number]
+type TablesPageData = Awaited<ReturnType<typeof getTablesPageData>>
+type FloorTable = TablesPageData["tables"][number]
+type TableZone = TablesPageData["zones"][number]
 
 function formatPrice(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -98,26 +99,16 @@ export default function TablesPage() {
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
-            const [zonesData, tablesData, statsData, activeOrders] = await Promise.all([
-                getZones(),
-                getTables(selectedZone === "all" ? undefined : selectedZone),
-                getTableStats(),
-                getActiveOrders(),
-            ])
-            setZones(zonesData)
-            setTables(tablesData)
-            setStats(statsData)
-
-            // Build order map by tableId
+            const data = await getTablesPageData(selectedZone === "all" ? undefined : selectedZone)
+            setZones(data.zones as TableZone[])
+            setTables(data.tables as FloorTable[])
+            setStats(data.stats)
+            // Convert server order map (string dates) to client map
             const orderMap: Record<string, { orderNo: string; total: number; createdAt: Date; itemCount: number }> = {}
-            for (const order of activeOrders) {
-                if (order.tableId) {
-                    orderMap[order.tableId] = {
-                        orderNo: order.orderNumber,
-                        total: order.total,
-                        createdAt: new Date(order.createdAt),
-                        itemCount: order.items.length,
-                    }
+            for (const [tableId, order] of Object.entries(data.activeOrderMap)) {
+                orderMap[tableId] = {
+                    ...order,
+                    createdAt: new Date(order.createdAt),
                 }
             }
             setActiveOrderMap(orderMap)
@@ -129,7 +120,6 @@ export default function TablesPage() {
 
     useEffect(() => {
         loadData()
-        // Auto-refresh every 30 seconds
         const interval = setInterval(loadData, 30000)
         return () => clearInterval(interval)
     }, [loadData])
@@ -146,9 +136,9 @@ export default function TablesPage() {
     return (
         <div className="p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-6 animate-fade-in-up">
                 <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 icon-hover">
                         <Armchair className="h-5 w-5 text-green-700" />
                     </div>
                     <div>
@@ -161,7 +151,7 @@ export default function TablesPage() {
                         variant="outline"
                         size="sm"
                         onClick={loadData}
-                        className="border-cream-300 text-cream-600"
+                        className="border-cream-300 text-cream-600 btn-press"
                     >
                         <RefreshCcw className="mr-1.5 h-3.5 w-3.5" />
                         Làm mới
@@ -170,12 +160,12 @@ export default function TablesPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => setShowZoneManager(true)}
-                        className="border-cream-300 text-cream-600"
+                        className="border-cream-300 text-cream-600 btn-press"
                     >
                         <MapPin className="mr-1.5 h-3.5 w-3.5" />
                         Khu vực
                     </Button>
-                    <Button size="sm" className="bg-green-900 text-cream-50 hover:bg-green-800" onClick={() => setShowAddTable(true)}>
+                    <Button size="sm" className="bg-green-900 text-cream-50 hover:bg-green-800 btn-press" onClick={() => setShowAddTable(true)}>
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
                         Thêm bàn
                     </Button>
@@ -295,7 +285,7 @@ export default function TablesPage() {
                                 setSelectedTable(isSelected ? null : table)
                             }
                             className={cn(
-                                "relative flex flex-col items-center rounded-xl border-2 p-4 transition-all hover:shadow-md",
+                                "relative flex flex-col items-center rounded-xl border-2 p-4 card-hover",
                                 cfg.bg,
                                 cfg.border,
                                 isSelected && `ring-2 ${cfg.ring} shadow-lg scale-[1.02]`
@@ -517,8 +507,8 @@ function AddTableModal({ zones, onClose, onCreated }: { zones: TableZone[]; onCl
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-[380px] rounded-2xl border border-cream-200 bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-modal-backdrop">
+            <div className="w-[380px] rounded-2xl border border-cream-200 bg-white shadow-2xl animate-modal-content">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200">
                     <h2 className="text-lg font-bold text-green-900">➕ Thêm bàn mới</h2>
                     <button onClick={onClose} className="rounded-lg p-2 hover:bg-cream-100"><X className="h-4 w-4 text-cream-400" /></button>
@@ -584,8 +574,8 @@ function ZoneManagerModal({ zones, onClose, onChanged }: { zones: TableZone[]; o
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-[360px] rounded-2xl border border-cream-200 bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-modal-backdrop">
+            <div className="w-[360px] rounded-2xl border border-cream-200 bg-white shadow-2xl animate-modal-content">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200">
                     <h2 className="text-lg font-bold text-green-900">📍 Quản lý khu vực</h2>
                     <button onClick={onClose} className="rounded-lg p-2 hover:bg-cream-100"><X className="h-4 w-4 text-cream-400" /></button>
