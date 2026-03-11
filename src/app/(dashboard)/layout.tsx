@@ -27,6 +27,8 @@ import {
     AlertTriangle,
     TrendingUp,
     MessageCircle,
+    GlassWater,
+    PieChart,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
@@ -36,6 +38,7 @@ const navSections = [
         label: "Tổng quan",
         items: [
             { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+            { label: "Analytics", href: "/dashboard/analytics", icon: PieChart },
         ],
     },
     {
@@ -66,6 +69,7 @@ const navSections = [
             { label: "Khách hàng", href: "/dashboard/customers", icon: Heart },
             { label: "Khuyến mãi", href: "/dashboard/promotions", icon: Tag },
             { label: "Wine Guide", href: "/dashboard/wine-guide", icon: BookOpen },
+            { label: "Bán theo ly", href: "/dashboard/bottle-tracking", icon: GlassWater },
             { label: "Feedback", href: "/dashboard/feedback", icon: MessageCircle },
         ],
     },

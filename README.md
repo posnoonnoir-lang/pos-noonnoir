@@ -2,7 +2,7 @@
 
 > *"drink slowly · laugh quietly · stay longer"*
 
-Hệ thống POS chuyên biệt cho Wine Bar, hỗ trợ bán ly thông minh, ký gửi, và quản lý vận hành toàn diện.
+Hệ thống POS chuyên biệt cho Wine Bar, hỗ trợ bán ly thông minh, theo dõi chai mở, ký gửi, và quản lý vận hành toàn diện.
 
 ---
 
@@ -38,7 +38,7 @@ Hệ thống POS chuyên biệt cho Wine Bar, hỗ trợ bán ly thông minh, k�
 |-------|-----------|:------:|
 | **Framework** | Next.js 16.1.6 (Turbopack, App Router, TypeScript) | ✅ |
 | **Database** | PostgreSQL (Supabase) | ✅ Connected |
-| **ORM** | Prisma v7 (33 models, schema synced) | ✅ |
+| **ORM** | Prisma v7 (34 models, schema synced) | ✅ |
 | **UI** | shadcn/ui + Tailwind CSS v4 | ✅ |
 | **State** | Zustand (persist) | ✅ |
 | **Auth** | PIN Login (mock, Supabase planned) | ✅ |
@@ -79,7 +79,7 @@ Open [http://localhost:3001](http://localhost:3001) → Login PIN: **1234** (Own
 ```
 pos-noonnoir/
 ├── prisma/
-│   ├── schema.prisma          # 33 models, full schema (synced with Supabase)
+│   ├── schema.prisma          # 34 models, full schema (synced with Supabase)
 │   ├── seed.ts                # Database seeder
 │   └── reset.ts               # Database reset utility
 ├── src/
@@ -88,7 +88,11 @@ pos-noonnoir/
 │   │   ├── tables.ts          #   Table management + stats
 │   │   ├── orders.ts          #   Order lifecycle + COGS + addItemsToOrder
 │   │   ├── reports.ts         #   Analytics & dashboard data
-│   │   ├── staff.ts           #   Staff CRUD + PIN + updateStaff
+│   │   ├── staff.ts           #   Staff CRUD + PIN + updateStaff + detail
+│   │   ├── attendance.ts      # 🆕 Attendance check-in/out, history
+│   │   ├── payroll.ts         # 🆕 Monthly payroll calculation + CSV
+│   │   ├── schedule.ts        # 🆕 Weekly shift schedule management
+│   │   ├── hr-config.ts       # 🆕 HR settings (shifts/attendance/payroll/leave/roles)
 │   │   ├── inventory.ts       #   Inventory management (goods)
 │   │   ├── procurement.ts     #   PO, Suppliers, Goods Receipt, FIFO
 │   │   ├── assets.ts          #   NPL, CCDC, Recipes, Depreciation
@@ -118,14 +122,16 @@ pos-noonnoir/
 │   │   │       ├── menu/categories/   # Category CRUD
 │   │   │       ├── menu/products/     # Product CRUD
 │   │   │       ├── reports/           # ⭐ Daily P&L Report
-│   │   │       ├── staff/             # Staff Management
+│   │   │       ├── staff/             # Staff Management (4 tabs + detail page)
+│   │   │       │   └── [id]/          # 🆕 Staff Detail (4 sub-tabs)
 │   │   │       ├── procurement/       # PO & Suppliers
 │   │   │       ├── inventory/         # Goods + NPL + CCDC (3 tabs)
 │   │   │       ├── finance/           # COGS FIFO + P&L
 │   │   │       ├── customers/         # ⭐ CRM Dashboard
 │   │   │       ├── promotions/        # ⭐ Promotions Manager
 │   │   │       ├── wine-guide/        # ⭐ Wine Serving Notes
-│   │   │       ├── settings/          # Settings + Tax Config
+│   │   │       ├── bottle-tracking/   # 🆕 By-Glass Sales Tracking
+│   │   │       ├── settings/          # Settings + Tax Config + HR Config
 │   │   │       ├── alerts/            # 🆕 V2: Inventory Alerts (9 types)
 │   │   │       ├── forecast/          # 🆕 V2: Demand Forecast
 │   │   │       └── feedback/          # 🆕 V2: Customer Feedback Dashboard
@@ -188,11 +194,14 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | **Table Management** | `/dashboard/tables` | Zone filter, 12 tables, status cards, **CRUD bàn + khu vực** | ✅ Done |
 | **Menu/Categories** | `/dashboard/menu/categories` | CRUD, toggle active, product count | ✅ Done |
 | **Menu/Products** | `/dashboard/menu/products` | CRUD, category filter, price, availability | ✅ Done |
-| **Staff Management** | `/dashboard/staff` | 6 staff cards, role badges, PIN reset, add form, **edit staff** | ✅ Done |
+| **Staff Management** | `/dashboard/staff` | 4 tabs (Danh sách + Chấm công + Bảng lương + Lịch ca), **edit staff**, detail page | ✅ Done |
+| **Staff Detail** 🆕 | `/dashboard/staff/[id]` | Profile header, 4 sub-tabs (Overview, Attendance, Shifts, Performance) | ✅ Done |
+| **Payroll** 🆕 | `/dashboard/staff` (tab) | Monthly salary calc (base + OT 1.5x + bonus 1% DT), CSV export | ✅ Done |
+| **Schedule** 🆕 | `/dashboard/staff` (tab) | Weekly grid, 4 shift types (Sáng/Chiều/Tối/Cả ngày), copy week | ✅ Done |
 | **Procurement** | `/dashboard/procurement` | PO CRUD, 5 NCC, goods receipt, FIFO batch, Create Supplier | ✅ Done |
 | **Inventory** | `/dashboard/inventory` | 3 tabs: Hàng bán + NPL + CCDC, auto depreciation | ✅ Done |
 | **Finance/COGS** | `/dashboard/finance` | P&L, COGS FIFO, expense breakdown, per-product margin | ✅ Done |
-| **Settings** | `/dashboard/settings` | 9 sections: Store, Tax, **Service Charge**, **QR Payment**, Receipt, Notification, Display, **Operational**, System | ✅ Done |
+| **Settings** | `/dashboard/settings` | 10 sections: Store, Tax, Service Charge, QR Payment, Receipt, Notification, Display, Operational, **HR Config**, System | ✅ Done |
 | **Receipt** | Overlay | Thermal-style bill, print button | ✅ Done |
 | **POS → NPL** | Checkout flow | Auto deduct NPL ingredients, stock warnings, COGS tracking | ✅ Done |
 | **POS Table Orders** 🆕 | POS `/pos` | **View occupied table orders**, **add items to existing order**, order detail panel | ✅ Done |
@@ -213,6 +222,9 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | **Inventory Alerts** 🆕 | `/dashboard/alerts` | 9 alert types (3 severities), auto-refresh, suggested actions | ✅ Done |
 | **QR Feedback** 🆕 | `/feedback/[token]` + dashboard | Per-item star ratings, ambience/service/visit scores, review feed | ✅ Done |
 | **Push Sale Sidebar** 🆕 | POS `/pos` | Always-visible: oxidation risk, low glasses, slow-moving, quick discount | ✅ Done |
+| **Wine Advisor** 🆕 | POS `/pos` | Smart wine recommendations: ABV/acidity/body filter, out-of-stock alternatives | ✅ Done |
+| **By-Glass Tracking** 🆕 | `/dashboard/bottle-tracking` | Bottle Selector modal, open/pour tracking, oxidation monitoring, P&L per bottle | ✅ Done |
+| **By-Glass Setup** 🆕 | `/dashboard/menu/products` | Configurable: glasses/bottle, oxidation hours, glass price, margin calc | ✅ Done |
 
 ### 📋 Planned (Phase 3+)
 
@@ -250,12 +262,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 6.0 |
+| **Version** | 8.0 |
 | **Created** | March 10, 2026 |
 | **Last Updated** | March 11, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **🚀 Full Prisma Migration Complete** — 25 routes, 33 modules, 17 server action files migrated, 33 Prisma models, 0 mock data |
+| **Status** | **🚀 Full HR Management** — 28 routes, 37 modules, 34 Prisma models, payroll, schedule, HR config |
 
 ---
 
@@ -287,7 +299,9 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-10 | **v4.2** | **✨ UX Polish + Staff Edit + 86 Toggle** — POS Table Order UX, Mock order data, Staff Edit Modal, 86 Out of Stock Toggle, GitHub repo |
 | 2026-03-11 | **v5.0** | **🚀 V2 Features** — (1) Wine Info Display + Wine Guide Modal. (2) Shift Target System (auto-suggest, approval, evaluation). (3) Forecast Module (WMA, confidence, accept/dismiss). (4) Inventory Alerts (9 types, 3 severities). (5) QR Feedback (public + dashboard). (6) Push Sale Sidebar. Schema: 5 new models. Vercel deployed. **25 routes, 33 modules** |
 | 2026-03-11 | **v6.0** | **🗄️ Full Prisma Migration** — Toàn bộ 17 server action files chuyển từ mock data → Prisma ORM. (1) **P0**: wine.ts, operational.ts, reservations.ts — WineBottle FIFO, AuditLog, Reservation model. (2) **P1**: feedback.ts, notifications.ts, reports.ts, daily-pnl.ts, qr-payment.ts — Live aggregation từ Order/Payment. (3) **P2**: forecast.ts, push-sale.ts, shift-targets.ts, inventory-alerts.ts, serving-notes.ts — Dynamic queries. (4) **P3**: promotions.ts, assets.ts — 3 new models (Promotion, Equipment, DepreciationEntry) + 4 new enums. **Schema: 33 models. 0 mock data. 0 delay() calls. Build: 0 TS errors.** |
+| 2026-03-11 | **v7.0** | **🍷 Wine By-Glass Sales System** — (1) Wine Guide tích hợp POS cards + setup dashboard. (2) Tax/CTKM hiển thị đầy đủ. (3) Wine Advisor: gợi ý theo ABV/acidity/body + alternatives. (4) Bottle Selector modal: chọn chai rót ly, oxidation tracking. (5) Bottle Tracking Dashboard: KPIs, opened bottles monitoring, P&L history. (6) By-Glass Product Setup: toggle, glasses/bottle, oxidation hours, margin calc. **27 routes, 34 modules.** |
+| 2026-03-11 | **v8.0** | **👥 Full HR Management** — (1) **Staff Audit & Fix**: sửa bug ₫undefined, thêm lương vào card + modal. (2) **Attendance**: check-in/out, nghỉ phép, summary KPIs (8 server actions). (3) **Staff Detail Page**: profile + 4 sub-tabs (Overview, Attendance, Shifts, Performance). (4) **Payroll**: tính lương tháng = Base ÷ days × worked + OT(1.5x) + bonus(1% DT nếu >5M), CSV export. (5) **Schedule**: weekly grid 7 ngày × N staff, 4 loại ca (Sáng/Chiều/Tối/Cả ngày), assign/remove/copy week. (6) **HR Settings**: 5 sub-tabs (Ca làm, Chấm công, Lương, Nghỉ phép, Vai trò & Thang lương). Schema: +2 models (StaffSchedule, SystemSetting). **28 routes, 37 modules, 34 Prisma models. 0 TS errors.** |
 
 ---
 
-*Last updated: March 11, 2026 — Full Prisma Migration v6.0*
+*Last updated: March 11, 2026 — Full HR Management v8.0*

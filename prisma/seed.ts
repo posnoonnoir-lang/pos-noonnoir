@@ -90,8 +90,17 @@ async function main() {
         { name: "Penfolds Bin 389", sku: "WR-002", categoryId: redWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2020, grapeVariety: "Cabernet Sauvignon, Shiraz", country: "Australia", region: "South Australia", alcoholPct: 14.5, costPrice: 1200000, sellPrice: 2400000, glassPrice: 380000, isByGlass: true, glassesPerBottle: 8, servingTemp: "16-18°C", glassType: "Bordeaux", oxidationHours: 48, lowStockAlert: 3 },
         { name: "Cabernet Sauvignon Reserve", sku: "WR-003", categoryId: redWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2021, grapeVariety: "Cabernet Sauvignon", country: "Chile", region: "Maipo Valley", alcoholPct: 14, costPrice: 380000, sellPrice: 720000, glassPrice: 120000, isByGlass: true, glassesPerBottle: 8, servingTemp: "16-18°C", glassType: "Bordeaux", oxidationHours: 48, lowStockAlert: 5 },
         { name: "Pinot Noir Willamette", sku: "WR-004", categoryId: redWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2022, grapeVariety: "Pinot Noir", country: "USA", region: "Oregon", alcoholPct: 13, costPrice: 450000, sellPrice: 960000, glassPrice: 150000, isByGlass: true, glassesPerBottle: 8, servingTemp: "14-16°C", glassType: "Burgundy", oxidationHours: 36, lowStockAlert: 3 },
+        { name: "Malbec Reserva Mendoza", sku: "WR-005", categoryId: redWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2021, grapeVariety: "Malbec", country: "Argentina", region: "Mendoza", alcoholPct: 14.5, tastingNotes: "Bold with plum, blackberry, chocolate, and spice", costPrice: 350000, sellPrice: 680000, glassPrice: 110000, isByGlass: true, glassesPerBottle: 8, servingTemp: "16-18°C", glassType: "Bordeaux", oxidationHours: 24, lowStockAlert: 3 },
+        { name: "Tempranillo Rioja Crianza", sku: "WR-006", categoryId: redWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2020, grapeVariety: "Tempranillo", country: "Spain", region: "Rioja", alcoholPct: 13.5, tastingNotes: "Cherry, leather, vanilla from oak aging", costPrice: 420000, sellPrice: 850000, glassPrice: 135000, isByGlass: true, glassesPerBottle: 8, servingTemp: "16-18°C", glassType: "Bordeaux", oxidationHours: 30, lowStockAlert: 3 },
+        { name: "Syrah Côtes du Rhône", sku: "WR-007", categoryId: redWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2022, grapeVariety: "Syrah, Grenache", country: "France", region: "Rhône Valley", alcoholPct: 14, tastingNotes: "Dark fruit, pepper, smoky notes", costPrice: 300000, sellPrice: 620000, glassPrice: 100000, isByGlass: true, glassesPerBottle: 8, servingTemp: "16-18°C", glassType: "Bordeaux", oxidationHours: 36, lowStockAlert: 5 },
         { name: "Chardonnay Napa Valley", sku: "WW-001", categoryId: whiteWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2022, grapeVariety: "Chardonnay", country: "USA", region: "Napa Valley", alcoholPct: 13.5, costPrice: 320000, sellPrice: 680000, glassPrice: 110000, isByGlass: true, glassesPerBottle: 8, servingTemp: "10-12°C", glassType: "White Wine", oxidationHours: 36, lowStockAlert: 3 },
         { name: "Sauvignon Blanc Marlborough", sku: "WW-002", categoryId: whiteWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2023, grapeVariety: "Sauvignon Blanc", country: "New Zealand", region: "Marlborough", alcoholPct: 12.5, costPrice: 280000, sellPrice: 580000, glassPrice: 95000, isByGlass: true, glassesPerBottle: 8, servingTemp: "8-10°C", glassType: "White Wine", oxidationHours: 24, lowStockAlert: 3 },
+        { name: "Riesling Mosel Kabinett", sku: "WW-003", categoryId: whiteWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2023, grapeVariety: "Riesling", country: "Germany", region: "Mosel", alcoholPct: 8.5, tastingNotes: "Green apple, lime, slate minerality, honey", costPrice: 380000, sellPrice: 750000, glassPrice: 120000, isByGlass: true, glassesPerBottle: 8, servingTemp: "6-8°C", glassType: "White Wine", oxidationHours: 24, lowStockAlert: 3 },
+        { name: "Pinot Grigio Alto Adige", sku: "WW-004", categoryId: whiteWine.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2023, grapeVariety: "Pinot Grigio", country: "Italy", region: "Alto Adige", alcoholPct: 12, tastingNotes: "Crisp, pear, almond, citrus zest", costPrice: 250000, sellPrice: 490000, glassPrice: 80000, isByGlass: true, glassesPerBottle: 8, servingTemp: "8-10°C", glassType: "White Wine", oxidationHours: 24, lowStockAlert: 5 },
+        { name: "Whispering Angel Rosé", sku: "RS-001", categoryId: rose.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2023, grapeVariety: "Grenache, Cinsault, Rolle", country: "France", region: "Provence", alcoholPct: 13, tastingNotes: "Pale pink, fresh strawberry, citrus, floral", costPrice: 450000, sellPrice: 890000, glassPrice: 140000, isByGlass: true, glassesPerBottle: 8, servingTemp: "8-10°C", glassType: "White Wine", oxidationHours: 24, lowStockAlert: 3 },
+        { name: "Miraval Rosé Provence", sku: "RS-002", categoryId: rose.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2023, grapeVariety: "Cinsault, Grenache, Syrah", country: "France", region: "Provence", alcoholPct: 13, tastingNotes: "Elegant, wild strawberry, peach, mineral finish", costPrice: 520000, sellPrice: 980000, glassPrice: 155000, isByGlass: true, glassesPerBottle: 8, servingTemp: "8-10°C", glassType: "White Wine", oxidationHours: 24, lowStockAlert: 3 },
+        { name: "Prosecco Valdobbiadene DOCG", sku: "SP-001", categoryId: sparkling.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 2023, grapeVariety: "Glera", country: "Italy", region: "Veneto", alcoholPct: 11, tastingNotes: "Fine bubbles, green apple, acacia, fresh finish", costPrice: 250000, sellPrice: 520000, glassPrice: 85000, isByGlass: true, glassesPerBottle: 8, servingTemp: "6-8°C", glassType: "Flute", oxidationHours: 12, lowStockAlert: 5 },
+        { name: "Veuve Clicquot Brut", sku: "SP-002", categoryId: sparkling.id, type: "WINE_BOTTLE" as const, taxRateId: taxRates[0].id, vintage: 0, appellation: "Champagne AOC", grapeVariety: "Pinot Noir, Chardonnay, Pinot Meunier", country: "France", region: "Champagne", alcoholPct: 12, tastingNotes: "Brioche, yellow fruit, fine mousse, long finish", costPrice: 1800000, sellPrice: 3200000, glassPrice: 480000, isByGlass: true, glassesPerBottle: 8, servingTemp: "8-10°C", glassType: "Flute", oxidationHours: 6, lowStockAlert: 2 },
         { name: "Noir Old Fashioned", sku: "CK-001", categoryId: cocktails.id, type: "DRINK" as const, taxRateId: taxRates[0].id, costPrice: 45000, sellPrice: 180000 },
         { name: "Wine Spritz", sku: "CK-002", categoryId: cocktails.id, type: "DRINK" as const, taxRateId: taxRates[0].id, costPrice: 35000, sellPrice: 150000 },
         { name: "Cheese Board Selection", sku: "FD-001", categoryId: charcuterie.id, type: "FOOD" as const, taxRateId: taxRates[0].id, costPrice: 120000, sellPrice: 350000 },
@@ -105,7 +114,7 @@ async function main() {
         const existing = await prisma.product.findFirst({ where: { sku: p.sku } })
         if (existing) { products.push(existing) } else { products.push(await prisma.product.create({ data: { ...p, nameVi: p.name } })) }
     }
-    console.log("  ✅ Products (12)")
+    console.log(`  ✅ Products (${products.length})`)
 
     // ============================================================
     // 6. TABLE ZONES & FLOOR TABLES
@@ -197,25 +206,48 @@ async function main() {
     console.log("  ✅ Ingredients (10)")
 
     // ============================================================
-    // 10. WINE BOTTLES (inventory)
+    // 10. WINE BOTTLES — diversified inventory
     // ============================================================
     const wineProducts = products.filter((p) => p.type === "WINE_BOTTLE")
+    // Different stock levels per product for realistic scenario
+    const stockConfig: Record<string, { total: number; opened: number; sold: number }> = {
+        "WR-001": { total: 3, opened: 1, sold: 2 },   // Margaux: limited
+        "WR-002": { total: 6, opened: 1, sold: 0 },   // Penfolds: good stock
+        "WR-003": { total: 8, opened: 1, sold: 2 },   // Cab Reserve: plenty 
+        "WR-004": { total: 2, opened: 0, sold: 3 },   // Pinot Noir: low
+        "WR-005": { total: 5, opened: 1, sold: 1 },   // Malbec
+        "WR-006": { total: 4, opened: 1, sold: 0 },   // Tempranillo
+        "WR-007": { total: 7, opened: 1, sold: 3 },   // Syrah
+        "WW-001": { total: 6, opened: 1, sold: 1 },   // Chardonnay
+        "WW-002": { total: 5, opened: 1, sold: 0 },   // Sauv Blanc
+        "WW-003": { total: 4, opened: 0, sold: 1 },   // Riesling
+        "WW-004": { total: 8, opened: 1, sold: 2 },   // Pinot Grigio: popular
+        "RS-001": { total: 3, opened: 1, sold: 1 },   // Whispering Angel
+        "RS-002": { total: 2, opened: 0, sold: 1 },   // Miraval
+        "SP-001": { total: 10, opened: 1, sold: 4 },  // Prosecco: best seller
+        "SP-002": { total: 2, opened: 0, sold: 0 },   // Veuve Clicquot: premium
+    }
     let bottleCount = 0
     for (const wp of wineProducts) {
         const existingCount = await prisma.wineBottle.count({ where: { productId: wp.id } })
         if (existingCount > 0) { bottleCount += existingCount; continue }
-        // Add 5 bottles per wine product
-        for (let i = 0; i < 5; i++) {
+        const cfg = stockConfig[wp.sku ?? ""] ?? { total: 5, opened: 0, sold: 0 }
+        const allBottles = cfg.total + cfg.sold
+        for (let i = 0; i < allBottles; i++) {
+            let status: "IN_STOCK" | "OPENED" | "SOLD" = "IN_STOCK"
+            if (i < cfg.sold) status = "SOLD"
+            else if (i === cfg.sold && cfg.opened > 0) status = "OPENED"
+
             await prisma.wineBottle.create({
                 data: {
                     productId: wp.id,
                     batchCode: `BATCH-${wp.sku}-${String(i + 1).padStart(3, "0")}`,
                     ownershipType: "PURCHASED",
-                    status: i === 0 ? "OPENED" : "IN_STOCK",
+                    status,
                     costPrice: Number(wp.costPrice),
-                    receivedAt: new Date(Date.now() - i * 7 * 86400000),
-                    openedAt: i === 0 ? new Date(Date.now() - 12 * 3600000) : null,
-                    glassesRemaining: i === 0 ? 5 : wp.glassesPerBottle,
+                    receivedAt: new Date(Date.now() - i * 5 * 86400000),
+                    openedAt: status === "OPENED" ? new Date(Date.now() - 12 * 3600000) : null,
+                    glassesRemaining: status === "OPENED" ? Math.floor(Math.random() * 5) + 2 : (status === "SOLD" ? 0 : wp.glassesPerBottle),
                 },
             })
             bottleCount++

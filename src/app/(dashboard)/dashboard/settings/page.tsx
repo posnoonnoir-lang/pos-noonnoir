@@ -21,6 +21,11 @@ import {
     Banknote,
     HandCoins,
     SlidersHorizontal,
+    Users,
+    Clock,
+    Calendar,
+    Wallet,
+    Briefcase,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -39,11 +44,12 @@ import {
 import { getServiceChargeConfig, updateServiceChargeConfig } from "@/actions/operational"
 import { getBankConfig, updateBankConfig, type QRPaymentConfig } from "@/actions/qr-payment"
 import type { TaxRate } from "@/types"
+import { getHrConfig, updateHrConfig, type HrConfigData } from "@/actions/hr-config"
 
 type TaxReportLine = Awaited<ReturnType<typeof getTaxReport>>[number]
 type TaxBreakdown = Awaited<ReturnType<typeof getTaxBreakdownByRate>>[number]
 
-type SettingSection = "store" | "tax" | "service-charge" | "payment" | "receipt" | "notification" | "display" | "operational" | "system"
+type SettingSection = "store" | "tax" | "service-charge" | "payment" | "receipt" | "notification" | "display" | "operational" | "system" | "hr"
 
 const NAV_ITEMS: { id: SettingSection; label: string; icon: typeof Store }[] = [
     { id: "store", label: "Cửa hàng", icon: Store },
@@ -54,6 +60,7 @@ const NAV_ITEMS: { id: SettingSection; label: string; icon: typeof Store }[] = [
     { id: "notification", label: "Thông báo", icon: Bell },
     { id: "display", label: "Giao diện", icon: Palette },
     { id: "operational", label: "Vận hành", icon: SlidersHorizontal },
+    { id: "hr", label: "Nhân sự", icon: Users },
     { id: "system", label: "Hệ thống", icon: Shield },
 ]
 
@@ -127,6 +134,7 @@ export default function SettingsPage() {
                     {activeSection === "notification" && <NotificationSettings />}
                     {activeSection === "display" && <DisplaySettings />}
                     {activeSection === "operational" && <OperationalSettings />}
+                    {activeSection === "hr" && <HrSettings />}
                     {activeSection === "system" && <SystemSettings />}
                 </div>
             </div>
@@ -988,6 +996,622 @@ function PaymentSettings() {
                 <p className="text-[10px] text-amber-700">Thông tin này sẽ được dùng để tạo mã QR VietQR khi khách chọn thanh toán chuyển khoản tại POS.</p>
             </div>
         </>
+    )
+}
+
+// ============================================================
+// HR SETTINGS — Full HR Configuration
+// ============================================================
+function HrSettings() {
+    const [config, setConfig] = useState<HrConfigData | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [activeTab, setActiveTab] = useState<"shifts" | "attendance" | "payroll" | "leave" | "roles">("shifts")
+
+    useEffect(() => {
+        (async () => {
+            const data = await getHrConfig()
+            setConfig(data)
+            setLoading(false)
+        })()
+    }, [])
+
+    const handleSave = async (updates: Partial<HrConfigData>) => {
+        setSaving(true)
+        const merged = { ...config, ...updates } as HrConfigData
+        setConfig(merged)
+        const result = await updateHrConfig(updates)
+        setSaving(false)
+        if (result.success) toast.success("Đã lưu cài đặt nhân sự")
+        else toast.error("Lỗi lưu cài đặt")
+    }
+
+    const formatVND = (n: number) => n.toLocaleString("vi-VN") + "₫"
+
+    if (loading || !config) return <div className="text-center py-12 text-cream-400 text-sm">Đang tải cấu hình HR...</div>
+
+    const tabs = [
+        { key: "shifts" as const, label: "Ca làm", icon: Clock },
+        { key: "attendance" as const, label: "Chấm công", icon: Calendar },
+        { key: "payroll" as const, label: "Lương", icon: Wallet },
+        { key: "leave" as const, label: "Nghỉ phép", icon: Calendar },
+        { key: "roles" as const, label: "Vai trò", icon: Briefcase },
+    ]
+
+    return (
+        <div>
+            {/* Sub-Tab Navigation */}
+            <div className="flex gap-1 mb-5 p-1 bg-cream-200 rounded-lg w-fit">
+                {tabs.map((tab) => {
+                    const Icon = tab.icon
+                    return (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                activeTab === tab.key
+                                    ? "bg-green-900 text-cream-50 shadow-sm"
+                                    : "text-cream-500 hover:text-green-800"
+                            )}
+                        >
+                            <Icon className="h-3.5 w-3.5" />
+                            {tab.label}
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* ===== SHIFTS TAB ===== */}
+            {activeTab === "shifts" && (
+                <>
+                    <SettingGroup title="Định nghĩa ca làm việc">
+                        <div className="rounded-lg border border-cream-200 overflow-hidden">
+                            <table className="w-full text-xs">
+                                <thead className="bg-cream-200/60">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left font-semibold text-green-900">Tên ca</th>
+                                        <th className="px-3 py-2 text-center font-semibold text-green-900">Bắt đầu</th>
+                                        <th className="px-3 py-2 text-center font-semibold text-green-900">Kết thúc</th>
+                                        <th className="px-3 py-2 text-center font-semibold text-green-900">Màu</th>
+                                        <th className="px-3 py-2 text-center font-semibold text-green-900">Kích hoạt</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-cream-200">
+                                    {config.shifts.map((shift, idx) => (
+                                        <tr key={shift.key} className="hover:bg-cream-50 transition-colors">
+                                            <td className="px-3 py-2.5">
+                                                <Input
+                                                    value={shift.label}
+                                                    onChange={(e) => {
+                                                        const newShifts = [...config.shifts]
+                                                        newShifts[idx] = { ...shift, label: e.target.value }
+                                                        setConfig({ ...config, shifts: newShifts })
+                                                    }}
+                                                    className="h-7 w-32 text-xs border-cream-300"
+                                                />
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center">
+                                                <Input
+                                                    type="time"
+                                                    value={shift.startTime}
+                                                    onChange={(e) => {
+                                                        const newShifts = [...config.shifts]
+                                                        newShifts[idx] = { ...shift, startTime: e.target.value }
+                                                        setConfig({ ...config, shifts: newShifts })
+                                                    }}
+                                                    className="h-7 w-28 text-xs border-cream-300"
+                                                />
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center">
+                                                <Input
+                                                    type="time"
+                                                    value={shift.endTime}
+                                                    onChange={(e) => {
+                                                        const newShifts = [...config.shifts]
+                                                        newShifts[idx] = { ...shift, endTime: e.target.value }
+                                                        setConfig({ ...config, shifts: newShifts })
+                                                    }}
+                                                    className="h-7 w-28 text-xs border-cream-300"
+                                                />
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center">
+                                                <input
+                                                    type="color"
+                                                    value={shift.color}
+                                                    onChange={(e) => {
+                                                        const newShifts = [...config.shifts]
+                                                        newShifts[idx] = { ...shift, color: e.target.value }
+                                                        setConfig({ ...config, shifts: newShifts })
+                                                    }}
+                                                    className="h-7 w-10 rounded border border-cream-300 cursor-pointer"
+                                                />
+                                            </td>
+                                            <td className="px-3 py-2.5 text-center">
+                                                <Toggle
+                                                    checked={shift.isActive}
+                                                    onChange={(v) => {
+                                                        const newShifts = [...config.shifts]
+                                                        newShifts[idx] = { ...shift, isActive: v }
+                                                        setConfig({ ...config, shifts: newShifts })
+                                                    }}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={() => handleSave({ shifts: config.shifts })}
+                            disabled={saving}
+                            className="bg-green-900 text-cream-50 hover:bg-green-800 text-xs h-8 mt-2"
+                        >
+                            <Save className="h-3.5 w-3.5 mr-1" />
+                            {saving ? "Đang lưu..." : "Lưu cài đặt ca"}
+                        </Button>
+                    </SettingGroup>
+
+                    <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 mt-4">
+                        <p className="text-[10px] font-semibold text-amber-800 mb-1">📌 Lưu ý</p>
+                        <p className="text-[10px] text-amber-700">Thay đổi thời gian ca sẽ áp dụng cho các lịch ca mới. Lịch ca đã gán trước đó sẽ không bị ảnh hưởng.</p>
+                    </div>
+                </>
+            )}
+
+            {/* ===== ATTENDANCE TAB ===== */}
+            {activeTab === "attendance" && (
+                <SettingGroup title="Quy tắc chấm công">
+                    <SettingRow
+                        label="Dung sai đi muộn (phút)"
+                        description="Số phút sau giờ bắt đầu ca được phép trễ mà không bị tính đi muộn"
+                    >
+                        <Input
+                            type="number"
+                            min="0"
+                            max="120"
+                            value={config.attendance.lateTolerance}
+                            onChange={(e) => setConfig({
+                                ...config,
+                                attendance: { ...config.attendance, lateTolerance: parseInt(e.target.value) || 0 }
+                            })}
+                            className="w-20 h-8 text-xs border-cream-300 text-center"
+                        />
+                    </SettingRow>
+                    <SettingRow
+                        label="Ngưỡng tính vắng (phút)"
+                        description="Sau bao nhiêu phút không check-in sẽ tự động tính vắng mặt"
+                    >
+                        <Input
+                            type="number"
+                            min="0"
+                            max="480"
+                            value={config.attendance.absentThreshold}
+                            onChange={(e) => setConfig({
+                                ...config,
+                                attendance: { ...config.attendance, absentThreshold: parseInt(e.target.value) || 0 }
+                            })}
+                            className="w-20 h-8 text-xs border-cream-300 text-center"
+                        />
+                    </SettingRow>
+                    <SettingRow
+                        label="Giờ tự động check-out"
+                        description="Hệ thống sẽ tự checkout nếu nhân viên quên"
+                    >
+                        <Input
+                            type="time"
+                            value={config.attendance.autoCheckoutHour}
+                            onChange={(e) => setConfig({
+                                ...config,
+                                attendance: { ...config.attendance, autoCheckoutHour: e.target.value }
+                            })}
+                            className="w-28 h-8 text-xs border-cream-300"
+                        />
+                    </SettingRow>
+                    <SettingRow
+                        label="Giờ làm tối thiểu / ngày"
+                        description="Số giờ tối thiểu để tính đủ 1 ngày công"
+                    >
+                        <Input
+                            type="number"
+                            min="1"
+                            max="24"
+                            value={config.attendance.minWorkHours}
+                            onChange={(e) => setConfig({
+                                ...config,
+                                attendance: { ...config.attendance, minWorkHours: parseInt(e.target.value) || 8 }
+                            })}
+                            className="w-20 h-8 text-xs border-cream-300 text-center"
+                        />
+                    </SettingRow>
+                    <SettingRow
+                        label="Yêu cầu ảnh check-in"
+                        description="Bắt buộc chụp ảnh selfie khi check-in"
+                    >
+                        <Toggle
+                            checked={config.attendance.requirePhoto}
+                            onChange={(v) => setConfig({
+                                ...config,
+                                attendance: { ...config.attendance, requirePhoto: v }
+                            })}
+                        />
+                    </SettingRow>
+
+                    <Button
+                        size="sm"
+                        onClick={() => handleSave({ attendance: config.attendance })}
+                        disabled={saving}
+                        className="bg-green-900 text-cream-50 hover:bg-green-800 text-xs h-8 mt-2"
+                    >
+                        <Save className="h-3.5 w-3.5 mr-1" />
+                        {saving ? "Đang lưu..." : "Lưu quy tắc chấm công"}
+                    </Button>
+                </SettingGroup>
+            )}
+
+            {/* ===== PAYROLL TAB ===== */}
+            {activeTab === "payroll" && (
+                <>
+                    <SettingGroup title="Cấu hình lương cơ bản">
+                        <SettingRow
+                            label="Giờ chuẩn / ngày"
+                            description="Số giờ làm tiêu chuẩn mỗi ngày"
+                        >
+                            <Input
+                                type="number"
+                                min="1"
+                                max="24"
+                                value={config.payroll.standardHoursPerDay}
+                                onChange={(e) => setConfig({
+                                    ...config,
+                                    payroll: { ...config.payroll, standardHoursPerDay: parseInt(e.target.value) || 8 }
+                                })}
+                                className="w-20 h-8 text-xs border-cream-300 text-center"
+                            />
+                        </SettingRow>
+                        <SettingRow
+                            label="Hệ số OT (overtime)"
+                            description="Hệ số nhân cho giờ làm thêm (VD: 1.5 = +50%)"
+                        >
+                            <Input
+                                type="number"
+                                min="1"
+                                max="5"
+                                step="0.1"
+                                value={config.payroll.overtimeMultiplier}
+                                onChange={(e) => setConfig({
+                                    ...config,
+                                    payroll: { ...config.payroll, overtimeMultiplier: parseFloat(e.target.value) || 1.5 }
+                                })}
+                                className="w-20 h-8 text-xs border-cream-300 text-center"
+                            />
+                        </SettingRow>
+                        <SettingRow
+                            label="Hệ số ca đêm"
+                            description="Hệ số nhân cho ca tối/đêm"
+                        >
+                            <Input
+                                type="number"
+                                min="1"
+                                max="5"
+                                step="0.1"
+                                value={config.payroll.nightShiftMultiplier}
+                                onChange={(e) => setConfig({
+                                    ...config,
+                                    payroll: { ...config.payroll, nightShiftMultiplier: parseFloat(e.target.value) || 1.3 }
+                                })}
+                                className="w-20 h-8 text-xs border-cream-300 text-center"
+                            />
+                        </SettingRow>
+                        <SettingRow
+                            label="Ngày trả lương"
+                            description="Ngày trong tháng để trả lương"
+                        >
+                            <Input
+                                type="number"
+                                min="1"
+                                max="31"
+                                value={config.payroll.payDay}
+                                onChange={(e) => setConfig({
+                                    ...config,
+                                    payroll: { ...config.payroll, payDay: parseInt(e.target.value) || 5 }
+                                })}
+                                className="w-20 h-8 text-xs border-cream-300 text-center"
+                            />
+                        </SettingRow>
+                    </SettingGroup>
+
+                    <SettingGroup title="Thưởng doanh thu">
+                        <SettingRow
+                            label="Bật thưởng doanh thu"
+                            description="Tính thưởng thêm dựa trên doanh thu cá nhân"
+                        >
+                            <Toggle
+                                checked={config.payroll.bonusEnabled}
+                                onChange={(v) => setConfig({
+                                    ...config,
+                                    payroll: { ...config.payroll, bonusEnabled: v }
+                                })}
+                            />
+                        </SettingRow>
+
+                        {config.payroll.bonusEnabled && (
+                            <>
+                                <SettingRow
+                                    label="Loại thưởng"
+                                    description="Thưởng cố định hoặc theo % doanh thu"
+                                >
+                                    <select
+                                        value={config.payroll.bonusType}
+                                        onChange={(e) => setConfig({
+                                            ...config,
+                                            payroll: { ...config.payroll, bonusType: e.target.value as "FIXED" | "PERCENT_REVENUE" }
+                                        })}
+                                        className="w-40 h-8 rounded-md border border-cream-300 bg-cream-50 px-2 text-xs"
+                                    >
+                                        <option value="PERCENT_REVENUE">% Doanh thu</option>
+                                        <option value="FIXED">Cố định</option>
+                                    </select>
+                                </SettingRow>
+                                <SettingRow
+                                    label="Ngưỡng kích hoạt thưởng"
+                                    description={`Doanh thu tối thiểu để nhận thưởng (hiện: ${formatVND(config.payroll.bonusThreshold)})`}
+                                >
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="1000000"
+                                        value={config.payroll.bonusThreshold}
+                                        onChange={(e) => setConfig({
+                                            ...config,
+                                            payroll: { ...config.payroll, bonusThreshold: parseInt(e.target.value) || 0 }
+                                        })}
+                                        className="w-36 h-8 text-xs border-cream-300"
+                                    />
+                                </SettingRow>
+                                <SettingRow
+                                    label={config.payroll.bonusType === "PERCENT_REVENUE" ? "% Thưởng" : "Số tiền thưởng"}
+                                    description={config.payroll.bonusType === "PERCENT_REVENUE" ? "% doanh thu cá nhân" : "Số tiền thưởng cố định"}
+                                >
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step={config.payroll.bonusType === "PERCENT_REVENUE" ? "0.5" : "100000"}
+                                        value={config.payroll.bonusValue}
+                                        onChange={(e) => setConfig({
+                                            ...config,
+                                            payroll: { ...config.payroll, bonusValue: parseFloat(e.target.value) || 0 }
+                                        })}
+                                        className="w-28 h-8 text-xs border-cream-300 text-center"
+                                    />
+                                </SettingRow>
+                            </>
+                        )}
+                    </SettingGroup>
+
+                    <SettingGroup title="Phí dịch vụ cho nhân viên">
+                        <SettingRow
+                            label="Chia phí dịch vụ cho NV"
+                            description="Trích % phí dịch vụ (service charge) vào lương nhân viên"
+                        >
+                            <Toggle
+                                checked={config.payroll.includeServiceCharge}
+                                onChange={(v) => setConfig({
+                                    ...config,
+                                    payroll: { ...config.payroll, includeServiceCharge: v }
+                                })}
+                            />
+                        </SettingRow>
+                        {config.payroll.includeServiceCharge && (
+                            <SettingRow
+                                label="% phí dịch vụ chia cho NV"
+                                description="Phần trăm phí dịch vụ chia cho tất cả nhân viên"
+                            >
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={config.payroll.serviceChargePercent}
+                                    onChange={(e) => setConfig({
+                                        ...config,
+                                        payroll: { ...config.payroll, serviceChargePercent: parseInt(e.target.value) || 0 }
+                                    })}
+                                    className="w-20 h-8 text-xs border-cream-300 text-center"
+                                />
+                            </SettingRow>
+                        )}
+                    </SettingGroup>
+
+                    <Button
+                        size="sm"
+                        onClick={() => handleSave({ payroll: config.payroll })}
+                        disabled={saving}
+                        className="bg-green-900 text-cream-50 hover:bg-green-800 text-xs h-8"
+                    >
+                        <Save className="h-3.5 w-3.5 mr-1" />
+                        {saving ? "Đang lưu..." : "Lưu cài đặt lương"}
+                    </Button>
+                </>
+            )}
+
+            {/* ===== LEAVE TAB ===== */}
+            {activeTab === "leave" && (
+                <SettingGroup title="Chính sách nghỉ phép">
+                    <SettingRow
+                        label="Phép năm (ngày)"
+                        description="Số ngày phép năm mỗi nhân viên được hưởng"
+                    >
+                        <Input
+                            type="number"
+                            min="0"
+                            max="30"
+                            value={config.leave.annualLeaveDays}
+                            onChange={(e) => setConfig({
+                                ...config,
+                                leave: { ...config.leave, annualLeaveDays: parseInt(e.target.value) || 0 }
+                            })}
+                            className="w-20 h-8 text-xs border-cream-300 text-center"
+                        />
+                    </SettingRow>
+                    <SettingRow
+                        label="Nghỉ ốm (ngày)"
+                        description="Số ngày nghỉ ốm có lương"
+                    >
+                        <Input
+                            type="number"
+                            min="0"
+                            max="30"
+                            value={config.leave.sickLeaveDays}
+                            onChange={(e) => setConfig({
+                                ...config,
+                                leave: { ...config.leave, sickLeaveDays: parseInt(e.target.value) || 0 }
+                            })}
+                            className="w-20 h-8 text-xs border-cream-300 text-center"
+                        />
+                    </SettingRow>
+                    <SettingRow
+                        label="Cho phép cộng dồn phép"
+                        description="Phép năm chưa dùng có thể chuyển sang năm sau"
+                    >
+                        <Toggle
+                            checked={config.leave.carryOverEnabled}
+                            onChange={(v) => setConfig({
+                                ...config,
+                                leave: { ...config.leave, carryOverEnabled: v }
+                            })}
+                        />
+                    </SettingRow>
+                    {config.leave.carryOverEnabled && (
+                        <SettingRow
+                            label="Số ngày cộng dồn tối đa"
+                            description="Giới hạn số ngày phép cộng dồn sang năm mới"
+                        >
+                            <Input
+                                type="number"
+                                min="0"
+                                max="30"
+                                value={config.leave.maxCarryOverDays}
+                                onChange={(e) => setConfig({
+                                    ...config,
+                                    leave: { ...config.leave, maxCarryOverDays: parseInt(e.target.value) || 0 }
+                                })}
+                                className="w-20 h-8 text-xs border-cream-300 text-center"
+                            />
+                        </SettingRow>
+                    )}
+                    <SettingRow
+                        label="Yêu cầu phê duyệt"
+                        description="Nghỉ phép phải được quản lý phê duyệt trước"
+                    >
+                        <Toggle
+                            checked={config.leave.requireApproval}
+                            onChange={(v) => setConfig({
+                                ...config,
+                                leave: { ...config.leave, requireApproval: v }
+                            })}
+                        />
+                    </SettingRow>
+
+                    <Button
+                        size="sm"
+                        onClick={() => handleSave({ leave: config.leave })}
+                        disabled={saving}
+                        className="bg-green-900 text-cream-50 hover:bg-green-800 text-xs h-8 mt-2"
+                    >
+                        <Save className="h-3.5 w-3.5 mr-1" />
+                        {saving ? "Đang lưu..." : "Lưu chính sách nghỉ phép"}
+                    </Button>
+                </SettingGroup>
+            )}
+
+            {/* ===== ROLES TAB ===== */}
+            {activeTab === "roles" && (
+                <SettingGroup title="Vai trò & Thang lương">
+                    <div className="rounded-lg border border-cream-200 overflow-hidden">
+                        <table className="w-full text-xs">
+                            <thead className="bg-cream-200/60">
+                                <tr>
+                                    <th className="px-3 py-2 text-left font-semibold text-green-900">Vai trò</th>
+                                    <th className="px-3 py-2 text-left font-semibold text-green-900">Mã</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-green-900">Lương tối thiểu</th>
+                                    <th className="px-3 py-2 text-right font-semibold text-green-900">Lương tối đa</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-cream-200">
+                                {config.roles.map((role, idx) => (
+                                    <tr key={role.key} className="hover:bg-cream-50 transition-colors">
+                                        <td className="px-3 py-2.5">
+                                            <Input
+                                                value={role.label}
+                                                onChange={(e) => {
+                                                    const newRoles = [...config.roles]
+                                                    newRoles[idx] = { ...role, label: e.target.value }
+                                                    setConfig({ ...config, roles: newRoles })
+                                                }}
+                                                className="h-7 w-32 text-xs border-cream-300"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2.5">
+                                            <span className="font-mono bg-cream-200 px-1.5 py-0.5 rounded text-[10px]">{role.key}</span>
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right">
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                step="500000"
+                                                value={role.minSalary}
+                                                onChange={(e) => {
+                                                    const newRoles = [...config.roles]
+                                                    newRoles[idx] = { ...role, minSalary: parseInt(e.target.value) || 0 }
+                                                    setConfig({ ...config, roles: newRoles })
+                                                }}
+                                                className="h-7 w-32 text-xs border-cream-300 text-right"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right">
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                step="500000"
+                                                value={role.maxSalary}
+                                                onChange={(e) => {
+                                                    const newRoles = [...config.roles]
+                                                    newRoles[idx] = { ...role, maxSalary: parseInt(e.target.value) || 0 }
+                                                    setConfig({ ...config, roles: newRoles })
+                                                }}
+                                                className="h-7 w-32 text-xs border-cream-300 text-right"
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-4">
+                        {config.roles.map((role) => (
+                            <div key={role.key} className="flex-1 rounded-lg bg-cream-200/50 border border-cream-200 p-3 text-center">
+                                <p className="text-xs font-bold text-green-900">{role.label}</p>
+                                <p className="text-[9px] text-cream-400 mt-1">
+                                    {formatVND(role.minSalary)} — {formatVND(role.maxSalary)}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+
+                    <Button
+                        size="sm"
+                        onClick={() => handleSave({ roles: config.roles })}
+                        disabled={saving}
+                        className="bg-green-900 text-cream-50 hover:bg-green-800 text-xs h-8 mt-4"
+                    >
+                        <Save className="h-3.5 w-3.5 mr-1" />
+                        {saving ? "Đang lưu..." : "Lưu cấu hình vai trò"}
+                    </Button>
+                </SettingGroup>
+            )}
+        </div>
     )
 }
 

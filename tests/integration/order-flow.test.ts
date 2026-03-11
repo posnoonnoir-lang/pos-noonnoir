@@ -121,7 +121,7 @@ describe('IT-03: Service Charge + Tax Pipeline', () => {
 describe('IT-04: Wine Glass Tracking Flow', () => {
     it('Get statuses → sell glass → verify state', async () => {
         const statuses = await getAllGlassStatuses()
-        if (!statuses || statuses.length === 0) {
+        if (!statuses || Object.keys(statuses).length === 0) {
             console.log('⚠️ No glass configs — skipping')
             return
         }

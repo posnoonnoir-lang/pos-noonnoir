@@ -171,6 +171,7 @@ model StoreSettings {
   currency         String   @default("VND")
   defaultTabLimit  Decimal  @default(2000000) @map("default_tab_limit") @db.Decimal(12, 2)
   telegramBotToken String?  @map("telegram_bot_token")
+  allowNegativeStock Boolean @default(false) @map("allow_negative_stock")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -222,8 +223,27 @@ model Staff {
   tabItems     TabItem[]
   shifts       ShiftRecord[]
   notifications NotificationConfig[]
+  schedules    StaffSchedule[]
 
   @@map("staff")
+}
+
+model StaffSchedule {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staffId   String   @map("staff_id") @db.Uuid
+  date      DateTime @db.Date
+  shiftType String   @default("FULL") @map("shift_type") // MORNING, AFTERNOON, EVENING, FULL
+  startTime String   @default("10:00") @map("start_time")
+  endTime   String   @default("22:00") @map("end_time")
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@unique([staffId, date])
+  @@index([date])
+  @@map("staff_schedule")
 }
 
 // ============================================================
@@ -308,6 +328,7 @@ model WineBottle {
   status          BottleStatus    @default(IN_STOCK)
   glassesRemaining Int?           @map("glasses_remaining")
   openedAt        DateTime?       @map("opened_at")
+  openedBy        String?         @map("opened_by") @db.Uuid
   soldAt          DateTime?       @map("sold_at")
   costPrice       Decimal?        @map("cost_price") @db.Decimal(12, 2)
   receivedAt      DateTime        @default(now()) @map("received_at")
@@ -1034,3 +1055,16 @@ model DepreciationEntry {
   @@map("depreciation_entry")
 }
 
+// ============================================================
+// SYSTEM SETTINGS (Key-Value JSON store)
+// ============================================================
+
+model SystemSetting {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_setting")
+}

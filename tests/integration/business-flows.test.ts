@@ -98,25 +98,27 @@ describe('IT-06: Customer Tab Full Lifecycle', () => {
         const cusResult = await createQuickCustomer({ fullName: 'Int Test Customer', phone: '0988887777' })
         expect(cusResult.success).toBe(true)
         if (!cusResult.data) return
-        cleanupCustomerIds.push(cusResult.data.id)
+        const customer = cusResult.data as { id: string }
+        cleanupCustomerIds.push(customer.id)
 
         // Open tab
         const tabResult = await openTab({
-            customerId: cusResult.data.id,
+            customerId: customer.id,
             staffId: staff.id,
             staffName: staff.fullName,
             tabLimit: 3000000,
         })
         expect(tabResult.success).toBe(true)
         if (!tabResult.data) return
-        cleanupTabIds.push(tabResult.data.id)
+        const tab = tabResult.data as { id: string }
+        cleanupTabIds.push(tab.id)
 
         // Add items
         const product = await prisma.product.findFirst({ where: { isActive: true } })
         if (!product) return
 
         const addResult = await addTabItem({
-            tabId: tabResult.data.id,
+            tabId: tab.id,
             productId: product.id,
             productName: product.name,
             unitPrice: Number(product.sellPrice),
@@ -127,16 +129,16 @@ describe('IT-06: Customer Tab Full Lifecycle', () => {
         expect(addResult.success).toBe(true)
 
         // Verify tab total
-        const tab = await getTabById(tabResult.data.id)
-        expect(tab).toBeDefined()
-        expect(Number(tab!.currentTotal)).toBeGreaterThan(0)
+        const fetchedTab = await getTabById(tab.id)
+        expect(fetchedTab).toBeDefined()
+        expect(Number(fetchedTab!.currentTotal)).toBeGreaterThan(0)
 
         // Close tab
-        const closeResult = await closeTab({ tabId: tabResult.data.id, paymentMethod: 'CASH' })
+        const closeResult = await closeTab({ tabId: tab.id, paymentMethod: 'CASH' })
         expect(closeResult.success).toBe(true)
 
         // Verify closed
-        const closedTab = await getTabById(tabResult.data.id)
+        const closedTab = await getTabById(tab.id)
         expect(closedTab!.status).toBe('CLOSED')
     })
 })

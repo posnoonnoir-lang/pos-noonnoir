@@ -23,6 +23,8 @@ import {
     GlassWater,
     Grape,
     Coffee,
+    Clock,
+    AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -164,6 +166,7 @@ export default function ProductsPage() {
             glassPrice: product.glassPrice ?? undefined,
             isByGlass: product.isByGlass,
             glassesPerBottle: product.glassesPerBottle,
+            oxidationHours: product.oxidationHours ?? undefined,
             servingTemp: product.servingTemp ?? undefined,
             decantingTime: product.decantingTime ?? undefined,
             description: product.description ?? undefined,
@@ -626,17 +629,6 @@ export default function ProductsPage() {
                                         className="border-cream-300 bg-cream-100 font-mono"
                                     />
                                 </div>
-                                {(form.type === "WINE_GLASS" || form.isByGlass) && (
-                                    <div className="space-y-1.5">
-                                        <Label>Giá ly</Label>
-                                        <Input
-                                            type="number"
-                                            value={form.glassPrice ?? ""}
-                                            onChange={(e) => setForm({ ...form, glassPrice: Number(e.target.value) })}
-                                            className="border-cream-300 bg-cream-100 font-mono"
-                                        />
-                                    </div>
-                                )}
                             </div>
                             {form.costPrice > 0 && form.sellPrice > 0 && (
                                 <p className="mt-2 text-xs text-cream-500">
@@ -730,15 +722,95 @@ export default function ProductsPage() {
                                             className="border-cream-300 bg-cream-100"
                                         />
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <Label>Ly/chai</Label>
-                                        <Input
-                                            type="number"
-                                            value={form.glassesPerBottle ?? 0}
-                                            onChange={(e) => setForm({ ...form, glassesPerBottle: Number(e.target.value) })}
-                                            className="border-cream-300 bg-cream-100 font-mono"
-                                        />
+                                </div>
+
+                                {/* By-Glass Setup Section */}
+                                <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                                    <h4 className="text-xs font-bold text-green-800 uppercase mb-3 flex items-center gap-1.5">
+                                        <GlassWater className="h-3.5 w-3.5" /> Setup bán theo ly
+                                    </h4>
+
+                                    {/* isByGlass toggle */}
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                            <Label className="text-sm font-semibold text-green-900">Cho phép bán theo ly</Label>
+                                            <p className="text-[10px] text-cream-500 mt-0.5">Bật để nhân viên rót ly từ chai tại POS</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setForm({ ...form, isByGlass: !form.isByGlass })}
+                                            className={cn(
+                                                "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors cursor-pointer",
+                                                form.isByGlass ? "bg-green-600" : "bg-cream-300"
+                                            )}
+                                        >
+                                            <span className={cn(
+                                                "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",
+                                                form.isByGlass ? "translate-x-5" : "translate-x-0"
+                                            )} />
+                                        </button>
                                     </div>
+
+                                    {form.isByGlass && (
+                                        <div className="grid grid-cols-3 gap-4 pt-2 border-t border-green-200">
+                                            <div className="space-y-1.5">
+                                                <Label className="flex items-center gap-1">
+                                                    <GlassWater className="h-3 w-3 text-green-700" /> Số ly / chai
+                                                </Label>
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    max={20}
+                                                    value={form.glassesPerBottle ?? 8}
+                                                    onChange={(e) => setForm({ ...form, glassesPerBottle: Number(e.target.value) })}
+                                                    className="border-cream-300 bg-cream-100 font-mono"
+                                                />
+                                                <p className="text-[9px] text-cream-400">Thường 6-8 ly cho rượu vang</p>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="flex items-center gap-1">
+                                                    <Clock className="h-3 w-3 text-amber-600" /> Giờ oxy hóa tối đa
+                                                </Label>
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    max={168}
+                                                    value={form.oxidationHours ?? ""}
+                                                    onChange={(e) => setForm({ ...form, oxidationHours: Number(e.target.value) || undefined })}
+                                                    placeholder="48"
+                                                    className="border-cream-300 bg-cream-100 font-mono"
+                                                />
+                                                <p className="text-[9px] text-cream-400">Sau thời gian này, hệ thống cảnh báo</p>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label>Giá bán ly (₫)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={form.glassPrice ?? ""}
+                                                    onChange={(e) => setForm({ ...form, glassPrice: Number(e.target.value) || undefined })}
+                                                    placeholder="110000"
+                                                    className="border-cream-300 bg-cream-100 font-mono"
+                                                />
+                                                {form.glassPrice && form.costPrice > 0 && (form.glassesPerBottle ?? 0) > 0 && (
+                                                    <p className="text-[9px] text-green-600 font-bold">
+                                                        Margin ly: {(((form.glassPrice * (form.glassesPerBottle ?? 8) - form.costPrice) / (form.glassPrice * (form.glassesPerBottle ?? 8))) * 100).toFixed(0)}%
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {form.isByGlass && form.oxidationHours && (
+                                        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex items-start gap-2">
+                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                            <p className="text-[10px] text-amber-700">
+                                                Chai mở quá <strong>{form.oxidationHours}h</strong> sẽ hiện cảnh báo đỏ tại POS và Dashboard.
+                                                {form.oxidationHours <= 24 ? " Sparkling/Rosé nên dưới 24h." :
+                                                    form.oxidationHours <= 48 ? " Rượu trắng nên dưới 48h." :
+                                                        " Rượu đỏ có thể mở lâu hơn."}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

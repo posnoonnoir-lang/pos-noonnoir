@@ -30,6 +30,7 @@ export async function getInventoryItems() {
             costPrice: Number(p.costPrice),
             sellPrice: Number(p.sellPrice),
             lowStockAlert: p.lowStockAlert,
+            sku: p.sku,
         })),
         bottles: bottles.map((b) => ({
             id: b.id,
@@ -58,14 +59,36 @@ export async function getStockMovements(params?: { limit?: number }) {
         orderBy: { createdAt: "desc" },
         take: params?.limit ?? 50,
     })
+
+    // Fetch product names for movements that have productId
+    const productIds = movements.map(m => m.productId).filter(Boolean) as string[]
+    const products = productIds.length > 0
+        ? await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, name: true } })
+        : []
+    const productMap = new Map(products.map(p => [p.id, p.name]))
+
     return movements.map((m) => ({
-        id: m.id, type: m.type,
+        id: m.id, type: mapMovementType(m.type),
         productId: m.productId,
+        productName: m.productId ? (productMap.get(m.productId) ?? "Không xác định") : "—",
         quantity: Number(m.quantity),
         unitCost: m.unitCost ? Number(m.unitCost) : null,
-        reason: m.reason,
+        reason: m.reason ?? "—",
+        staffName: m.createdBy ?? "Hệ thống",
+        previousStock: 0,
+        newStock: 0,
         createdAt: m.createdAt,
     }))
+}
+
+function mapMovementType(type: string): string {
+    switch (type) {
+        case "PURCHASE": case "CONSIGNMENT_IN": return "IN"
+        case "SALE": case "WASTE": case "SPOILAGE": case "BREAKAGE": return "OUT"
+        case "ADJUSTMENT": return "ADJUSTMENT"
+        case "RETURN": return "IN"
+        default: return "ADJUSTMENT"
+    }
 }
 
 export async function createStockMovement(data: {
@@ -119,29 +142,44 @@ export async function updateIngredientStock(id: string, newStock: number) {
 }
 
 export async function getInventoryStats() {
-    const [bottleCount, ingredients] = await Promise.all([
-        prisma.wineBottle.groupBy({
-            by: ["status"],
-            _count: true,
+    const [products, bottleCount, ingredients] = await Promise.all([
+        prisma.product.findMany({
+            where: { isActive: true, trackInventory: true },
+            include: {
+                _count: { select: { wineBottles: { where: { status: "IN_STOCK" } } } },
+                wineBottles: { where: { status: "IN_STOCK" }, select: { costPrice: true } },
+            },
         }),
+        prisma.wineBottle.groupBy({ by: ["status"], _count: true }),
         prisma.ingredient.findMany({ where: { isActive: true } }),
     ])
 
     const lowStockIngredients = ingredients.filter((i) => Number(i.currentStock) <= Number(i.minStock))
 
+    // Calculate inventory value = sum of cost prices * stock
+    const productValues = products.reduce((sum, p) => {
+        const bottleVal = p.wineBottles.reduce((s, b) => s + Number(b.costPrice ?? 0), 0)
+        return sum + bottleVal + Number(p.costPrice)
+    }, 0)
+
+    // Count products with real stock issues
+    const wineProducts = products.filter(p => ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"].includes(p.type))
+    const lowStockProducts = wineProducts.filter(p => p._count.wineBottles > 0 && p._count.wineBottles <= p.lowStockAlert)
+    const outOfStockProducts = wineProducts.filter(p => p._count.wineBottles === 0)
+
     return {
+        totalItems: products.length,
+        inStock: products.length - outOfStockProducts.length,
+        lowStock: lowStockProducts.length + lowStockIngredients.length,
+        outOfStock: outOfStockProducts.length,
+        totalValue: productValues,
+        expiringSoon: ingredients.filter(i => i.expiryDate && ((new Date(i.expiryDate).getTime() - Date.now()) / 86400000) <= 14).length,
+        // legacy
         totalBottles: bottleCount.reduce((s, b) => s + b._count, 0),
         inStockBottles: bottleCount.find((b) => b.status === "IN_STOCK")?._count ?? 0,
         openedBottles: bottleCount.find((b) => b.status === "OPENED")?._count ?? 0,
         totalIngredients: ingredients.length,
-        lowStockAlerts: lowStockIngredients.length,
-        // backward compat aliases
-        totalItems: bottleCount.reduce((s, b) => s + b._count, 0) + ingredients.length,
-        inStock: bottleCount.find((b) => b.status === "IN_STOCK")?._count ?? 0,
-        lowStock: lowStockIngredients.length,
-        outOfStock: 0,
-        totalValue: 0,
-        expiringSoon: 0,
+        lowStockAlerts: lowStockProducts.length + lowStockIngredients.length,
     }
 }
 
@@ -167,16 +205,47 @@ export type StockMovement = {
     createdAt: Date
 }
 
-// Alias functions for backward compat
-export async function getInventory() {
-    const data = await getInventoryItems()
-    return data.products.map((p) => ({
-        ...p, currentStock: 0, status: "IN_STOCK" as InventoryStatus,
-    }))
+// Full inventory list for the Inventory page
+export async function getInventory(): Promise<InventoryItem[]> {
+    const products = await prisma.product.findMany({
+        where: { isActive: true, trackInventory: true },
+        include: {
+            category: true,
+            _count: { select: { wineBottles: { where: { status: "IN_STOCK" } } } },
+        },
+        orderBy: { name: "asc" },
+    })
+
+    return products.map((p) => {
+        const isWine = ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"].includes(p.type)
+        const currentStock = isWine ? p._count.wineBottles : 0
+        const lowStockThreshold = p.lowStockAlert
+        let status: InventoryStatus = "IN_STOCK"
+        if (currentStock <= 0) status = "OUT_OF_STOCK"
+        else if (currentStock <= lowStockThreshold) status = "LOW_STOCK"
+
+        return {
+            id: p.id,
+            name: p.name,
+            productName: p.name,
+            type: p.type,
+            categoryName: p.category.name,
+            category: p.category.name,
+            sku: p.sku ?? "",
+            unit: isWine ? "chai" : "cái",
+            costPrice: Number(p.costPrice),
+            sellPrice: Number(p.sellPrice),
+            currentStock,
+            lowStockAlert: lowStockThreshold,
+            minStock: lowStockThreshold,
+            maxStock: lowStockThreshold * 4,
+            expiryDate: null,
+            status,
+        }
+    })
 }
 
 export async function adjustStock(productId: string, typeOrAdjustment: string | number, quantityOrReason?: number | string, reason?: string, _staffName?: string) {
-    // Accept both (id, adjustment, reason?) and (id, type, qty, reason, staffName)
     let type: string
     let quantity: number
     let reasonStr: string | undefined
@@ -189,7 +258,7 @@ export async function adjustStock(productId: string, typeOrAdjustment: string | 
         quantity = quantityOrReason as number
         reasonStr = reason
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await createStockMovement({ type: type as any, productId, quantity, reason: reasonStr })
     return { ...result, error: result.success ? undefined : "Lỗi" }
 }
-

@@ -42,6 +42,11 @@ import {
     MapPin,
     Info,
     ChevronRight,
+    BookOpen,
+    ChevronDown,
+    ChevronUp,
+    Utensils,
+    Sparkles,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -62,7 +67,7 @@ import {
 } from "@/actions/tabs"
 import { getProducts, getCategories } from "@/actions/menu"
 import { getTables, getZones } from "@/actions/tables"
-import { getAllGlassStatuses, sellWineGlass, sellWineBottle, type GlassStatus } from "@/actions/wine"
+import { getAllGlassStatuses, sellWineGlass, sellWineBottle, openBottle, pourFromBottle, getOpenedBottlesForProduct, getInStockBottlesForProduct, type GlassStatus, type OpenedBottleSummary } from "@/actions/wine"
 import { getCurrentShift, openShift, closeShift, addShiftExpense, type Shift } from "@/actions/shifts"
 import { getUnreadNotifications, markAsRead, markAllAsRead, type Notification } from "@/actions/notifications"
 import { generateQRPayment, confirmQRPayment, cancelQRPayment, getBankConfig, type QRPaymentRequest, type QRPaymentConfig } from "@/actions/qr-payment"
@@ -82,6 +87,10 @@ import {
 } from "@/actions/operational"
 import { getUpcomingReservations, type Reservation } from "@/actions/reservations"
 import { getPushSaleItems, type PushSaleItem } from "@/actions/push-sale"
+import { getAllServingNotes, searchServingNotes, type WineServingNote } from "@/actions/serving-notes"
+import { getDefaultTaxRate } from "@/actions/tax"
+import { checkPromotions, type AppliedPromo } from "@/actions/promotions"
+import { getProductStock, getAllowNegativeStock, getWineRecommendations, getAlternativesForOutOfStock, type WineRecommendation } from "@/actions/wine-advisor"
 import type { Product, Category, Customer, CustomerTab } from "@/types"
 type FloorTable = Awaited<ReturnType<typeof getTables>>[number]
 type TableZone = Awaited<ReturnType<typeof getZones>>[number]
@@ -351,8 +360,32 @@ export default function POSPage() {
     const [upcomingReservations, setUpcomingReservations] = useState<Reservation[]>([])
     const [qrLoading, setQrLoading] = useState(false)
 
+    // Tax & Promotions
+    const [taxRate, setTaxRate] = useState<{ id: string; name: string; rate: number } | null>(null)
+    const [taxAmount, setTaxAmount] = useState(0)
+    const [appliedPromos, setAppliedPromos] = useState<AppliedPromo[]>([])
+    const [promoDiscount, setPromoDiscount] = useState(0)
+
+    // Cash Payment Modal
+    const [cashModalOpen, setCashModalOpen] = useState(false)
+    const [cashReceived, setCashReceived] = useState(0)
+
+    // Wine Advisor — stock + recommendations
+    const [stockMap, setStockMap] = useState<Map<string, number>>(new Map())
+    const [allowNegativeStock, setAllowNegativeStock] = useState(false)
+    const [showRecommendations, setShowRecommendations] = useState(false)
+    const [recommendations, setRecommendations] = useState<WineRecommendation[]>([])
+    const [recoSourceName, setRecoSourceName] = useState("")
+
+    // Bottle Selector for glass sales
+    const [showBottleSelector, setShowBottleSelector] = useState(false)
+    const [bottleSelectorProduct, setBottleSelectorProduct] = useState<Product | null>(null)
+    const [openedBottles, setOpenedBottles] = useState<OpenedBottleSummary[]>([])
+    const [inStockBottles, setInStockBottles] = useState<Array<{ id: string; batchCode: string; costPrice: number; receivedAt: Date }>>([])
+
     // V2: Wine Guide popup
     const [wineGuideProduct, setWineGuideProduct] = useState<Product | null>(null)
+    const [showWineGuidePopup, setShowWineGuidePopup] = useState(false)
 
     // V2: Push Sale sidebar
     const [pushSidebarOpen, setPushSidebarOpen] = useState(true)
@@ -473,14 +506,60 @@ export default function POSPage() {
         return () => clearInterval(interval)
     }, [refreshPushSale])
 
-    // Phase 8A: Calculate service charge when cart changes
+    // Load default tax rate + stock data on startup
+    useEffect(() => {
+        getDefaultTaxRate().then((rate) => setTaxRate(rate))
+        getAllowNegativeStock().then(setAllowNegativeStock)
+    }, [])
+
+    // Load stock for all wine products
+    const refreshStockMap = useCallback(async () => {
+        const wineProds = dbProducts.filter(p => ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"].includes(p.type))
+        const map = new Map<string, number>()
+        await Promise.all(wineProds.map(async (p) => {
+            const stock = await getProductStock(p.id)
+            map.set(p.id, stock)
+        }))
+        setStockMap(map)
+    }, [dbProducts])
+
+    useEffect(() => {
+        if (dbProducts.length > 0) refreshStockMap()
+    }, [dbProducts, refreshStockMap])
+
+    // Phase 8A: Calculate service charge, tax & promotions when cart changes
     useEffect(() => {
         if (cart.items.length > 0) {
             calculateServiceCharge(cart.subtotal(), cart.orderType).then((sc) => setServiceCharge(sc.amount))
+            // Tax calculation
+            if (taxRate) {
+                const afterDiscount = cart.subtotal() * (1 - discountPct / 100)
+                setTaxAmount(Math.round(afterDiscount * taxRate.rate / 100))
+            }
+            // Auto-check promotions
+            checkPromotions({
+                orderTotal: cart.subtotal(),
+                items: cart.items.map(i => ({
+                    productId: i.product.id,
+                    categorySlug: i.product.categoryId,
+                    quantity: i.quantity,
+                    unitPrice: i.product.isByGlass && i.product.glassPrice ? i.product.glassPrice : i.product.sellPrice,
+                })),
+            }).then((promos) => {
+                setAppliedPromos(promos)
+                setPromoDiscount(promos.reduce((sum, p) => sum + p.discountAmount, 0))
+            })
         } else {
             setServiceCharge(0)
+            setTaxAmount(0)
+            setAppliedPromos([])
+            setPromoDiscount(0)
         }
-    }, [cart.items, cart.orderType, cart.subtotal])
+    }, [cart.items, cart.orderType, cart.subtotal, taxRate, discountPct])
+
+    // Compute final total
+    const manualDiscount = Math.round(cart.subtotal() * discountPct / 100)
+    const finalTotal = Math.round(cart.subtotal() - manualDiscount - promoDiscount + serviceCharge + taxAmount)
 
     // Filter products
     const filteredProducts = useMemo(() => {
@@ -514,6 +593,39 @@ export default function POSPage() {
         }
         if (product86Ids.includes(product.id)) {
             toast.error(`❌ 86: ${product.name} đã hết`, { description: "Sản phẩm không còn phục vụ", duration: 3000 })
+            return
+        }
+        // Stock check for wine products
+        const isWineType = ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"].includes(product.type)
+        if (isWineType && !allowNegativeStock) {
+            const stock = stockMap.get(product.id) ?? 0
+            const inCart = cart.items.find(i => i.product.id === product.id)?.quantity ?? 0
+            if (stock <= inCart && product.type === "WINE_BOTTLE") {
+                toast.error(`📦 Hết tồn kho: ${product.name}`, {
+                    description: `Chỉ còn ${stock} chai. Xem gợi ý thay thế ↓`,
+                    duration: 5000,
+                })
+                getAlternativesForOutOfStock(product.id).then((recs) => {
+                    if (recs.length > 0) {
+                        setRecommendations(recs)
+                        setRecoSourceName(product.name)
+                        setShowRecommendations(true)
+                    }
+                })
+                return
+            }
+        }
+        // By-glass: Open bottle selector
+        if (product.isByGlass && isWineType) {
+            setBottleSelectorProduct(product)
+            Promise.all([
+                getOpenedBottlesForProduct(product.id),
+                getInStockBottlesForProduct(product.id),
+            ]).then(([opened, inStock]) => {
+                setOpenedBottles(opened)
+                setInStockBottles(inStock)
+                setShowBottleSelector(true)
+            })
             return
         }
         cart.addItem(product)
@@ -1116,11 +1228,20 @@ export default function POSPage() {
                                                     By Glass
                                                 </Badge>
                                             )}
-                                            {product.type === "WINE_BOTTLE" && gs && (
-                                                <Badge className="bg-cream-200 text-cream-600 text-[9px] px-1.5 py-0">
-                                                    {gs.bottlesInStock} chai
-                                                </Badge>
-                                            )}
+                                            {/* Stock count badge for wine */}
+                                            {["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"].includes(product.type) && (() => {
+                                                const stock = stockMap.get(product.id) ?? 0
+                                                return (
+                                                    <Badge className={cn(
+                                                        "text-[9px] px-1.5 py-0",
+                                                        stock <= 0 ? "bg-red-100 text-red-700" :
+                                                            stock <= product.lowStockAlert ? "bg-amber-100 text-amber-700" :
+                                                                "bg-green-100 text-green-700"
+                                                    )}>
+                                                        {stock} chai
+                                                    </Badge>
+                                                )
+                                            })()}
                                         </div>
 
                                         {/* Name */}
@@ -1149,13 +1270,46 @@ export default function POSPage() {
                                             </p>
                                         )}
 
-                                        {/* Price */}
-                                        <div className="mt-auto pt-2">
-                                            <span className="font-mono text-sm font-bold text-green-900">
-                                                ₫{formatPrice(displayPrice)}
-                                            </span>
-                                            {product.isByGlass && product.glassPrice && (
-                                                <span className="ml-1 text-[10px] text-cream-400">/ly</span>
+                                        {/* Price + Wine Guide button */}
+                                        <div className="mt-auto pt-2 flex items-center justify-between">
+                                            <div>
+                                                <span className="font-mono text-sm font-bold text-green-900">
+                                                    ₫{formatPrice(displayPrice)}
+                                                </span>
+                                                {product.isByGlass && product.glassPrice && (
+                                                    <span className="ml-1 text-[10px] text-cream-400">/ly</span>
+                                                )}
+                                            </div>
+                                            {/* Wine Guide quick button */}
+                                            {(product.type === "WINE_BOTTLE" || product.type === "WINE_GLASS" || product.type === "WINE_TASTING") && (
+                                                <>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setWineGuideProduct(product)
+                                                        }}
+                                                        className="flex items-center gap-1 rounded-md bg-wine-50 border border-wine-200 px-1.5 py-0.5 text-wine-700 hover:bg-wine-100 hover:border-wine-400 transition-all"
+                                                        title="Wine Guide"
+                                                    >
+                                                        <BookOpen className="h-3 w-3" />
+                                                        <span className="text-[8px] font-bold">Guide</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            getWineRecommendations(product.id).then((recs) => {
+                                                                setRecommendations(recs)
+                                                                setRecoSourceName(product.name)
+                                                                setShowRecommendations(true)
+                                                            })
+                                                        }}
+                                                        className="flex items-center gap-1 rounded-md bg-green-50 border border-green-200 px-1.5 py-0.5 text-green-700 hover:bg-green-100 hover:border-green-400 transition-all"
+                                                        title="Gợi ý rượu tương tự"
+                                                    >
+                                                        <Sparkles className="h-3 w-3" />
+                                                        <span className="text-[8px] font-bold">Gợi ý</span>
+                                                    </button>
+                                                </>
                                             )}
                                         </div>
                                     </button>
@@ -1327,12 +1481,26 @@ export default function POSPage() {
                             {discountPct > 0 && (
                                 <div className="flex justify-between text-xs text-green-600">
                                     <span>Giảm giá ({discountPct}%)</span>
-                                    <span className="font-mono">-₫{formatPrice(Math.round(cart.subtotal() * discountPct / 100))}</span>
+                                    <span className="font-mono">-₫{formatPrice(manualDiscount)}</span>
+                                </div>
+                            )}
+                            {/* Applied Promotions */}
+                            {appliedPromos.map((promo) => (
+                                <div key={promo.id} className="flex justify-between text-xs text-wine-600">
+                                    <span className="flex items-center gap-1">🎁 {promo.name}</span>
+                                    <span className="font-mono">-₫{formatPrice(promo.discountAmount)}</span>
+                                </div>
+                            ))}
+                            {/* Tax / VAT */}
+                            {taxRate && taxAmount > 0 && (
+                                <div className="flex justify-between text-xs text-cream-500">
+                                    <span>{taxRate.name} ({taxRate.rate}%)</span>
+                                    <span className="font-mono">₫{formatPrice(taxAmount)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between text-sm font-bold text-green-900 pt-1 border-t border-cream-200">
                                 <span>Tổng cộng</span>
-                                <span className="font-mono text-lg">₫{formatPrice(Math.round(cart.subtotal() * (1 - discountPct / 100)) + serviceCharge)}</span>
+                                <span className="font-mono text-lg">₫{formatPrice(finalTotal)}</span>
                             </div>
                         </div>
 
@@ -1342,7 +1510,11 @@ export default function POSPage() {
                             {[100000, 200000, 500000].map((amt) => (
                                 <button
                                     key={amt}
-                                    onClick={() => handleCheckout("CASH")}
+                                    onClick={() => {
+                                        if (cart.items.length === 0) { toast.error("Giỏ hàng trống"); return }
+                                        setCashReceived(amt)
+                                        setCashModalOpen(true)
+                                    }}
                                     className="rounded-md bg-cream-200 px-2 py-1 text-[9px] font-mono font-bold text-cream-600 hover:bg-green-100 hover:text-green-800 transition-all"
                                 >
                                     {amt >= 1000000 ? `${amt / 1000000}M` : `${amt / 1000}K`}
@@ -1383,7 +1555,11 @@ export default function POSPage() {
                         {/* Payment Buttons */}
                         <div className="grid grid-cols-3 gap-2 px-4 pb-2">
                             <button
-                                onClick={() => handleCheckout("CASH")}
+                                onClick={() => {
+                                    if (cart.items.length === 0) { toast.error("Giỏ hàng trống"); return }
+                                    setCashReceived(0)
+                                    setCashModalOpen(true)
+                                }}
                                 disabled={isSubmitting}
                                 className="flex flex-col items-center gap-1 rounded-xl border border-cream-300 bg-cream-100 py-2.5 text-[10px] font-medium text-cream-500 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
                             >
@@ -1598,17 +1774,30 @@ export default function POSPage() {
                 )}
             </div>
 
-            {/* 86 Context Menu */}
+            {/* Context Menu (86 + Wine Guide) */}
             {contextMenu && (
                 <>
                     <div className="fixed inset-0 z-50" onClick={() => setContextMenu(null)} />
                     <div
-                        className="fixed z-50 min-w-[180px] rounded-xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden"
+                        className="fixed z-50 min-w-[200px] rounded-xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden"
                         style={{ left: contextMenu.x, top: contextMenu.y }}
                     >
                         <div className="px-3 py-2 border-b border-cream-200 bg-cream-100">
                             <p className="text-[10px] font-bold text-green-900 truncate">{contextMenu.product.name}</p>
                         </div>
+                        {/* Wine Guide option for wine products */}
+                        {(contextMenu.product.type === "WINE_BOTTLE" || contextMenu.product.type === "WINE_GLASS" || contextMenu.product.type === "WINE_TASTING") && (
+                            <button
+                                onClick={() => {
+                                    setWineGuideProduct(contextMenu.product)
+                                    setContextMenu(null)
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-wine-700 hover:bg-wine-50 transition-all border-b border-cream-100"
+                            >
+                                <BookOpen className="h-3.5 w-3.5" />
+                                Xem Wine Guide
+                            </button>
+                        )}
                         <button
                             onClick={() => handle86Toggle(contextMenu.product)}
                             className={cn(
@@ -1813,13 +2002,464 @@ export default function POSPage() {
                     </div>
                 </div>
             )}
-            {/* ============ V2: Wine Guide Modal ============ */}
+            {/* ============ CASH PAYMENT MODAL ============ */}
+            {cashModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setCashModalOpen(false)}>
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-cream-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="bg-green-900 px-6 py-4 text-white">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Banknote className="h-5 w-5" />
+                                    <h3 className="font-display text-lg font-bold">Thanh toán tiền mặt</h3>
+                                </div>
+                                <button onClick={() => setCashModalOpen(false)} className="rounded-full p-1 hover:bg-white/20 transition-all">
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6 space-y-5">
+                            {/* Order Total */}
+                            <div className="text-center">
+                                <p className="text-xs text-cream-500 uppercase font-bold mb-1">Tổng cộng</p>
+                                <p className="font-mono text-3xl font-bold text-green-900">₫{formatPrice(finalTotal)}</p>
+                                {(manualDiscount > 0 || promoDiscount > 0) && (
+                                    <p className="mt-1 text-xs text-green-600">
+                                        Đã giảm: ₫{formatPrice(manualDiscount + promoDiscount)}
+                                    </p>
+                                )}
+                                {taxAmount > 0 && (
+                                    <p className="text-[10px] text-cream-400">Đã bao gồm {taxRate?.name}: ₫{formatPrice(taxAmount)}</p>
+                                )}
+                            </div>
+
+                            {/* Quick Denomination Buttons */}
+                            <div>
+                                <p className="text-[10px] font-bold uppercase text-cream-400 mb-2">Chọn nhanh</p>
+                                <div className="grid grid-cols-5 gap-2">
+                                    {[100000, 200000, 500000, 1000000, 2000000].map((amt) => (
+                                        <button
+                                            key={amt}
+                                            onClick={() => setCashReceived(amt)}
+                                            className={cn(
+                                                "rounded-lg border-2 py-2.5 font-mono text-xs font-bold transition-all",
+                                                cashReceived === amt
+                                                    ? "border-green-600 bg-green-50 text-green-800"
+                                                    : "border-cream-200 bg-cream-50 text-cream-600 hover:border-green-400 hover:bg-green-50"
+                                            )}
+                                        >
+                                            {amt >= 1000000 ? `${amt / 1000000}M` : `${amt / 1000}K`}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Custom Input */}
+                            <div>
+                                <p className="text-[10px] font-bold uppercase text-cream-400 mb-1.5">Hoặc nhập số tiền</p>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cream-400 font-bold">₫</span>
+                                    <input
+                                        type="number"
+                                        value={cashReceived || ""}
+                                        onChange={(e) => setCashReceived(Number(e.target.value) || 0)}
+                                        placeholder="Nhập số tiền khách đưa..."
+                                        className="w-full rounded-xl border-2 border-cream-200 bg-cream-50 py-3 pl-8 pr-4 font-mono text-lg font-bold text-green-900 placeholder:text-cream-300 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Change Calculation */}
+                            {cashReceived > 0 && (
+                                <div className={cn(
+                                    "rounded-xl border-2 p-4 text-center transition-all",
+                                    cashReceived >= finalTotal
+                                        ? "border-green-300 bg-green-50"
+                                        : "border-red-200 bg-red-50"
+                                )}>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-cream-500">Khách đưa:</span>
+                                        <span className="font-mono font-bold text-green-900">₫{formatPrice(cashReceived)}</span>
+                                    </div>
+                                    <div className="h-px bg-cream-200 my-2" />
+                                    <div className="flex items-center justify-between">
+                                        <span className={cn("text-sm font-bold", cashReceived >= finalTotal ? "text-green-700" : "text-red-600")}>
+                                            {cashReceived >= finalTotal ? "💰 Tiền trả lại:" : "⚠️ Còn thiếu:"}
+                                        </span>
+                                        <span className={cn(
+                                            "font-mono text-xl font-bold",
+                                            cashReceived >= finalTotal ? "text-green-700" : "text-red-600"
+                                        )}>
+                                            ₫{formatPrice(Math.abs(cashReceived - finalTotal))}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="border-t border-cream-200 bg-cream-50 px-6 py-4 flex items-center gap-3">
+                            <button
+                                onClick={() => setCashModalOpen(false)}
+                                className="flex-1 rounded-xl border border-cream-300 bg-white py-2.5 text-xs font-bold text-cream-500 hover:bg-cream-100 transition-all"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setCashModalOpen(false)
+                                    handleCheckout("CASH")
+                                }}
+                                disabled={cashReceived < finalTotal || cashReceived === 0}
+                                className={cn(
+                                    "flex-1 rounded-xl py-2.5 text-xs font-bold transition-all flex items-center justify-center gap-2",
+                                    cashReceived >= finalTotal && cashReceived > 0
+                                        ? "bg-green-700 text-white hover:bg-green-800 shadow-md"
+                                        : "bg-cream-200 text-cream-400 cursor-not-allowed"
+                                )}
+                            >
+                                <CheckCircle2 className="h-4 w-4" />
+                                Xác nhận thanh toán
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============ Bottle Selector for Glass Sales ============ */}
+            {showBottleSelector && bottleSelectorProduct && (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onClick={() => setShowBottleSelector(false)}>
+                    <div
+                        className="w-full max-w-xl bg-white rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-cream-200 flex items-center justify-between shrink-0">
+                            <div>
+                                <h3 className="text-base font-bold text-green-900 flex items-center gap-2">
+                                    <Wine className="h-5 w-5 text-wine-600" /> Chọn chai rót ly
+                                </h3>
+                                <p className="text-xs text-cream-500 mt-0.5">
+                                    {bottleSelectorProduct.name} · ₫{formatPrice(Number(bottleSelectorProduct.glassPrice ?? 0))}/ly
+                                </p>
+                            </div>
+                            <button onClick={() => setShowBottleSelector(false)} className="rounded-lg p-2 hover:bg-cream-200 transition-all">
+                                <X className="h-4 w-4 text-cream-500" />
+                            </button>
+                        </div>
+
+                        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+                            {/* Opened Bottles */}
+                            {openedBottles.length > 0 && (
+                                <div>
+                                    <h4 className="text-xs font-bold text-green-800 uppercase mb-2 flex items-center gap-1.5">
+                                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" /> Chai đang mở ({openedBottles.length})
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {openedBottles.map((bottle) => {
+                                            const oxPct = bottle.maxOxidationHours > 0 ? Math.min(100, (bottle.oxidationHours / bottle.maxOxidationHours) * 100) : 0
+                                            const glassRatio = bottle.glassesTotal > 0 ? ((bottle.glassesTotal - bottle.glassesRemaining) / bottle.glassesTotal) * 100 : 0
+                                            return (
+                                                <button
+                                                    key={bottle.id}
+                                                    onClick={async () => {
+                                                        const result = await pourFromBottle({
+                                                            bottleId: bottle.id,
+                                                            glasses: 1,
+                                                            staffId: staff?.id ?? "",
+                                                        })
+                                                        if (result.success) {
+                                                            cart.addItem(bottleSelectorProduct!)
+                                                            toast.success(`🍷 Rót 1 ly từ ${bottle.batchCode}`, {
+                                                                description: result.bottleFinished ? "⚠️ Chai đã hết!" : `Còn ${bottle.glassesRemaining - 1} ly`,
+                                                                duration: 2000,
+                                                            })
+                                                            setShowBottleSelector(false)
+                                                            refreshStockMap()
+                                                        } else {
+                                                            toast.error(result.error ?? "Lỗi")
+                                                        }
+                                                    }}
+                                                    disabled={bottle.glassesRemaining <= 0}
+                                                    className={cn(
+                                                        "w-full rounded-xl border p-3 text-left transition-all hover:shadow-md",
+                                                        bottle.isExpired ? "border-red-300 bg-red-50 hover:border-red-400" :
+                                                            oxPct > 70 ? "border-amber-300 bg-amber-50 hover:border-amber-400" :
+                                                                "border-green-200 bg-green-50 hover:border-green-400",
+                                                        bottle.glassesRemaining <= 0 && "opacity-40 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-bold text-green-900">{bottle.batchCode}</span>
+                                                                {bottle.isExpired && <Badge className="bg-red-600 text-white text-[8px] px-1.5 py-0">Oxy hóa</Badge>}
+                                                            </div>
+                                                            <p className="text-[10px] text-cream-500 mt-0.5">
+                                                                Mở bởi {bottle.openedByName ?? "—"} · {bottle.oxidationHours}h trước
+                                                            </p>
+
+                                                            {/* Glass progress */}
+                                                            <div className="mt-2 flex items-center gap-2">
+                                                                <div className="flex-1 h-2 rounded-full bg-cream-200 overflow-hidden">
+                                                                    <div className="h-full rounded-full bg-wine-600 transition-all" style={{ width: `${glassRatio}%` }} />
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-green-800 whitespace-nowrap">
+                                                                    {bottle.glassesPoured}/{bottle.glassesTotal} ly
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Oxidation progress */}
+                                                            <div className="mt-1.5 flex items-center gap-2">
+                                                                <div className="flex-1 h-1.5 rounded-full bg-cream-200 overflow-hidden">
+                                                                    <div
+                                                                        className={cn(
+                                                                            "h-full rounded-full transition-all",
+                                                                            oxPct > 90 ? "bg-red-500" : oxPct > 70 ? "bg-amber-500" : "bg-green-500"
+                                                                        )}
+                                                                        style={{ width: `${Math.min(oxPct, 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                                <span className="text-[9px] text-cream-500 whitespace-nowrap">
+                                                                    {bottle.oxidationHours}h / {bottle.maxOxidationHours}h
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="text-right shrink-0">
+                                                            <p className="font-mono text-lg font-bold text-green-900">
+                                                                {bottle.glassesRemaining}
+                                                            </p>
+                                                            <p className="text-[9px] text-cream-500">ly còn lại</p>
+                                                            <p className="text-[9px] text-wine-600 font-medium mt-1">
+                                                                ⚡ {bottle.sellSpeedPerHour} ly/giờ
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* In-Stock Bottles to open */}
+                            {inStockBottles.length > 0 && (
+                                <div>
+                                    <h4 className="text-xs font-bold text-cream-600 uppercase mb-2 flex items-center gap-1.5">
+                                        📦 Chai chưa mở ({inStockBottles.length} chai)
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {inStockBottles.map((bottle) => (
+                                            <button
+                                                key={bottle.id}
+                                                onClick={async () => {
+                                                    const result = await openBottle({ bottleId: bottle.id, staffId: staff?.id ?? "" })
+                                                    if (result.success) {
+                                                        // Pour 1 glass from the newly opened bottle
+                                                        const pourResult = await pourFromBottle({
+                                                            bottleId: bottle.id,
+                                                            glasses: 1,
+                                                            staffId: staff?.id ?? "",
+                                                        })
+                                                        if (pourResult.success) {
+                                                            cart.addItem(bottleSelectorProduct!)
+                                                            toast.success(`🍾 Mở chai mới & rót 1 ly`, {
+                                                                description: `${bottle.batchCode} — ${(bottleSelectorProduct?.glassesPerBottle ?? 8) - 1} ly còn lại`,
+                                                                duration: 3000,
+                                                            })
+                                                        }
+                                                        setShowBottleSelector(false)
+                                                        refreshStockMap()
+                                                    } else {
+                                                        toast.error(result.error ?? "Lỗi mở chai")
+                                                    }
+                                                }}
+                                                className="w-full rounded-xl border border-cream-200 bg-cream-50 p-3 text-left transition-all hover:shadow-md hover:border-green-400"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <span className="text-sm font-bold text-green-900">{bottle.batchCode}</span>
+                                                        <p className="text-[10px] text-cream-500 mt-0.5">
+                                                            Giá vốn: ₫{formatPrice(bottle.costPrice)} · Nhập {new Date(bottle.receivedAt).toLocaleDateString("vi-VN")}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="rounded-full bg-green-700 px-3 py-1 text-[10px] font-bold text-cream-50">
+                                                            Mở chai & rót
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {openedBottles.length === 0 && inStockBottles.length === 0 && (
+                                <div className="text-center py-10">
+                                    <Wine className="h-10 w-10 text-cream-300 mx-auto mb-2" />
+                                    <p className="text-sm text-cream-500">Không có chai nào để rót</p>
+                                    <p className="text-xs text-cream-400 mt-1">Cần nhập thêm sản phẩm này vào kho</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-3 border-t border-cream-200 bg-cream-50 rounded-b-2xl flex items-center justify-between shrink-0">
+                            <div className="text-[9px] text-cream-400">
+                                <span className="inline-block h-2 w-2 rounded-full bg-green-500 mr-1" />Oxy hóa tốt
+                                <span className="inline-block h-2 w-2 rounded-full bg-amber-500 ml-3 mr-1" /> Cảnh báo
+                                <span className="inline-block h-2 w-2 rounded-full bg-red-500 ml-3 mr-1" /> Quá hạn
+                            </div>
+                            <button
+                                onClick={() => setShowBottleSelector(false)}
+                                className="rounded-lg bg-green-900 px-3 py-1.5 text-xs font-bold text-cream-50 hover:bg-green-800 transition-all"
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============ Wine Recommendations Panel ============ */}
+            {showRecommendations && recommendations.length > 0 && (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setShowRecommendations(false)}>
+                    <div
+                        className="w-full max-w-2xl bg-white rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-cream-200">
+                            <div>
+                                <h3 className="text-base font-bold text-green-900 flex items-center gap-2">
+                                    <span className="text-lg">🍷</span> Gợi ý thay thế
+                                </h3>
+                                <p className="text-xs text-cream-500 mt-0.5">
+                                    Rượu tương tự <span className="font-semibold text-wine-600">{recoSourceName}</span>
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowRecommendations(false)}
+                                className="rounded-lg p-2 hover:bg-cream-200 transition-all"
+                            >
+                                <X className="h-4 w-4 text-cream-500" />
+                            </button>
+                        </div>
+
+                        {/* Recommendations list */}
+                        <div className="max-h-[50vh] overflow-y-auto divide-y divide-cream-100">
+                            {recommendations.map((rec, idx) => (
+                                <button
+                                    key={rec.id}
+                                    onClick={() => {
+                                        const product = dbProducts.find(p => p.id === rec.id)
+                                        if (product) {
+                                            cart.addItem(product)
+                                            toast.success(`+1 ${product.name}`, { duration: 1500 })
+                                            setShowRecommendations(false)
+                                        }
+                                    }}
+                                    disabled={rec.inStock <= 0}
+                                    className={cn(
+                                        "w-full flex items-center gap-4 px-6 py-3.5 text-left transition-all hover:bg-green-50",
+                                        rec.inStock <= 0 && "opacity-40 cursor-not-allowed"
+                                    )}
+                                >
+                                    {/* Rank */}
+                                    <div className={cn(
+                                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold text-sm",
+                                        idx === 0 ? "bg-green-700 text-cream-50" :
+                                            idx === 1 ? "bg-green-600 text-cream-50" :
+                                                "bg-cream-200 text-cream-600"
+                                    )}>
+                                        {idx + 1}
+                                    </div>
+
+                                    {/* Wine info */}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-green-900 truncate">
+                                            {rec.name}
+                                        </p>
+                                        <p className="text-[10px] text-cream-500 mt-0.5">
+                                            {rec.grapeVariety} · {rec.country}{rec.region ? `, ${rec.region}` : ""} · {rec.alcoholPct}%
+                                        </p>
+                                        <p className="text-[10px] text-wine-600 mt-0.5 font-medium">
+                                            {rec.matchReason}
+                                        </p>
+                                    </div>
+
+                                    {/* Match score */}
+                                    <div className="text-right shrink-0">
+                                        <div className={cn(
+                                            "inline-block rounded-full px-2 py-0.5 text-[9px] font-bold",
+                                            rec.matchScore >= 80 ? "bg-green-100 text-green-700" :
+                                                rec.matchScore >= 50 ? "bg-amber-100 text-amber-700" :
+                                                    "bg-cream-200 text-cream-600"
+                                        )}>
+                                            {rec.matchScore}% match
+                                        </div>
+                                        <p className="font-mono text-sm font-bold text-green-900 mt-1">
+                                            ₫{formatPrice(rec.sellPrice)}
+                                        </p>
+                                        <p className={cn(
+                                            "text-[9px] font-bold",
+                                            rec.inStock > 0 ? "text-green-600" : "text-red-600"
+                                        )}>
+                                            {rec.inStock > 0 ? `📦 ${rec.inStock} chai` : "❌ Hết hàng"}
+                                        </p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-3 border-t border-cream-200 bg-cream-50 rounded-b-2xl flex items-center justify-between">
+                            <p className="text-[9px] text-cream-400 italic">
+                                Gợi ý dựa trên hương vị, giống nho, vùng và nồng độ
+                            </p>
+                            <button
+                                onClick={() => setShowRecommendations(false)}
+                                className="rounded-lg bg-green-900 px-3 py-1.5 text-xs font-bold text-cream-50 hover:bg-green-800 transition-all"
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============ V2: Wine Guide Modal (per product) ============ */}
             {wineGuideProduct && (
                 <WineGuideModal
                     product={wineGuideProduct}
                     onClose={() => setWineGuideProduct(null)}
                 />
             )}
+
+            {/* ============ Wine Guide Popup (full list) ============ */}
+            {showWineGuidePopup && (
+                <WineGuidePopup onClose={() => setShowWineGuidePopup(false)} />
+            )}
+
+            {/* ============ Floating Wine Guide Button ============ */}
+            <button
+                id="wine-guide-fab"
+                onClick={() => setShowWineGuidePopup(true)}
+                className={cn(
+                    "fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full shadow-lg transition-all duration-300",
+                    "bg-wine-700 text-cream-50 hover:bg-wine-800 hover:shadow-xl hover:scale-105 active:scale-95",
+                    "px-4 py-2.5 border border-wine-600",
+                    upcomingReservations.length > 0 && "bottom-20"
+                )}
+                title="Wine Guide — Tư vấn rượu vang"
+            >
+                <BookOpen className="h-4 w-4" />
+                <span className="text-xs font-bold">Wine Guide</span>
+            </button>
         </div>
     )
 }
@@ -3148,6 +3788,310 @@ function WineGuideModal({
                     >
                         Đóng
                     </Button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ============================================================
+// WINE GUIDE POPUP — Full wine list for POS consultation
+// ============================================================
+function WineGuidePopup({ onClose }: { onClose: () => void }) {
+    const [notes, setNotes] = useState<WineServingNote[]>([])
+    const [loading, setLoading] = useState(true)
+    const [search, setSearch] = useState("")
+    const [expandedId, setExpandedId] = useState<string | null>(null)
+
+    const loadData = useCallback(async () => {
+        setLoading(true)
+        const list = search ? await searchServingNotes(search) : await getAllServingNotes()
+        setNotes(list)
+        setLoading(false)
+    }, [search])
+
+    useEffect(() => { loadData() }, [loadData])
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+            <div
+                className="relative w-full max-w-2xl mx-4 max-h-[85vh] rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="bg-green-900 px-6 py-4 shrink-0">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-800 border border-green-700">
+                                <BookOpen className="h-4 w-4 text-cream-200" />
+                            </div>
+                            <div>
+                                <h2 className="font-display text-lg font-bold text-cream-50">Wine Guide</h2>
+                                <p className="text-[10px] text-cream-400">Tư vấn rượu vang · Phục vụ · Food pairing</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="rounded-full p-1.5 text-cream-400 hover:text-cream-50 hover:bg-green-800 transition-all"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                    {/* Search */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-500" />
+                        <Input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Tìm rượu, vùng, nho, pairing..."
+                            className="h-9 pl-9 text-xs border-green-700 bg-green-800 text-cream-100 placeholder:text-cream-500 focus:border-cream-400"
+                            autoFocus
+                        />
+                    </div>
+                </div>
+
+                {/* Wine List */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-16">
+                            <Loader2 className="h-6 w-6 text-wine-600 animate-spin" />
+                            <span className="ml-2 text-xs text-cream-400">Đang tải...</span>
+                        </div>
+                    ) : notes.length === 0 ? (
+                        <div className="py-16 text-center">
+                            <Wine className="h-10 w-10 text-cream-300 mx-auto mb-2" />
+                            <p className="text-sm text-cream-400">Không tìm thấy wine serving notes</p>
+                        </div>
+                    ) : (
+                        notes.map((note) => {
+                            const isExpanded = expandedId === note.id
+                            return (
+                                <div
+                                    key={note.id}
+                                    className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition-all"
+                                >
+                                    {/* Collapsed row */}
+                                    <button
+                                        onClick={() => setExpandedId(isExpanded ? null : note.id)}
+                                        className={cn(
+                                            "w-full flex items-center px-4 py-3 text-left transition-colors",
+                                            isExpanded && "bg-wine-50"
+                                        )}
+                                    >
+                                        {/* Wine icon */}
+                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-wine-100 border border-wine-200 mr-3 shrink-0">
+                                            <Wine className="h-4 w-4 text-wine-700" />
+                                        </div>
+
+                                        {/* Name + Region */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-green-900 truncate">{note.productName}</span>
+                                                {note.vintage && (
+                                                    <Badge className="text-[8px] bg-wine-100 border-wine-300 text-wine-700 shrink-0">
+                                                        {note.vintage}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3 mt-0.5">
+                                                <span className="flex items-center gap-1 text-[10px] text-cream-500">
+                                                    <MapPin className="h-2.5 w-2.5" />{note.region}
+                                                </span>
+                                                {note.grape && (
+                                                    <span className="flex items-center gap-1 text-[10px] text-cream-500">
+                                                        <Grape className="h-2.5 w-2.5" />{note.grape}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Quick info pills */}
+                                        <div className="hidden md:flex items-center gap-2 mr-3 shrink-0">
+                                            <div className="flex items-center gap-1 rounded-lg bg-blue-50 border border-blue-200 px-2 py-0.5">
+                                                <Thermometer className="h-2.5 w-2.5 text-blue-600" />
+                                                <span className="text-[9px] font-bold text-blue-700">{note.servingTemp}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 rounded-lg bg-cream-100 border border-cream-200 px-2 py-0.5">
+                                                <GlassWater className="h-2.5 w-2.5 text-cream-500" />
+                                                <span className="text-[9px] font-medium text-cream-600">{note.glassType.split(" ")[0]}</span>
+                                            </div>
+                                            {note.decantTime && (
+                                                <div className="flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2 py-0.5">
+                                                    <Clock className="h-2.5 w-2.5 text-amber-600" />
+                                                    <span className="text-[9px] font-medium text-amber-700">Decant</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Pairing count */}
+                                        {note.pairings.length > 0 && (
+                                            <div className="flex items-center gap-1 mr-2 shrink-0">
+                                                <Utensils className="h-2.5 w-2.5 text-cream-400" />
+                                                <span className="text-[9px] text-cream-400">{note.pairings.length}</span>
+                                            </div>
+                                        )}
+
+                                        <div className="w-4 shrink-0">
+                                            {isExpanded
+                                                ? <ChevronUp className="h-3.5 w-3.5 text-cream-400" />
+                                                : <ChevronDown className="h-3.5 w-3.5 text-cream-400" />
+                                            }
+                                        </div>
+                                    </button>
+
+                                    {/* Expanded detail */}
+                                    {isExpanded && (
+                                        <div className="border-t border-cream-200 bg-cream-50 px-4 py-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                {/* Left: Serving Info */}
+                                                <div className="space-y-2.5">
+                                                    <h4 className="text-[9px] font-bold uppercase text-cream-400">HƯỚNG DẪN PHỤC VỤ</h4>
+                                                    <div className="rounded-lg bg-white border border-cream-200 p-2.5 space-y-2">
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-cream-500 flex items-center gap-1.5">
+                                                                <Thermometer className="h-3 w-3" /> Nhiệt độ
+                                                            </span>
+                                                            <span className="font-bold text-blue-700">{note.servingTemp}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-cream-500 flex items-center gap-1.5">
+                                                                <GlassWater className="h-3 w-3" /> Ly
+                                                            </span>
+                                                            <span className="font-medium">{note.glassType}</span>
+                                                        </div>
+                                                        {note.decantTime && (
+                                                            <div className="flex justify-between text-xs">
+                                                                <span className="text-cream-500 flex items-center gap-1.5">
+                                                                    <Clock className="h-3 w-3" /> Decant
+                                                                </span>
+                                                                <span className="font-bold text-amber-700">{note.decantTime}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-cream-500 flex items-center gap-1.5">
+                                                                <MapPin className="h-3 w-3" /> Vùng
+                                                            </span>
+                                                            <span className="font-medium text-right max-w-[140px]">{note.region}</span>
+                                                        </div>
+                                                        {note.grape && (
+                                                            <div className="flex justify-between text-xs">
+                                                                <span className="text-cream-500 flex items-center gap-1.5">
+                                                                    <Grape className="h-3 w-3" /> Nho
+                                                                </span>
+                                                                <span className="font-medium text-right max-w-[140px]">{note.grape}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Staff notes */}
+                                                    {note.staffNotes && (
+                                                        <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5">
+                                                            <p className="text-[8px] font-bold uppercase text-amber-500 mb-1 flex items-center gap-1">
+                                                                <MessageSquare className="h-2.5 w-2.5" /> GHI CHÚ
+                                                            </p>
+                                                            <p className="text-[10px] text-amber-800 leading-relaxed">{note.staffNotes}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Middle: Tasting Notes */}
+                                                <div className="space-y-2.5">
+                                                    <h4 className="text-[9px] font-bold uppercase text-cream-400">TASTING NOTES</h4>
+                                                    <div className="rounded-lg bg-white border border-cream-200 p-2.5 space-y-2.5">
+                                                        {note.tastingNotes.nose.length > 0 && (
+                                                            <div>
+                                                                <p className="text-[8px] font-bold uppercase text-wine-400 mb-1">👃 Nose (Hương)</p>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {note.tastingNotes.nose.map((n) => (
+                                                                        <span key={n} className="rounded-full bg-wine-50 border border-wine-200 px-2 py-0.5 text-[8px] font-medium text-wine-700">
+                                                                            {n}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {note.tastingNotes.palate.length > 0 && (
+                                                            <div>
+                                                                <p className="text-[8px] font-bold uppercase text-green-500 mb-1">👅 Palate (Vị)</p>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {note.tastingNotes.palate.map((p) => (
+                                                                        <span key={p} className="rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-[8px] font-medium text-green-700">
+                                                                            {p}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {note.tastingNotes.finish && (
+                                                            <div>
+                                                                <p className="text-[8px] font-bold uppercase text-amber-500 mb-1">✨ Finish (Kết thúc)</p>
+                                                                <p className="text-[10px] text-cream-600 italic">{note.tastingNotes.finish}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Right: Food Pairings */}
+                                                <div className="space-y-2.5">
+                                                    <h4 className="text-[9px] font-bold uppercase text-cream-400 flex items-center gap-1">
+                                                        <Utensils className="h-2.5 w-2.5" /> FOOD PAIRING
+                                                    </h4>
+                                                    {note.pairings.length > 0 ? (
+                                                        <div className="rounded-lg bg-white border border-cream-200 p-2.5">
+                                                            <div className="space-y-1">
+                                                                {note.pairings.map((p, i) => (
+                                                                    <div key={i} className="flex items-center gap-2 py-0.5">
+                                                                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-100 text-[8px] font-bold text-green-700 shrink-0">
+                                                                            {i + 1}
+                                                                        </span>
+                                                                        <span className="text-[11px] text-green-900 font-medium">{p}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="rounded-lg bg-cream-100 border border-cream-200 p-2.5">
+                                                            <p className="text-[10px] text-cream-400 italic">Chưa có food pairing</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Upsell suggestion */}
+                                                    {note.pairings.length > 0 && (
+                                                        <div className="rounded-lg bg-green-50 border border-green-200 p-2.5">
+                                                            <p className="text-[8px] font-bold uppercase text-green-500 mb-0.5">💡 GỢI Ý UPSELL</p>
+                                                            <p className="text-[9px] text-green-700 leading-relaxed">
+                                                                {note.pairings.length > 2
+                                                                    ? `Đề xuất kèm "${note.pairings[0]}" hoặc "${note.pairings[1]}" để tăng ticket size.`
+                                                                    : `Đề xuất kèm "${note.pairings[0]}" cho trải nghiệm tốt nhất.`
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-cream-300 bg-cream-100 px-6 py-2.5 flex items-center justify-between shrink-0">
+                    <p className="text-[9px] text-cream-400 italic font-script">
+                        drink slowly · laugh quietly · stay longer
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] text-cream-400">{notes.length} loại rượu</span>
+                        <Button
+                            onClick={onClose}
+                            size="sm"
+                            className="bg-green-900 text-cream-50 hover:bg-green-800 text-xs"
+                        >
+                            Đóng
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>

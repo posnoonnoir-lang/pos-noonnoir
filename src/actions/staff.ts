@@ -35,6 +35,13 @@ export type Staff = {
 export async function getStaffList() {
     const staffList = await prisma.staff.findMany({
         orderBy: { createdAt: "desc" },
+        include: {
+            _count: { select: { orders: { where: { status: "PAID" } } } },
+            orders: {
+                where: { status: "PAID" },
+                select: { totalAmount: true },
+            },
+        },
     })
     return staffList.map((s) => ({
         ...s,
@@ -42,16 +49,103 @@ export async function getStaffList() {
         pinCode: s.pinCode,
         baseSalary: Number(s.baseSalary),
         status: (s.isActive ? "ACTIVE" : "INACTIVE") as StaffStatus,
+        totalOrders: s._count.orders,
+        totalRevenue: s.orders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
+        shiftStart: undefined as string | undefined,
+        shiftEnd: undefined as string | undefined,
     }))
 }
 
 export async function getStaffById(id: string) {
-    const staff = await prisma.staff.findUnique({ where: { id } })
+    const staff = await prisma.staff.findUnique({
+        where: { id },
+        include: {
+            _count: { select: { orders: { where: { status: "PAID" } } } },
+            orders: {
+                where: { status: "PAID" },
+                select: { totalAmount: true },
+            },
+        },
+    })
     if (!staff) return null
     return {
         ...staff,
         pin: staff.pinCode ? "****" : null,
         baseSalary: Number(staff.baseSalary),
+        status: (staff.isActive ? "ACTIVE" : "INACTIVE") as StaffStatus,
+        totalOrders: staff._count.orders,
+        totalRevenue: staff.orders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
+    }
+}
+
+export async function getStaffShiftHistory(staffId: string) {
+    const shifts = await prisma.shiftRecord.findMany({
+        where: { staffId },
+        orderBy: { openedAt: "desc" },
+        take: 50,
+    })
+    return shifts.map((s) => ({
+        id: s.id,
+        openedAt: s.openedAt,
+        closedAt: s.closedAt,
+        openingCash: Number(s.openingCash),
+        closingCash: s.closingCash ? Number(s.closingCash) : null,
+        expectedCash: s.expectedCash ? Number(s.expectedCash) : null,
+        variance: s.variance ? Number(s.variance) : null,
+        totalRevenue: s.totalRevenue ? Number(s.totalRevenue) : null,
+        status: s.closedAt ? "CLOSED" : "OPEN",
+        duration: s.closedAt
+            ? Math.round((s.closedAt.getTime() - s.openedAt.getTime()) / 3600000 * 10) / 10
+            : null,
+    }))
+}
+
+export async function getStaffPerformance(staffId: string) {
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const orders = await prisma.order.findMany({
+        where: {
+            createdBy: staffId,
+            status: "PAID",
+            createdAt: { gte: thirtyDaysAgo },
+        },
+        select: {
+            totalAmount: true,
+            createdAt: true,
+            items: { select: { quantity: true } },
+        },
+        orderBy: { createdAt: "asc" },
+    })
+
+    // Group by day
+    const dailyMap = new Map<string, { revenue: number; orders: number; items: number }>()
+    for (const o of orders) {
+        const day = o.createdAt.toISOString().split("T")[0]
+        const existing = dailyMap.get(day) ?? { revenue: 0, orders: 0, items: 0 }
+        existing.revenue += Number(o.totalAmount)
+        existing.orders += 1
+        existing.items += o.items.reduce((s, i) => s + i.quantity, 0)
+        dailyMap.set(day, existing)
+    }
+
+    const dailyData = Array.from(dailyMap.entries()).map(([date, data]) => ({
+        date,
+        ...data,
+    }))
+
+    const totalRevenue = orders.reduce((s, o) => s + Number(o.totalAmount), 0)
+    const totalOrders = orders.length
+    const totalItems = orders.reduce((s, o) => s + o.items.reduce((is, i) => is + i.quantity, 0), 0)
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+
+    return {
+        dailyData,
+        totalRevenue,
+        totalOrders,
+        totalItems,
+        avgOrderValue,
+        daysActive: dailyMap.size,
     }
 }
 

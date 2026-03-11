@@ -53,6 +53,18 @@ export async function calculateTax(subtotal: number, taxRateId?: string) {
 // Alias for settings page
 export const getAllTaxRates = getTaxRates
 
+// Get default/first active tax rate for POS
+export async function getDefaultTaxRate(): Promise<{ id: string; name: string; rate: number } | null> {
+    const rate = await prisma.taxRate.findFirst({
+        where: { isActive: true, isDefault: true },
+        orderBy: { rate: "asc" },
+    })
+    if (rate) return { id: rate.id, name: rate.name, rate: Number(rate.rate) }
+    // Fallback: first active rate
+    const any = await prisma.taxRate.findFirst({ where: { isActive: true }, orderBy: { rate: "asc" } })
+    return any ? { id: any.id, name: any.name, rate: Number(any.rate) } : null
+}
+
 // Stubs for settings page
 export async function getTaxConfig() {
     return { enabled: true, inclusive: true, defaultRateId: null }
@@ -60,4 +72,5 @@ export async function getTaxConfig() {
 export async function updateTaxConfig(_data: Record<string, unknown>) { return { success: true } }
 export async function getTaxReport(_period?: string) { return [] }
 export async function getTaxBreakdownByRate() { return [] }
+
 

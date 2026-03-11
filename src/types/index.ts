@@ -126,6 +126,7 @@ export type ProductFormData = {
     servingTemp?: string
     decantingTime?: string
     glassType?: string
+    oxidationHours?: number
     trackInventory?: boolean
     lowStockAlert?: number
     imageUrl?: string
