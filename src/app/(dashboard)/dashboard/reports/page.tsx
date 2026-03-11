@@ -16,15 +16,32 @@ import {
     Package,
     Clock,
     Minus,
+    PieChart,
+    ArrowUpRight,
+    ArrowDownRight,
+    Layers,
+    RefreshCcw,
+    Award,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
     getPnLSummary,
     getWeeklyPnL,
     type PnLSummary,
     type DailyPnL,
 } from "@/actions/daily-pnl"
+import {
+    getCOGSRecords,
+    getCOGSSummary,
+    getFinanceSummary,
+    getExpenseBreakdown,
+    getCOGSByProduct,
+    type COGSRecord,
+    type FinanceSummary,
+    type ExpenseCategory,
+} from "@/actions/finance"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -34,7 +51,58 @@ function fmtK(n: number) {
     return String(n)
 }
 
+type MainTab = "pnl" | "finance"
+
 export default function ReportsPage() {
+    const [mainTab, setMainTab] = useState<MainTab>("pnl")
+
+    return (
+        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
+                        <BarChart3 className="h-5 w-5 text-green-700" />
+                    </div>
+                    <div>
+                        <h1 className="font-display text-2xl font-bold text-green-900">Lãi Lỗ (P&L)</h1>
+                        <p className="text-sm text-cream-500">Báo cáo lãi lỗ & phân tích tài chính</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Tab Switch */}
+            <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5 w-fit">
+                {([
+                    { key: "pnl" as MainTab, label: "📊 P&L hàng ngày", desc: "Lãi lỗ theo ngày" },
+                    { key: "finance" as MainTab, label: "💰 Giá vốn & Chi phí", desc: "COGS, biên LN" },
+                ]).map((t) => (
+                    <button
+                        key={t.key}
+                        onClick={() => setMainTab(t.key)}
+                        className={cn(
+                            "rounded-md px-4 py-2 text-xs font-semibold transition-all",
+                            mainTab === t.key
+                                ? "bg-green-900 text-cream-50 shadow-sm"
+                                : "text-cream-500 hover:text-cream-700"
+                        )}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </div>
+
+            {mainTab === "pnl" && <DailyPnLView />}
+            {mainTab === "finance" && <FinanceView />}
+        </div>
+    )
+}
+
+// ============================================================
+// TAB 1: DAILY P&L VIEW (from old Reports page)
+// ============================================================
+
+function DailyPnLView() {
     const [summary, setSummary] = useState<PnLSummary | null>(null)
     const [weekData, setWeekData] = useState<DailyPnL[]>([])
     const [selectedDay, setSelectedDay] = useState(0)
@@ -52,9 +120,9 @@ export default function ReportsPage() {
 
     const day = weekData[selectedDay] ?? null
 
-    if (!summary || !day) return (
-        <div className="min-h-screen bg-cream-50 flex items-center justify-center">
-            <div className="animate-pulse text-sm text-cream-400">Đang tải báo cáo...</div>
+    if (loading || !summary || !day) return (
+        <div className="flex items-center justify-center py-20">
+            <div className="animate-pulse text-sm text-cream-400">Đang tải báo cáo P&L...</div>
         </div>
     )
 
@@ -62,20 +130,9 @@ export default function ReportsPage() {
     const dateStr = new Date(day.date).toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
-            {/* Header */}
+        <div className="space-y-5">
+            {/* Day selector */}
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
-                        <BarChart3 className="h-5 w-5 text-green-700" />
-                    </div>
-                    <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Báo cáo P&L</h1>
-                        <p className="text-sm text-cream-500">Lãi lỗ hàng ngày — auto-generated</p>
-                    </div>
-                </div>
-
-                {/* Day selector */}
                 <div className="flex items-center gap-2">
                     <button onClick={() => setSelectedDay(Math.min(selectedDay + 1, weekData.length - 1))} className="p-1.5 rounded-lg hover:bg-cream-200 text-cream-500 transition-all">
                         <ChevronLeft className="h-4 w-4" />
@@ -90,7 +147,7 @@ export default function ReportsPage() {
                 </div>
             </div>
 
-            {/* Comparison with yesterday (only show for today) */}
+            {/* Comparison KPIs (only show for today) */}
             {isToday && (
                 <div className="grid grid-cols-4 gap-3">
                     <StatCard
@@ -135,7 +192,6 @@ export default function ReportsPage() {
                     </div>
 
                     <div className="p-5 space-y-1">
-                        {/* Revenue */}
                         <PnLRow label="Doanh thu (Revenue)" value={day.revenue} accent="green" bold />
                         <PnLRow label="Giá vốn (COGS)" value={-day.costOfGoods} accent="red" indent />
                         <div className="border-t border-cream-200 my-1.5" />
@@ -144,7 +200,6 @@ export default function ReportsPage() {
 
                         <div className="border-t border-cream-200 my-2" />
 
-                        {/* Expenses by category */}
                         <p className="text-[9px] font-bold uppercase text-cream-400 pt-1">CHI PHÍ VẬN HÀNH</p>
                         {day.expenses.map((group) => (
                             <div key={group.category}>
@@ -163,7 +218,6 @@ export default function ReportsPage() {
 
                         <div className="border-t-2 border-green-300 my-2" />
 
-                        {/* Net Profit */}
                         <div className="flex justify-between items-center py-2 px-3 rounded-lg bg-green-50 border border-green-200">
                             <span className="text-sm font-bold text-green-900">💰 LỢI NHUẬN RÒNG (Net Profit)</span>
                             <div className="text-right">
@@ -212,13 +266,13 @@ export default function ReportsPage() {
                         </div>
                     </div>
 
-                    {/* Weekly mini chart (text-based) */}
+                    {/* Weekly mini chart */}
                     <div className="rounded-xl border border-cream-200 bg-white shadow-sm p-4">
                         <h3 className="text-[10px] font-bold uppercase text-cream-400 mb-3 flex items-center gap-1"><Clock className="h-3 w-3" /> BIỂU ĐỒ 7 NGÀY</h3>
                         <div className="space-y-1.5">
                             {weekData.map((d, i) => {
                                 const maxRev = Math.max(...weekData.map((dd) => dd.revenue))
-                                const pct = (d.revenue / maxRev) * 100
+                                const pct = maxRev > 0 ? (d.revenue / maxRev) * 100 : 0
                                 const dayLabel = new Date(d.date).toLocaleDateString("vi-VN", { weekday: "short", day: "numeric" })
                                 return (
                                     <button
@@ -246,7 +300,258 @@ export default function ReportsPage() {
 }
 
 // ============================================================
-// SUB-COMPONENTS
+// TAB 2: FINANCE VIEW (merged from old Finance page)
+// ============================================================
+
+type FinanceTab = "overview" | "cogs" | "products"
+
+function FinanceView() {
+    const [tab, setTab] = useState<FinanceTab>("overview")
+    const [cogsRecords, setCogsRecords] = useState<COGSRecord[]>([])
+    const [cogsSummary, setCogsSummary] = useState<Awaited<ReturnType<typeof getCOGSSummary>> | null>(null)
+    const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null)
+    const [expenses, setExpenses] = useState<ExpenseCategory[]>([])
+    const [productCOGS, setProductCOGS] = useState<Awaited<ReturnType<typeof getCOGSByProduct>>>([])
+    const [loading, setLoading] = useState(true)
+
+    const loadData = useCallback(async () => {
+        setLoading(true)
+        const [records, summary, finance, exp, products] = await Promise.all([
+            getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
+        ])
+        setCogsRecords(records); setCogsSummary(summary); setFinanceSummary(finance); setExpenses(exp); setProductCOGS(products)
+        setLoading(false)
+    }, [])
+
+    useEffect(() => { loadData() }, [loadData])
+
+    if (loading) return (
+        <div className="flex items-center justify-center py-20">
+            <div className="animate-pulse text-sm text-cream-400">Đang tải dữ liệu tài chính...</div>
+        </div>
+    )
+
+    const TH = "px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-cream-400 bg-cream-50 border-b border-cream-200 whitespace-nowrap"
+    const THR = cn(TH, "text-right")
+    const THC = cn(TH, "text-center")
+    const TD = "px-3 py-3 text-xs text-green-900 border-b border-cream-100 whitespace-nowrap"
+    const TDR = cn(TD, "text-right font-mono")
+    const TDC = cn(TD, "text-center")
+
+    return (
+        <div className="space-y-5">
+            {/* KPI Cards */}
+            {financeSummary && cogsSummary && (
+                <div className="grid grid-cols-6 gap-3">
+                    <FinanceStatCard label="Doanh thu" value={`₫${fmtK(financeSummary.totalRevenue ?? 0)}`} sub="Tháng này" color="text-green-700" icon={TrendingUp} accent="bg-green-100" />
+                    <FinanceStatCard label="Giá vốn (COGS)" value={`₫${fmtK(financeSummary.totalCOGS ?? 0)}`} sub="FIFO method" color="text-wine-700" icon={Package} accent="bg-wine-100" />
+                    <FinanceStatCard label="Lợi nhuận gộp" value={`₫${fmtK(financeSummary.grossProfit ?? 0)}`} sub={`GM: ${financeSummary.grossMargin ?? 0}%`} color="text-green-600" icon={ArrowUpRight} accent="bg-green-100" />
+                    <FinanceStatCard label="Chi phí vận hành" value={`₫${fmtK(financeSummary.operatingExpenses ?? 0)}`} sub="Nhân sự, mặt bằng..." color="text-blue-600" icon={Layers} accent="bg-blue-100" />
+                    <FinanceStatCard label="Khấu hao CCDC" value={`₫${fmtK(financeSummary.depreciationExpense ?? 0)}`} sub="Tháng này" color="text-amber-600" icon={TrendingDown} accent="bg-amber-100" />
+                    <FinanceStatCard
+                        label="Lợi nhuận ròng" value={`₫${fmtK(financeSummary.netProfit ?? 0)}`}
+                        sub={`NM: ${financeSummary.netMargin ?? 0}%`}
+                        color={(financeSummary.netProfit ?? 0) >= 0 ? "text-green-700" : "text-red-600"}
+                        icon={(financeSummary.netProfit ?? 0) >= 0 ? ArrowUpRight : ArrowDownRight}
+                        accent={(financeSummary.netProfit ?? 0) >= 0 ? "bg-green-100" : "bg-red-100"}
+                    />
+                </div>
+            )}
+
+            {/* Sub Tab Switch */}
+            <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5 w-fit">
+                {([
+                    { key: "overview" as FinanceTab, label: "📊 Tổng quan P&L" },
+                    { key: "cogs" as FinanceTab, label: "💰 Chi tiết COGS" },
+                    { key: "products" as FinanceTab, label: "🍷 Biên LN sản phẩm" },
+                ]).map((t) => (
+                    <button
+                        key={t.key}
+                        onClick={() => setTab(t.key)}
+                        className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition-all", tab === t.key ? "bg-green-900 text-cream-50 shadow-sm" : "text-cream-500 hover:text-cream-700")}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* ═══ P&L OVERVIEW ═══ */}
+            {tab === "overview" && financeSummary && (
+                <div className="grid grid-cols-5 gap-4">
+                    {/* P&L Statement */}
+                    <div className="col-span-3 rounded-xl border border-cream-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-green-700" />
+                            Báo cáo Lãi / Lỗ — Tháng này
+                        </h3>
+                        <div className="space-y-0.5">
+                            <div className="flex items-center justify-between rounded-lg bg-green-50 px-4 py-2.5">
+                                <span className="text-xs font-bold text-green-900">Doanh thu thuần</span>
+                                <span className="font-mono text-sm font-bold text-green-700">₫{fmt(financeSummary.totalRevenue ?? 0)}</span>
+                            </div>
+                            <div className="flex items-center justify-between px-4 py-2">
+                                <span className="text-xs text-cream-500 pl-4">(-) Giá vốn hàng bán (COGS - FIFO)</span>
+                                <span className="font-mono text-xs text-red-600">-₫{fmt(financeSummary.totalCOGS ?? 0)}</span>
+                            </div>
+                            <div className="flex items-center justify-between rounded-lg bg-cream-50 border border-cream-200 px-4 py-2.5">
+                                <span className="text-xs font-bold text-green-900">
+                                    Lợi nhuận gộp <span className="ml-1 text-[10px] text-cream-400 font-normal">({financeSummary.grossMargin ?? 0}%)</span>
+                                </span>
+                                <span className="font-mono text-sm font-bold text-green-600">₫{fmt(financeSummary.grossProfit ?? 0)}</span>
+                            </div>
+                            {expenses.filter((e) => e.category !== "Giá vốn hàng bán (COGS)").map((exp) => (
+                                <div key={exp.category} className="flex items-center justify-between px-4 py-1.5">
+                                    <span className="text-[11px] text-cream-500 pl-4">(-) {exp.category}</span>
+                                    <span className="font-mono text-[11px] text-cream-600">-₫{fmt(exp.amount)}</span>
+                                </div>
+                            ))}
+                            <div className={cn(
+                                "flex items-center justify-between rounded-lg px-4 py-3 mt-2",
+                                (financeSummary.netProfit ?? 0) >= 0 ? "bg-green-100 border border-green-300" : "bg-red-100 border border-red-300"
+                            )}>
+                                <span className="text-sm font-bold text-green-900">
+                                    LỢI NHUẬN RÒNG <span className="ml-1 text-[10px] text-cream-500 font-normal">({financeSummary.netMargin ?? 0}%)</span>
+                                </span>
+                                <span className={cn("font-mono text-lg font-bold", (financeSummary.netProfit ?? 0) >= 0 ? "text-green-700" : "text-red-600")}>
+                                    ₫{fmt(financeSummary.netProfit ?? 0)}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Expense Breakdown */}
+                    <div className="col-span-2 rounded-xl border border-cream-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">
+                            <PieChart className="h-4 w-4 text-wine-600" /> Cơ cấu chi phí
+                        </h3>
+                        <div className="space-y-2.5 mb-4">
+                            {expenses.map((exp) => (
+                                <div key={exp.category}>
+                                    <div className="flex items-center justify-between mb-0.5">
+                                        <span className="text-[10px] text-cream-500 truncate max-w-[160px]">{exp.category}</span>
+                                        <span className="font-mono text-[10px] font-bold text-cream-600">₫{fmtK(exp.amount)} ({exp.percentage}%)</span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-cream-200 overflow-hidden">
+                                        <div className="h-full rounded-full transition-all" style={{ width: `${exp.percentage}%`, backgroundColor: exp.color }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {cogsSummary && (
+                            <div className="border-t border-cream-200 pt-3 space-y-2">
+                                <h4 className="text-[10px] font-bold text-cream-400 uppercase">COGS Insights</h4>
+                                <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2">
+                                    <Award className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                                    <div><p className="text-[9px] text-cream-400">Biên cao nhất</p><p className="text-[11px] font-bold text-green-700">{cogsSummary.topMarginProduct}</p></div>
+                                </div>
+                                <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                    <div><p className="text-[9px] text-cream-400">Biên thấp nhất</p><p className="text-[11px] font-bold text-amber-700">{cogsSummary.lowestMarginProduct}</p></div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ═══ COGS DETAIL ═══ */}
+            {tab === "cogs" && (
+                <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                    {cogsRecords.length === 0 ? (
+                        <div className="text-center py-12 text-cream-400 text-sm">Chưa có dữ liệu COGS</div>
+                    ) : (
+                        <table className="w-full">
+                            <thead>
+                                <tr>
+                                    <th className={TH}>Sản phẩm</th>
+                                    <th className={THR} style={{ width: 110 }}>Giá bán</th>
+                                    <th className={THR} style={{ width: 110 }}>Giá vốn FIFO</th>
+                                    <th className={THR} style={{ width: 110 }}>Lợi nhuận gộp</th>
+                                    <th className={THC} style={{ width: 80 }}>Biên LN</th>
+                                    <th className={THC} style={{ width: 60 }}>SL bán</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {cogsRecords.map((record) => {
+                                    const margin = record.grossMargin ?? 0
+                                    const cls = margin >= 70 ? "bg-green-100 text-green-700"
+                                        : margin >= 50 ? "bg-blue-100 text-blue-700"
+                                            : margin >= 30 ? "bg-amber-100 text-amber-700"
+                                                : "bg-red-100 text-red-700"
+                                    return (
+                                        <tr key={record.id} className="hover:bg-green-50/50 transition-colors">
+                                            <td className={TD}>
+                                                <p className="font-medium leading-tight">{record.productName}</p>
+                                            </td>
+                                            <td className={TDR}>₫{fmt(record.sellingPrice ?? 0)}</td>
+                                            <td className={cn(TDR, "text-wine-600")}>₫{fmt(record.fifoCost ?? 0)}</td>
+                                            <td className={cn(TDR, "font-bold text-green-600")}>₫{fmt(record.grossProfit)}</td>
+                                            <td className={TDC}>
+                                                <span className={cn("inline-block rounded-full px-2 py-0.5 text-[9px] font-bold leading-tight", cls)}>{margin}%</span>
+                                            </td>
+                                            <td className={cn(TDC, "text-cream-600")}>{record.soldQty}</td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+
+            {/* ═══ PRODUCT MARGIN ═══ */}
+            {tab === "products" && (
+                <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                    {productCOGS.length === 0 ? (
+                        <div className="text-center py-12 text-cream-400 text-sm">Chưa có dữ liệu biên lợi nhuận</div>
+                    ) : (
+                        <table className="w-full">
+                            <thead>
+                                <tr>
+                                    <th className={TH} style={{ width: 24 }}>#</th>
+                                    <th className={TH}>Sản phẩm</th>
+                                    <th className={THR} style={{ width: 100 }}>Doanh thu</th>
+                                    <th className={THR} style={{ width: 100 }}>COGS</th>
+                                    <th className={THR} style={{ width: 100 }}>Lợi nhuận</th>
+                                    <th className={TH} style={{ width: 130 }}>Mức biên</th>
+                                    <th className={THC} style={{ width: 60 }}>SL bán</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {productCOGS.map((product: any, idx: number) => {
+                                    const mc = product.grossMargin >= 70 ? "text-green-700" : product.grossMargin >= 50 ? "text-blue-700" : product.grossMargin >= 30 ? "text-amber-700" : "text-red-700"
+                                    const bc = product.grossMargin >= 70 ? "bg-green-500" : product.grossMargin >= 50 ? "bg-blue-500" : product.grossMargin >= 30 ? "bg-amber-500" : "bg-red-500"
+                                    return (
+                                        <tr key={product.productName} className="hover:bg-green-50/50 transition-colors">
+                                            <td className={cn(TD, "text-cream-400 text-center font-mono")}>{idx + 1}</td>
+                                            <td className={cn(TD, "font-medium")}>{product.productName}</td>
+                                            <td className={TDR}>₫{fmtK(product.totalRevenue)}</td>
+                                            <td className={cn(TDR, "text-wine-600")}>₫{fmtK(product.totalCOGS)}</td>
+                                            <td className={cn(TDR, "font-bold text-green-600")}>₫{fmtK(product.grossProfit)}</td>
+                                            <td className={TD}>
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="flex-1 h-1.5 rounded-full bg-cream-200 overflow-hidden">
+                                                        <div className={cn("h-full rounded-full", bc)} style={{ width: `${product.grossMargin}%` }} />
+                                                    </div>
+                                                    <span className={cn("text-[10px] font-bold min-w-[32px] text-right", mc)}>{product.grossMargin}%</span>
+                                                </div>
+                                            </td>
+                                            <td className={cn(TDC, "text-cream-600")}>{product.totalQty}</td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ============================================================
+// SHARED COMPONENTS
 // ============================================================
 
 function StatCard({ label, value, change, sub, icon, color }: {
@@ -271,6 +576,19 @@ function StatCard({ label, value, change, sub, icon, color }: {
                 )}
             </div>
             <p className="text-[10px] text-cream-400 mt-1">{sub}</p>
+        </div>
+    )
+}
+
+function FinanceStatCard({ label, value, sub, color, icon: Icon, accent }: { label: string; value: string; sub: string; color: string; icon: typeof DollarSign; accent: string }) {
+    return (
+        <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
+            <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">{label}</span>
+                <div className={cn("flex h-5 w-5 items-center justify-center rounded-md", accent)}><Icon className="h-3 w-3" /></div>
+            </div>
+            <p className={cn("font-mono text-xl font-bold leading-none", color)}>{value}</p>
+            <p className="text-[9px] text-cream-400 mt-1">{sub}</p>
         </div>
     )
 }

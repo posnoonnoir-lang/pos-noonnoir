@@ -23,15 +23,22 @@ export type DepreciationEntry = {
 }
 
 export type RawMaterial = {
-    id: string; name: string; sku: string; category: string; unit: string
-    currentStock: number; minStock: number; costPrice: number; lastPurchasePrice: number
+    id: string; name: string; sku: string; category: string
+    unit: string       // display unit: "chai", "kg"
+    baseUnit: string   // smallest unit: "ml", "g", "pcs"
+    baseQuantity: number  // 1 unit = ? baseUnit (e.g. 1 chai = 750 ml)
+    currentStock: number  // in BASE unit
+    minStock: number      // in BASE unit
+    costPrice: number     // per display unit
+    costPerBaseUnit: number // auto-calc: costPrice / baseQuantity
+    lastPurchasePrice: number
     expiryDate: string | null; supplierId: string | null; supplierName: string | null
     status: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK"
 }
 
 export type Recipe = {
     id: string; productName: string; productId: string
-    ingredients: { materialId: string; materialName: string; quantity: number; unit: string; costPerUnit: number }[]
+    ingredients: { materialId: string; materialName: string; quantity: number; unit: string; costPerUnit: number; costPerBaseUnit: number; baseUnit: string }[]
     totalCost: number; notes: string
 }
 
@@ -176,14 +183,54 @@ function ingredientStatus(current: number, min: number): "IN_STOCK" | "LOW_STOCK
 
 export async function getRawMaterials(): Promise<RawMaterial[]> {
     const rows = await prisma.ingredient.findMany({ where: { isActive: true }, orderBy: { name: "asc" } })
-    return rows.map((r) => ({
-        id: r.id, name: r.name, sku: "", category: "", unit: r.unit,
-        currentStock: Number(r.currentStock), minStock: Number(r.minStock),
-        costPrice: Number(r.costPerUnit), lastPurchasePrice: Number(r.costPerUnit),
-        expiryDate: r.expiryDate ? r.expiryDate.toISOString().split("T")[0] : null,
-        supplierId: null, supplierName: null,
-        status: ingredientStatus(Number(r.currentStock), Number(r.minStock)),
-    }))
+    return rows.map((r) => {
+        const costPerUnit = Number(r.costPerUnit)
+        const baseQty = Number(r.baseQuantity)
+        return {
+            id: r.id, name: r.name, sku: "", category: "",
+            unit: r.unit,
+            baseUnit: r.baseUnit,
+            baseQuantity: baseQty,
+            currentStock: Number(r.currentStock),
+            minStock: Number(r.minStock),
+            costPrice: costPerUnit,
+            costPerBaseUnit: baseQty > 0 ? Math.round(costPerUnit / baseQty * 100) / 100 : costPerUnit,
+            lastPurchasePrice: costPerUnit,
+            expiryDate: r.expiryDate ? r.expiryDate.toISOString().split("T")[0] : null,
+            supplierId: null, supplierName: null,
+            status: ingredientStatus(Number(r.currentStock), Number(r.minStock)),
+        }
+    })
+}
+
+/** Create a new raw material / ingredient */
+export async function createIngredient(data: {
+    name: string
+    unit: string       // display unit: "chai", "kg"
+    baseUnit: string   // smallest unit: "ml", "g"
+    baseQuantity: number // 1 unit = ? baseUnit
+    currentStock?: number  // in BASE unit
+    minStock?: number      // in BASE unit
+    costPerUnit: number    // cost per display unit
+    expiryDate?: string
+}) {
+    try {
+        const row = await prisma.ingredient.create({
+            data: {
+                name: data.name,
+                unit: data.unit,
+                baseUnit: data.baseUnit,
+                baseQuantity: data.baseQuantity,
+                currentStock: data.currentStock ?? 0,
+                minStock: data.minStock ?? 0,
+                costPerUnit: data.costPerUnit,
+                expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+            },
+        })
+        return { success: true, id: row.id }
+    } catch (e) {
+        return { success: false, error: (e as Error).message }
+    }
 }
 
 export async function getRawMaterialStats() {
@@ -241,13 +288,23 @@ export async function getRecipes(): Promise<Recipe[]> {
             ingredients: [], totalCost: 0, notes: "",
         }
         const costPerUnit = Number(r.ingredient.costPerUnit)
+        const baseQty = Number(r.ingredient.baseQuantity)
+        const costPerBase = baseQty > 0 ? costPerUnit / baseQty : costPerUnit
         const qty = Number(r.quantity)
+        // Recipe quantity is in the recipe's unit (which should be base unit)
+        // Cost = qty_in_base_unit × cost_per_base_unit
+        const ingredientCost = qty * costPerBase
         existing.ingredients.push({
             materialId: r.ingredientId, materialName: r.ingredient.name,
-            quantity: qty, unit: r.unit, costPerUnit,
+            quantity: qty, unit: r.unit, costPerUnit, costPerBaseUnit: Math.round(costPerBase * 100) / 100,
+            baseUnit: r.ingredient.baseUnit,
         })
-        existing.totalCost += qty * costPerUnit
+        existing.totalCost += ingredientCost
         grouped.set(r.productId, existing)
+    }
+    // Round total costs
+    for (const [, recipe] of grouped) {
+        recipe.totalCost = Math.round(recipe.totalCost)
     }
     return Array.from(grouped.values())
 }
@@ -255,14 +312,49 @@ export async function getRecipes(): Promise<Recipe[]> {
 export async function createRecipe(data: Omit<Recipe, "id" | "totalCost">): Promise<Recipe> {
     let totalCost = 0
     for (const ing of data.ingredients) {
-        totalCost += ing.quantity * ing.costPerUnit
+        totalCost += ing.quantity * (ing.costPerBaseUnit ?? ing.costPerUnit)
         await prisma.productRecipe.upsert({
             where: { productId_ingredientId: { productId: data.productId, ingredientId: ing.materialId } },
             create: { productId: data.productId, ingredientId: ing.materialId, quantity: ing.quantity, unit: ing.unit },
             update: { quantity: ing.quantity, unit: ing.unit },
         })
     }
-    return { ...data, id: `rec-${data.productId.slice(0, 8)}`, totalCost }
+    return { ...data, id: `rec-${data.productId.slice(0, 8)}`, totalCost: Math.round(totalCost) }
+}
+
+/** Update a recipe ingredient quantity/unit */
+export async function updateRecipeIngredient(productId: string, ingredientId: string, quantity: number, unit: string) {
+    try {
+        await prisma.productRecipe.update({
+            where: { productId_ingredientId: { productId, ingredientId } },
+            data: { quantity, unit },
+        })
+        return { success: true }
+    } catch {
+        return { success: false, error: "Không tìm thấy" }
+    }
+}
+
+/** Remove an ingredient from a recipe */
+export async function deleteRecipeIngredient(productId: string, ingredientId: string) {
+    try {
+        await prisma.productRecipe.delete({
+            where: { productId_ingredientId: { productId, ingredientId } },
+        })
+        return { success: true }
+    } catch {
+        return { success: false, error: "Không tìm thấy" }
+    }
+}
+
+/** Delete entire recipe for a product */
+export async function deleteRecipe(productId: string) {
+    try {
+        await prisma.productRecipe.deleteMany({ where: { productId } })
+        return { success: true }
+    } catch {
+        return { success: false, error: "Lỗi xóa công thức" }
+    }
 }
 
 // ============================================================
@@ -292,26 +384,30 @@ export async function deductRecipeIngredients(productId: string, qtySold: number
 
     for (const ri of recipeIngredients) {
         const mat = ri.ingredient
+        // Recipe quantity is in recipe unit (should be base unit like ml, g)
         const qtyNeeded = Math.round(Number(ri.quantity) * qtySold * 1000) / 1000
-        const current = Number(mat.currentStock)
+        const current = Number(mat.currentStock) // stored in base unit
 
         if (current < qtyNeeded) {
-            errors.push(`${mat.name}: cần ${qtyNeeded}${ri.unit}, chỉ còn ${Math.round(current * 100) / 100}${ri.unit}`)
+            errors.push(`${mat.name}: cần ${qtyNeeded}${ri.unit}, chỉ còn ${Math.round(current * 100) / 100}${mat.baseUnit}`)
             continue
         }
 
         const newStock = Math.round((current - qtyNeeded) * 1000) / 1000
         await prisma.ingredient.update({ where: { id: mat.id }, data: { currentStock: newStock } })
 
-        const costPerUnit = Number(mat.costPerUnit)
-        const subtotal = qtyNeeded * costPerUnit
+        // Cost calculation uses base unit: costPerUnit / baseQuantity
+        const baseQty = Number(mat.baseQuantity)
+        const costPerDisplayUnit = Number(mat.costPerUnit)
+        const costPerBase = baseQty > 0 ? costPerDisplayUnit / baseQty : costPerDisplayUnit
+        const subtotal = Math.round(qtyNeeded * costPerBase)
         totalCost += subtotal
 
         let warning: string | null = null
         if (newStock <= 0) warning = "Hết hàng! Cần nhập thêm."
-        else if (newStock <= Number(mat.minStock)) warning = `Sắp hết (còn ${Math.round(newStock * 100) / 100}${mat.unit})`
+        else if (newStock <= Number(mat.minStock)) warning = `Sắp hết (còn ${Math.round(newStock * 100) / 100}${mat.baseUnit})`
 
-        deductions.push({ materialName: mat.name, qtyUsed: qtyNeeded, unit: ri.unit, costPerUnit, subtotal, remainingStock: newStock, warning })
+        deductions.push({ materialName: mat.name, qtyUsed: qtyNeeded, unit: ri.unit, costPerUnit: Math.round(costPerBase * 100) / 100, subtotal, remainingStock: newStock, warning })
     }
 
     return { success: errors.length === 0, productName, qtySold, totalIngredientCost: totalCost, deductions, errors }
@@ -327,10 +423,17 @@ export async function getRecipeByProductId(productId: string): Promise<Recipe | 
     let totalCost = 0
     const ingredients = rows.map((r) => {
         const costPerUnit = Number(r.ingredient.costPerUnit)
+        const baseQty = Number(r.ingredient.baseQuantity)
+        const costPerBase = baseQty > 0 ? costPerUnit / baseQty : costPerUnit
         const qty = Number(r.quantity)
-        totalCost += qty * costPerUnit
-        return { materialId: r.ingredientId, materialName: r.ingredient.name, quantity: qty, unit: r.unit, costPerUnit }
+        totalCost += qty * costPerBase
+        return {
+            materialId: r.ingredientId, materialName: r.ingredient.name,
+            quantity: qty, unit: r.unit, costPerUnit,
+            costPerBaseUnit: Math.round(costPerBase * 100) / 100,
+            baseUnit: r.ingredient.baseUnit,
+        }
     })
 
-    return { id: `rec-${productId.slice(0, 8)}`, productName: rows[0].product.name, productId, ingredients, totalCost, notes: "" }
+    return { id: `rec-${productId.slice(0, 8)}`, productName: rows[0].product.name, productId, ingredients, totalCost: Math.round(totalCost), notes: "" }
 }

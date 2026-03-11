@@ -21,7 +21,7 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
-import { getDashboardStats, getWeeklyRevenue, getTopProducts, type DailyRevenue, type TopProduct } from "@/actions/reports"
+import { getDashboardStats, getWeeklyRevenue, type DailyRevenue } from "@/actions/reports"
 import { getOrders, type Order } from "@/actions/orders"
 import { getTableStats } from "@/actions/tables"
 
@@ -43,21 +43,19 @@ export default function DashboardPage() {
     const { staff } = useAuthStore()
     const [stats, setStats] = useState<Awaited<ReturnType<typeof getDashboardStats>> | null>(null)
     const [weeklyRevenue, setWeeklyRevenue] = useState<DailyRevenue[]>([])
-    const [topProducts, setTopProducts] = useState<TopProduct[]>([])
+
     const [recentOrders, setRecentOrders] = useState<Order[]>([])
     const [tableStats, setTableStats] = useState<Awaited<ReturnType<typeof getTableStats>> | null>(null)
 
     const loadData = useCallback(async () => {
-        const [s, w, t, o, ts] = await Promise.all([
+        const [s, w, o, ts] = await Promise.all([
             getDashboardStats(),
             getWeeklyRevenue(),
-            getTopProducts(),
             getOrders(),
             getTableStats(),
         ])
         setStats(s)
         setWeeklyRevenue(w)
-        setTopProducts(t.slice(0, 5))
         setRecentOrders(o.slice(0, 5))
         setTableStats(ts)
     }, [])
@@ -207,93 +205,56 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Second Row */}
-            <div className="grid grid-cols-3 gap-4">
-                {/* Recent Orders */}
-                <div className="col-span-2 rounded-xl border border-cream-300 bg-cream-100 p-5">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-display text-sm font-bold text-green-900">
-                            🍷 Đơn hàng gần đây
-                        </h3>
-                        <Link href="/pos/orders" className="text-[10px] text-cream-400 hover:text-green-700 flex items-center gap-0.5 transition-all">
-                            Xem tất cả <ExternalLink className="h-2.5 w-2.5" />
-                        </Link>
-                    </div>
-                    {recentOrders.length === 0 ? (
-                        <p className="text-xs text-cream-400 text-center py-8">Chưa có đơn hàng nào</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {recentOrders.map((order) => {
-                                const statusColor =
-                                    order.status === "COMPLETED" ? "text-green-600" :
-                                        order.status === "PREPARING" ? "text-orange-600" :
-                                            order.status === "PENDING" ? "text-amber-600" :
-                                                "text-cream-500"
-                                const StatusIcon =
-                                    order.status === "COMPLETED" ? CheckCircle2 :
-                                        order.status === "PREPARING" ? ChefHat :
-                                            order.status === "PENDING" ? AlertCircle :
-                                                Clock
-                                return (
-                                    <div
-                                        key={order.id}
-                                        className="flex items-center gap-3 rounded-lg bg-cream-50 px-3 py-2.5"
-                                    >
-                                        <StatusIcon className={cn("h-4 w-4 shrink-0", statusColor)} />
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-mono text-[10px] text-cream-400">{order.orderNumber}</span>
-                                                <span className="rounded bg-green-900 px-1 py-0.5 text-[8px] font-bold text-cream-50">
-                                                    {order.tableNumber ?? "TK"}
-                                                </span>
-                                                <span className="text-[10px] text-cream-400">
-                                                    {order.items.length} món · {formatTime(order.createdAt)}
-                                                </span>
-                                            </div>
+            {/* Recent Orders */}
+            <div className="rounded-xl border border-cream-300 bg-cream-100 p-5">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-display text-sm font-bold text-green-900">
+                        🍷 Đơn hàng gần đây
+                    </h3>
+                    <Link href="/pos/orders" className="text-[10px] text-cream-400 hover:text-green-700 flex items-center gap-0.5 transition-all">
+                        Xem tất cả <ExternalLink className="h-2.5 w-2.5" />
+                    </Link>
+                </div>
+                {recentOrders.length === 0 ? (
+                    <p className="text-xs text-cream-400 text-center py-8">Chưa có đơn hàng nào</p>
+                ) : (
+                    <div className="grid grid-cols-1 gap-2">
+                        {recentOrders.map((order) => {
+                            const statusColor =
+                                order.status === "COMPLETED" ? "text-green-600" :
+                                    order.status === "PREPARING" ? "text-orange-600" :
+                                        order.status === "PENDING" ? "text-amber-600" :
+                                            "text-cream-500"
+                            const StatusIcon =
+                                order.status === "COMPLETED" ? CheckCircle2 :
+                                    order.status === "PREPARING" ? ChefHat :
+                                        order.status === "PENDING" ? AlertCircle :
+                                            Clock
+                            return (
+                                <div
+                                    key={order.id}
+                                    className="flex items-center gap-3 rounded-lg bg-cream-50 px-3 py-2.5"
+                                >
+                                    <StatusIcon className={cn("h-4 w-4 shrink-0", statusColor)} />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono text-[10px] text-cream-400">{order.orderNumber}</span>
+                                            <span className="rounded bg-green-900 px-1 py-0.5 text-[8px] font-bold text-cream-50">
+                                                {order.tableNumber ?? "TK"}
+                                            </span>
+                                            <span className="text-[10px] text-cream-400">
+                                                {order.items.length} món · {formatTime(order.createdAt)}
+                                            </span>
                                         </div>
-                                        <span className="font-mono text-xs font-bold text-green-900">
-                                            ₫{formatPrice(order.total)}
-                                        </span>
                                     </div>
-                                )
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                {/* Top Products Mini */}
-                <div className="rounded-xl border border-cream-300 bg-cream-100 p-5">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-display text-sm font-bold text-green-900">🏆 Top 5</h3>
-                        <Link href="/dashboard/reports" className="text-[10px] text-cream-400 hover:text-green-700 flex items-center gap-0.5 transition-all">
-                            Chi tiết <ExternalLink className="h-2.5 w-2.5" />
-                        </Link>
+                                    <span className="font-mono text-xs font-bold text-green-900">
+                                        ₫{formatPrice(order.total)}
+                                    </span>
+                                </div>
+                            )
+                        })}
                     </div>
-                    <div className="space-y-2">
-                        {topProducts.map((product, i) => (
-                            <div
-                                key={product.name}
-                                className="flex items-center gap-2 rounded-lg bg-cream-50 px-3 py-2"
-                            >
-                                <span className={cn(
-                                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold",
-                                    i === 0 ? "bg-amber-400 text-amber-900" :
-                                        i === 1 ? "bg-cream-400 text-cream-700" :
-                                            i === 2 ? "bg-amber-700 text-amber-100" :
-                                                "bg-cream-200 text-cream-500"
-                                )}>
-                                    {i + 1}
-                                </span>
-                                <span className="flex-1 text-xs text-green-900 truncate">
-                                    {product.name}
-                                </span>
-                                <span className="font-mono text-[10px] font-bold text-wine-700">
-                                    {product.quantity}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                )}
             </div>
 
             {/* Quick Links */}
@@ -302,7 +263,7 @@ export default function DashboardPage() {
                     { label: "POS Terminal", href: "/pos", icon: Wine, desc: "Bán hàng" },
                     { label: "Kitchen", href: "/pos/kitchen", icon: ChefHat, desc: "Xem bếp" },
                     { label: "Menu", href: "/dashboard/menu", icon: UtensilsCrossed, desc: "Sản phẩm" },
-                    { label: "Báo cáo", href: "/dashboard/reports", icon: BarChart3, desc: "Thống kê" },
+                    { label: "Lãi Lỗ", href: "/dashboard/reports", icon: BarChart3, desc: "P&L" },
                 ].map((link) => {
                     const Icon = link.icon
                     return (

@@ -131,7 +131,7 @@ export default function AnalyticsPage() {
                             <BarChart3 className="h-5 w-5 text-cream-50" />
                         </div>
                         <div>
-                            <h1 className="font-display text-2xl font-bold text-green-900">Analytics</h1>
+                            <h1 className="font-display text-2xl font-bold text-green-900">Phân tích</h1>
                             <p className="text-xs text-cream-400 flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
                                 Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}

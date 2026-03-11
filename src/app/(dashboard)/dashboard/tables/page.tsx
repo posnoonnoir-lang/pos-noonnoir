@@ -22,6 +22,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getTables, getZones, updateTableStatus, getTableStats, createTable, createZone, deleteTable, deleteZone } from "@/actions/tables"
 import { getActiveOrders } from "@/actions/orders"
+import dynamic from "next/dynamic"
+
+const FloorPlanEditor = dynamic(() => import("@/components/floor-plan-editor"), { ssr: false })
+
 type FloorTable = Awaited<ReturnType<typeof getTables>>[number]
 type TableZone = Awaited<ReturnType<typeof getZones>>[number]
 
@@ -86,6 +90,7 @@ export default function TablesPage() {
     const [selectedTable, setSelectedTable] = useState<FloorTable | null>(null)
     const [showAddTable, setShowAddTable] = useState(false)
     const [showZoneManager, setShowZoneManager] = useState(false)
+    const [viewMode, setViewMode] = useState<"list" | "floorplan">("list")
 
     // Active orders keyed by tableId
     const [activeOrderMap, setActiveOrderMap] = useState<Record<string, { orderNo: string; total: number; createdAt: Date; itemCount: number }>>({})
@@ -205,34 +210,78 @@ export default function TablesPage() {
                 })}
             </div>
 
-            {/* Zone Filter */}
-            <div className="flex items-center gap-1.5 mb-4 overflow-x-auto">
-                <button
-                    onClick={() => setSelectedZone("all")}
-                    className={cn(
-                        "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
-                        selectedZone === "all"
-                            ? "bg-green-900 text-cream-50"
-                            : "bg-cream-200 text-cream-500 hover:bg-cream-300"
-                    )}
-                >
-                    Tất cả
-                </button>
-                {zones.map((zone) => (
+            {/* View Toggle + Zone Filter */}
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-1.5 overflow-x-auto">
                     <button
-                        key={zone.id}
-                        onClick={() => setSelectedZone(zone.id)}
+                        onClick={() => setSelectedZone("all")}
                         className={cn(
                             "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
-                            selectedZone === zone.id
+                            selectedZone === "all"
                                 ? "bg-green-900 text-cream-50"
                                 : "bg-cream-200 text-cream-500 hover:bg-cream-300"
                         )}
                     >
-                        {zone.name}
+                        Tất cả
                     </button>
-                ))}
+                    {zones.map((zone) => (
+                        <button
+                            key={zone.id}
+                            onClick={() => setSelectedZone(zone.id)}
+                            className={cn(
+                                "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+                                selectedZone === zone.id
+                                    ? "bg-green-900 text-cream-50"
+                                    : "bg-cream-200 text-cream-500 hover:bg-cream-300"
+                            )}
+                        >
+                            {zone.name}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex items-center gap-1 bg-cream-200 rounded-lg p-0.5">
+                    <button
+                        onClick={() => setViewMode("list")}
+                        className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                            viewMode === "list" ? "bg-white text-green-900 shadow-sm" : "text-cream-500 hover:text-green-900"
+                        )}
+                    >
+                        📋 Danh sách
+                    </button>
+                    <button
+                        onClick={() => setViewMode("floorplan")}
+                        className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                            viewMode === "floorplan" ? "bg-white text-green-900 shadow-sm" : "text-cream-500 hover:text-green-900"
+                        )}
+                    >
+                        🗺️ Sơ đồ
+                    </button>
+                </div>
             </div>
+
+            {/* Floor Plan View */}
+            {viewMode === "floorplan" && selectedZone !== "all" && (
+                <FloorPlanEditor
+                    tables={tables.map(t => ({
+                        id: t.id, tableNumber: t.tableNumber, seats: t.seats,
+                        status: t.status, shape: t.shape,
+                        posX: t.posX, posY: t.posY,
+                        width: t.width, height: t.height,
+                        rotation: t.rotation, zoneId: t.zoneId,
+                    }))}
+                    zoneId={selectedZone}
+                    layoutData={zones.find(z => z.id === selectedZone)?.layoutData as { walls: Array<{ id: string; type: "wall" | "door" | "label"; x1: number; y1: number; x2: number; y2: number; label?: string }> } | null}
+                    onSaved={loadData}
+                />
+            )}
+
+            {viewMode === "floorplan" && selectedZone === "all" && (
+                <div className="bg-white rounded-xl border border-cream-300 p-12 text-center">
+                    <span className="text-5xl mb-4 block">🗺️</span>
+                    <p className="text-green-800 font-medium">Chọn một khu vực để xem sơ đồ mặt bằng</p>
+                    <p className="text-cream-400 text-sm mt-1">Sơ đồ hiển thị cho từng khu vực riêng biệt</p>
+                </div>
+            )}
 
             {/* Table Grid */}
             <div className="grid grid-cols-4 gap-4 xl:grid-cols-6">

@@ -10,7 +10,6 @@ import {
     ClipboardList,
     Armchair,
     Package,
-    DollarSign,
     Users,
     BarChart3,
     Settings,
@@ -34,12 +33,11 @@ const navItems = [
     { label: "Bàn", href: "/dashboard/tables", icon: Armchair },
     { label: "Mua hàng", href: "/dashboard/procurement", icon: Truck },
     { label: "Kho", href: "/dashboard/inventory", icon: Package },
-    { label: "Tài chính", href: "/dashboard/finance", icon: DollarSign },
     { label: "Nhân sự", href: "/dashboard/staff", icon: Users },
     { label: "Khách hàng", href: "/dashboard/customers", icon: Heart },
     { label: "Khuyến mãi", href: "/dashboard/promotions", icon: Sparkles },
     { label: "Wine Guide", href: "/dashboard/wine-guide", icon: BookOpenCheck },
-    { label: "Báo cáo", href: "/dashboard/reports", icon: BarChart3 },
+    { label: "Lãi Lỗ", href: "/dashboard/reports", icon: BarChart3 },
 ]
 
 const bottomItems = [

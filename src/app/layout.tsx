@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { DM_Sans, Playfair_Display, Caveat, JetBrains_Mono } from "next/font/google"
 import { Toaster } from "sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { ThemeProvider } from "@/components/theme-switcher"
 import "./globals.css"
 
 const dmSans = DM_Sans({
@@ -45,7 +46,9 @@ export default function RootLayout({
         className={`${dmSans.variable} ${playfair.variable} ${caveat.variable} ${jetbrainsMono.variable} font-sans antialiased bg-cream-50 text-green-900`}
       >
         <TooltipProvider>
-          {children}
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
         </TooltipProvider>
         <Toaster
           position="top-right"

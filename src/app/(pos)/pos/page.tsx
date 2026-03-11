@@ -55,7 +55,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useCartStore } from "@/stores/cart-store"
 import { useAuthStore } from "@/stores/auth-store"
-import { createOrder, processOrderWithCOGS, getActiveOrderByTable, addItemsToOrder, type PaymentMethod, type Order } from "@/actions/orders"
+import { createOrder, processOrderWithCOGS, getActiveOrderByTable, addItemsToOrder, sendToKitchen as sendToKitchenAction, type PaymentMethod, type Order } from "@/actions/orders"
 import {
     searchCustomers,
     createQuickCustomer,
@@ -737,6 +737,8 @@ export default function POSPage() {
             if (activeOrderId) {
                 const result = await addItemsToOrder(activeOrderId, cart.items)
                 if (result.success && result.order) {
+                    // Send newly added items to kitchen
+                    await sendToKitchenAction(activeOrderId)
                     setLastOrder({
                         orderNumber: result.order.orderNumber,
                         total: result.order.total,
@@ -766,6 +768,8 @@ export default function POSPage() {
                 })
 
                 if (result.success && result.order) {
+                    // Send all items to kitchen
+                    await sendToKitchenAction(result.order.id)
                     setLastOrder({
                         orderNumber: result.order.orderNumber,
                         total: result.order.total,
@@ -834,18 +838,10 @@ export default function POSPage() {
 
                 // Stock warnings
                 if (cogsResult.stockWarnings.length > 0) {
-                    for (const w of cogsResult.stockWarnings) {
-                        if (w.level === "OUT") {
-                            toast.error(`🚨 Hết hàng: ${w.materialName}`, {
-                                description: "Cần nhập thêm nguyên liệu ngay!",
-                                duration: 8000,
-                            })
-                        } else {
-                            toast.warning(`⚠️ Sắp hết: ${w.materialName}`, {
-                                description: `Còn ${w.remaining} ${w.unit}`,
-                                duration: 6000,
-                            })
-                        }
+                    for (const warning of cogsResult.stockWarnings) {
+                        toast.warning(`⚠️ ${warning}`, {
+                            duration: 6000,
+                        })
                     }
                 }
 

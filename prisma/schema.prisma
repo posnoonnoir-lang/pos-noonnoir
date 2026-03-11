@@ -365,11 +365,12 @@ model WineGlassConfig {
 // ============================================================
 
 model TableZone {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String
-  sortOrder Int      @default(0) @map("sort_order")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  sortOrder  Int      @default(0) @map("sort_order")
+  isActive   Boolean  @default(true) @map("is_active")
+  layoutData Json?    @map("layout_data") // walls, doors, labels for floor plan
+  createdAt  DateTime @default(now()) @map("created_at")
 
   tables FloorTable[]
 
@@ -385,6 +386,9 @@ model FloorTable {
   shape        String      @default("square")
   posX         Int         @default(0) @map("pos_x")
   posY         Int         @default(0) @map("pos_y")
+  width        Int         @default(80) @map("width")
+  height       Int         @default(80) @map("height")
+  rotation     Int         @default(0) @map("rotation") // degrees 0-359
   mergedIntoId String?     @map("merged_into_id") @db.Uuid
   isActive     Boolean     @default(true) @map("is_active")
   createdAt    DateTime    @default(now()) @map("created_at")
@@ -620,10 +624,12 @@ model ConsignmentSettlement {
 model Ingredient {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name         String
-  unit         String
-  currentStock Decimal  @default(0) @map("current_stock") @db.Decimal(12, 3)
-  minStock     Decimal  @default(0) @map("min_stock") @db.Decimal(12, 3)
-  costPerUnit  Decimal  @default(0) @map("cost_per_unit") @db.Decimal(12, 2)
+  unit         String            // display unit: "chai", "kg", "gói"
+  baseUnit     String   @default("g") @map("base_unit")  // smallest unit: "ml", "g", "pcs"
+  baseQuantity Decimal  @default(1) @map("base_quantity") @db.Decimal(12, 3) // 1 "chai" = 750 ml
+  currentStock Decimal  @default(0) @map("current_stock") @db.Decimal(12, 3) // stored in BASE unit
+  minStock     Decimal  @default(0) @map("min_stock") @db.Decimal(12, 3)     // in BASE unit
+  costPerUnit  Decimal  @default(0) @map("cost_per_unit") @db.Decimal(12, 2) // cost per display unit
   expiryDate   DateTime? @map("expiry_date") @db.Date
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")

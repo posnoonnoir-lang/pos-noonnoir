@@ -2,7 +2,9 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import type { OrderStatus, PaymentMethod } from "@prisma/client"
+import type { OrderStatus, PaymentMethod, OrderItemStatus } from "@prisma/client"
+import { deductRecipeIngredients } from "@/actions/assets"
+import { checkPromotions } from "@/actions/promotions"
 
 export type { OrderStatus, PaymentMethod } from "@prisma/client"
 
@@ -113,6 +115,30 @@ export async function createOrder(params: {
             })
         }
 
+        // GAP-11: Auto-apply best promotion
+        try {
+            const promos = await checkPromotions({
+                orderTotal: subtotal,
+                items: normalizedItems.map((i: any) => ({
+                    productId: i.productId, categorySlug: "", quantity: i.quantity, unitPrice: i.price,
+                })),
+            })
+            if (promos.length > 0) {
+                // Apply best (highest discount) promo
+                const best = promos.sort((a, b) => b.discountAmount - a.discountAmount)[0]
+                const discountPct = (best.type === "PERCENT_OFF" || best.type === "HAPPY_HOUR") ? (best.discountAmount / subtotal * 100) : 0
+                await prisma.order.update({
+                    where: { id: order.id },
+                    data: {
+                        discountAmount: best.discountAmount,
+                        discountPct: Math.round(discountPct * 100) / 100,
+                        totalAmount: subtotal - best.discountAmount,
+                        notes: `CTKM: ${best.name}`,
+                    },
+                })
+            }
+        } catch { /* promo is non-critical */ }
+
         revalidatePath("/pos")
         revalidatePath("/dashboard/tables")
         return { success: true, order: serializeOrder(order) }
@@ -167,20 +193,117 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
     }
 }
 
-export async function payOrder(orderId: string, method: PaymentMethod) {
+/**
+ * GAP-06: Void/Cancel order with mandatory audit trail.
+ * Records reason + staff in audit_log table.
+ */
+export async function voidOrder(
+    orderId: string,
+    staffId: string,
+    reason: string
+) {
     try {
+        if (!reason || reason.trim().length < 3) {
+            return { success: false, error: "Lý do hủy phải có ít nhất 3 ký tự" }
+        }
+
         const order = await prisma.order.findUnique({ where: { id: orderId } })
-        if (!order) return { success: false }
+        if (!order) return { success: false, error: "Không tìm thấy đơn" }
+        if (order.status === "PAID") return { success: false, error: "Đơn đã thanh toán, không thể hủy" }
 
         await prisma.$transaction([
-            prisma.payment.create({
+            prisma.order.update({
+                where: { id: orderId },
+                data: { status: "CANCELLED", closedAt: new Date(), notes: `[VOID] ${reason}` },
+            }),
+            // Audit log entry
+            prisma.auditLog.create({
                 data: {
-                    orderId,
-                    method,
-                    amount: order.totalAmount,
-                    receivedAmount: order.totalAmount,
+                    action: "VOID_ORDER",
+                    tableName: "order",
+                    recordId: orderId,
+                    staffId,
+                    oldData: {
+                        orderNo: order.orderNo,
+                        status: order.status,
+                        totalAmount: Number(order.totalAmount),
+                    },
+                    newData: {
+                        status: "CANCELLED",
+                        reason: reason.trim(),
+                        voidedAt: new Date().toISOString(),
+                    },
                 },
             }),
+            // Restore table if occupied
+            ...(order.tableId
+                ? [prisma.floorTable.update({ where: { id: order.tableId }, data: { status: "AVAILABLE" } })]
+                : []),
+        ])
+
+        revalidatePath("/pos")
+        revalidatePath("/dashboard/tables")
+        return { success: true }
+    } catch (e) {
+        console.error("voidOrder error:", e)
+        return { success: false, error: "Lỗi hủy đơn" }
+    }
+}
+
+// Split Payment type — each entry is one payment method + amount
+export type SplitPaymentEntry = {
+    method: PaymentMethod
+    amount: number
+    receivedAmount?: number // for cash — how much customer gave
+    transactionRef?: string // for card/transfer
+}
+
+/**
+ * Pay order — supports both single and split payment.
+ * @param orderId - The order to pay
+ * @param payments - Single PaymentMethod string OR array of SplitPaymentEntry
+ */
+export async function payOrder(
+    orderId: string,
+    payments: PaymentMethod | SplitPaymentEntry[]
+) {
+    try {
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: { items: { include: { product: true } } },
+        })
+        if (!order) return { success: false, error: "Không tìm thấy đơn hàng" }
+
+        // Normalize payments into array
+        const paymentEntries: SplitPaymentEntry[] = typeof payments === "string"
+            ? [{ method: payments, amount: Number(order.totalAmount) }]
+            : payments
+
+        // Validate total paid >= order total
+        const totalPaid = paymentEntries.reduce((s, p) => s + p.amount, 0)
+        const orderTotal = Number(order.totalAmount)
+        if (totalPaid < orderTotal - 1) {
+            return { success: false, error: `Thiếu ${Math.round(orderTotal - totalPaid)}₫. Tổng thanh toán: ${Math.round(totalPaid)}₫` }
+        }
+
+        // Calculate change (only applies to last cash payment)
+        const changeAmount = Math.max(0, totalPaid - orderTotal)
+
+        await prisma.$transaction([
+            // Create payment records
+            ...paymentEntries.map((p, idx) =>
+                prisma.payment.create({
+                    data: {
+                        orderId,
+                        method: p.method,
+                        amount: p.amount,
+                        receivedAmount: p.receivedAmount ?? p.amount,
+                        changeAmount: idx === paymentEntries.length - 1 ? changeAmount : 0,
+                        transactionRef: p.transactionRef,
+                    },
+                })
+            ),
+            // Update order status
             prisma.order.update({
                 where: { id: orderId },
                 data: {
@@ -189,6 +312,7 @@ export async function payOrder(orderId: string, method: PaymentMethod) {
                     closedAt: new Date(),
                 },
             }),
+            // Set table to CLEANING (not AVAILABLE — staff must clear first)
             ...(order.tableId
                 ? [prisma.floorTable.update({ where: { id: order.tableId }, data: { status: "CLEANING" } })]
                 : []),
@@ -196,9 +320,36 @@ export async function payOrder(orderId: string, method: PaymentMethod) {
 
         revalidatePath("/pos")
         revalidatePath("/dashboard/tables")
-        return { success: true }
-    } catch {
-        return { success: false }
+
+        // GAP-09: Update customer loyalty if order has a customer
+        if (order.customerId) {
+            try {
+                const loyaltyPts = Math.floor(orderTotal / 10000) // 1 pt per 10K₫
+                const updated = await prisma.customer.update({
+                    where: { id: order.customerId },
+                    data: {
+                        totalSpent: { increment: orderTotal },
+                        loyaltyPts: { increment: loyaltyPts },
+                    },
+                })
+                // Auto-tier: REGULAR < 5M, SILVER 5-20M, GOLD 20-50M, VIP 50M+
+                const spent = Number(updated.totalSpent)
+                const newTier = spent >= 50_000_000 ? "VIP" : spent >= 20_000_000 ? "GOLD" : spent >= 5_000_000 ? "SILVER" : "REGULAR"
+                if (updated.tier !== newTier) {
+                    await prisma.customer.update({ where: { id: order.customerId }, data: { tier: newTier } })
+                }
+            } catch { /* non-critical */ }
+        }
+
+        return {
+            success: true,
+            paymentCount: paymentEntries.length,
+            totalPaid: Math.round(totalPaid),
+            changeAmount: Math.round(changeAmount),
+        }
+    } catch (e) {
+        console.error("payOrder error:", e)
+        return { success: false, error: "Lỗi thanh toán" }
     }
 }
 
@@ -309,15 +460,207 @@ export async function getTodayStats() {
     }
 }
 
-// COGS placeholder — will be implemented when assets module is migrated
-export async function processOrderWithCOGS(orderId: string, paymentMethod: PaymentMethod) {
-    const result = await payOrder(orderId, paymentMethod)
-    return {
-        success: result.success,
-        orderId,
-        deductions: [],
-        stockWarnings: [],
-        totalIngredientCost: 0,
-        errors: [],
+// ============================================================
+// COGS — Pay + deduct recipe ingredients
+// ============================================================
+
+export async function processOrderWithCOGS(
+    orderId: string,
+    payments: PaymentMethod | SplitPaymentEntry[]
+) {
+    // 1. Process payment first
+    const payResult = await payOrder(orderId, payments)
+    if (!payResult.success) {
+        return { success: false, orderId, deductions: [], stockWarnings: [], totalIngredientCost: 0, errors: [payResult.error ?? "Payment failed"] }
+    }
+
+    // 2. Deduct ingredients for food / drink items with recipes
+    const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: { include: { product: true } } },
+    })
+    if (!order) return { success: true, orderId, deductions: [], stockWarnings: [], totalIngredientCost: 0, errors: [] }
+
+    const allDeductions: Array<{ productName: string; materialName: string; qtyUsed: number; unit: string; warning: string | null }> = []
+    const stockWarnings: string[] = []
+    const errors: string[] = []
+    let totalIngredientCost = 0
+
+    // Only deduct for food/drink items (wine bottles handled separately)
+    const deductibleItems = order.items.filter(i =>
+        ["FOOD", "DRINK", "OTHER"].includes(i.product.type)
+    )
+
+    for (const item of deductibleItems) {
+        const result = await deductRecipeIngredients(item.productId, item.quantity)
+        if (result.deductions.length > 0) {
+            totalIngredientCost += result.totalIngredientCost
+            for (const d of result.deductions) {
+                allDeductions.push({
+                    productName: result.productName,
+                    materialName: d.materialName,
+                    qtyUsed: d.qtyUsed,
+                    unit: d.unit,
+                    warning: d.warning,
+                })
+                if (d.warning) stockWarnings.push(`${result.productName} → ${d.warning}`)
+            }
+        }
+        if (result.errors.length > 0) errors.push(...result.errors)
+    }
+
+    return { success: true, orderId, deductions: allDeductions, stockWarnings, totalIngredientCost, errors }
+}
+
+// ============================================================
+// KDS — Kitchen Display System Flow
+// ============================================================
+
+/** Send specific items (or all pending) to kitchen */
+export async function sendToKitchen(orderId: string, itemIds?: string[]) {
+    try {
+        const where = itemIds && itemIds.length > 0
+            ? { id: { in: itemIds }, orderId, sentToKitchen: false }
+            : { orderId, sentToKitchen: false }
+
+        const result = await prisma.orderItem.updateMany({
+            where,
+            data: {
+                sentToKitchen: true,
+                sentAt: new Date(),
+                status: "PREPARING",
+            },
+        })
+
+        // Also update order status if still OPEN
+        await prisma.order.updateMany({
+            where: { id: orderId, status: "OPEN" },
+            data: { status: "PREPARING" },
+        })
+
+        revalidatePath("/pos")
+        revalidatePath("/dashboard/kitchen")
+        return { success: true, itemsSent: result.count }
+    } catch {
+        return { success: false, itemsSent: 0, error: "Lỗi gửi bếp" }
+    }
+}
+
+/** Update item status (kitchen/bar staff marks items) */
+export async function updateItemStatus(
+    itemId: string,
+    status: OrderItemStatus
+) {
+    try {
+        await prisma.orderItem.update({
+            where: { id: itemId },
+            data: { status },
+        })
+
+        // Check if all items in order are READY → set order to READY
+        const item = await prisma.orderItem.findUnique({ where: { id: itemId } })
+        if (item && status === "READY") {
+            const allItems = await prisma.orderItem.findMany({ where: { orderId: item.orderId } })
+            const allReady = allItems.every(i => i.status === "READY" || i.status === "SERVED" || i.status === "CANCELLED")
+            if (allReady) {
+                await prisma.order.update({ where: { id: item.orderId }, data: { status: "READY" } })
+            }
+        }
+
+        // If marking as SERVED, check if all served → set order to SERVED
+        if (item && status === "SERVED") {
+            const allItems = await prisma.orderItem.findMany({ where: { orderId: item.orderId } })
+            const allServed = allItems.every(i => i.status === "SERVED" || i.status === "CANCELLED")
+            if (allServed) {
+                await prisma.order.update({ where: { id: item.orderId }, data: { status: "SERVED" } })
+            }
+        }
+
+        revalidatePath("/pos")
+        revalidatePath("/dashboard/kitchen")
+        return { success: true }
+    } catch {
+        return { success: false, error: "Lỗi cập nhật trạng thái" }
+    }
+}
+
+/** Get kitchen orders — items sent but not yet served */
+export async function getKitchenOrders() {
+    const items = await prisma.orderItem.findMany({
+        where: {
+            sentToKitchen: true,
+            status: { in: ["PREPARING", "READY"] },
+        },
+        include: {
+            product: true,
+            order: { include: { table: true } },
+        },
+        orderBy: { sentAt: "asc" },
+    })
+
+    // Group by order
+    const orderMap = new Map<string, {
+        orderId: string
+        orderNo: string
+        tableNumber: string | null
+        items: Array<{
+            id: string
+            productName: string
+            quantity: number
+            status: string
+            notes: string | null
+            sentAt: Date | null
+            productType: string
+        }>
+    }>()
+
+    for (const item of items) {
+        if (!orderMap.has(item.orderId)) {
+            orderMap.set(item.orderId, {
+                orderId: item.orderId,
+                orderNo: item.order.orderNo,
+                tableNumber: item.order.table?.tableNumber ?? null,
+                items: [],
+            })
+        }
+        orderMap.get(item.orderId)!.items.push({
+            id: item.id,
+            productName: item.product.name,
+            quantity: item.quantity,
+            status: item.status,
+            notes: item.notes,
+            sentAt: item.sentAt,
+            productType: item.product.type,
+        })
+    }
+
+    return Array.from(orderMap.values())
+}
+
+// ============================================================
+// REMOVE ITEM
+// ============================================================
+
+export async function removeItemFromOrder(orderId: string, itemId: string) {
+    try {
+        const item = await prisma.orderItem.findUnique({ where: { id: itemId } })
+        if (!item || item.orderId !== orderId) return { success: false, error: "Không tìm thấy" }
+        if (item.sentToKitchen) return { success: false, error: "Món đã gửi bếp, không thể xóa" }
+
+        await prisma.$transaction([
+            prisma.orderItem.delete({ where: { id: itemId } }),
+            prisma.order.update({
+                where: { id: orderId },
+                data: {
+                    subtotal: { decrement: item.subtotal },
+                    totalAmount: { decrement: item.subtotal },
+                },
+            }),
+        ])
+
+        revalidatePath("/pos")
+        return { success: true }
+    } catch {
+        return { success: false, error: "Lỗi xóa món" }
     }
 }

@@ -179,7 +179,10 @@ export async function pourFromBottle(params: {
     bottleId: string; glasses: number; staffId: string
 }): Promise<{ success: boolean; glassesPoured: number; bottleFinished: boolean; error?: string }> {
     try {
-        const bottle = await prisma.wineBottle.findUnique({ where: { id: params.bottleId } })
+        const bottle = await prisma.wineBottle.findUnique({
+            where: { id: params.bottleId },
+            include: { consignment: true },
+        })
         if (!bottle) return { success: false, glassesPoured: 0, bottleFinished: false, error: "Không tìm thấy chai" }
         if (bottle.status !== "OPENED") return { success: false, glassesPoured: 0, bottleFinished: false, error: "Chai chưa được mở" }
 
@@ -187,15 +190,25 @@ export async function pourFromBottle(params: {
         if (remaining < params.glasses) return { success: false, glassesPoured: 0, bottleFinished: false, error: `Chỉ còn ${remaining} ly` }
 
         const newRemaining = remaining - params.glasses
+        const bottleFinished = newRemaining <= 0
+
         await prisma.wineBottle.update({
             where: { id: params.bottleId },
             data: {
                 glassesRemaining: newRemaining,
-                ...(newRemaining <= 0 ? { status: "SOLD", soldAt: new Date() } : {}),
+                ...(bottleFinished ? { status: "SOLD", soldAt: new Date() } : {}),
             },
         })
 
-        return { success: true, glassesPoured: params.glasses, bottleFinished: newRemaining <= 0 }
+        // GAP-12 fix: Update consignment tracking when bottle finishes
+        if (bottleFinished && bottle.consignmentId && bottle.ownershipType === "CONSIGNED") {
+            await prisma.consignment.update({
+                where: { id: bottle.consignmentId },
+                data: { soldBottles: { increment: 1 } },
+            })
+        }
+
+        return { success: true, glassesPoured: params.glasses, bottleFinished }
     } catch (e) {
         return { success: false, glassesPoured: 0, bottleFinished: false, error: (e as Error).message }
     }
@@ -544,4 +557,204 @@ export async function getBottleStats() {
         sold: bottles.filter((b) => b.status === "SOLD").length,
         damaged: bottles.filter((b) => b.status === "DAMAGED").length,
     }
+}
+
+// ============================================================
+// GAP-04: WINE FLIGHT / TASTING
+// ============================================================
+
+/**
+ * Sell a wine tasting portion (smaller than a glass, ~60ml vs 150ml).
+ * Uses tastingPortions config on Product instead of glassesPerBottle.
+ * 1 bottle = tastingPortions tastings (default 12).
+ */
+export async function sellWineTasting(params: {
+    productId: string
+    portions: number
+    staffId: string
+    bottleId?: string
+}): Promise<{
+    success: boolean
+    portionsSold: number
+    bottlesConsumed: string[]
+    error?: string
+}> {
+    try {
+        const product = await prisma.product.findUnique({ where: { id: params.productId } })
+        if (!product) return { success: false, portionsSold: 0, bottlesConsumed: [], error: "Sản phẩm không tồn tại" }
+        if (product.type !== "WINE_TASTING" && product.type !== "WINE_GLASS") {
+            return { success: false, portionsSold: 0, bottlesConsumed: [], error: "Sản phẩm không phải loại tasting" }
+        }
+
+        const tastingPerBottle = product.tastingPortions > 0 ? product.tastingPortions : 12
+        let remaining = params.portions
+        let sold = 0
+        const consumed: string[] = []
+
+        // Use specific bottle if provided
+        if (params.bottleId) {
+            const bottle = await prisma.wineBottle.findUnique({ where: { id: params.bottleId } })
+            if (!bottle || bottle.status !== "OPENED") {
+                return { success: false, portionsSold: 0, bottlesConsumed: [], error: "Chai không khả dụng" }
+            }
+            const available = bottle.glassesRemaining ?? 0
+            // Convert: tastings use smaller portions, so multiply available glasses
+            // If bottle has 4 glasses remaining (150ml each) = roughly 10 tastings (60ml each)
+            const tastingsAvailable = Math.floor((available / product.glassesPerBottle) * tastingPerBottle)
+            const pour = Math.min(remaining, tastingsAvailable > 0 ? tastingsAvailable : available)
+
+            // Deduct: 1 tasting = (glassesPerBottle / tastingPerBottle) glasses
+            const glassEquivalent = (pour / tastingPerBottle) * product.glassesPerBottle
+            const newRemaining = Math.max(0, available - Math.ceil(glassEquivalent))
+            const finished = newRemaining <= 0
+
+            await prisma.wineBottle.update({
+                where: { id: params.bottleId },
+                data: {
+                    glassesRemaining: newRemaining,
+                    status: finished ? "SOLD" : "OPENED",
+                },
+            })
+
+            sold += pour
+            remaining -= pour
+            if (finished) consumed.push(params.bottleId)
+        }
+
+        // Auto-pour from oldest opened bottles
+        while (remaining > 0) {
+            const bottle = await prisma.wineBottle.findFirst({
+                where: { productId: params.productId, status: "OPENED", glassesRemaining: { gt: 0 } },
+                orderBy: { openedAt: "asc" },
+            })
+            if (!bottle) break
+
+            const available = bottle.glassesRemaining ?? 0
+            const tastingsAvailable = Math.floor((available / product.glassesPerBottle) * tastingPerBottle)
+            const pour = Math.min(remaining, Math.max(tastingsAvailable, 1))
+            const glassEquivalent = (pour / tastingPerBottle) * product.glassesPerBottle
+            const newRemaining = Math.max(0, available - Math.ceil(glassEquivalent))
+            const finished = newRemaining <= 0
+
+            await prisma.wineBottle.update({
+                where: { id: bottle.id },
+                data: {
+                    glassesRemaining: newRemaining,
+                    status: finished ? "SOLD" : "OPENED",
+                },
+            })
+
+            sold += pour
+            remaining -= pour
+            if (finished) consumed.push(bottle.id)
+        }
+
+        return { success: true, portionsSold: sold, bottlesConsumed: consumed }
+    } catch (e) {
+        console.error("sellWineTasting error:", e)
+        return { success: false, portionsSold: 0, bottlesConsumed: [], error: "Lỗi bán tasting" }
+    }
+}
+
+/**
+ * Create a wine flight (combo of tastings from multiple wines).
+ * Each flight is a set of tasting pour from different products.
+ */
+export async function createWineFlight(params: {
+    wineProductIds: string[]  // Array of product IDs to taste
+    portionsPerWine: number   // Usually 1 portion of each
+    staffId: string
+}): Promise<{
+    success: boolean
+    results: Array<{ productId: string; productName: string; portionsSold: number; error?: string }>
+    totalPortions: number
+    error?: string
+}> {
+    try {
+        if (params.wineProductIds.length < 2) {
+            return { success: false, results: [], totalPortions: 0, error: "Flight cần ít nhất 2 loại rượu" }
+        }
+        if (params.wineProductIds.length > 6) {
+            return { success: false, results: [], totalPortions: 0, error: "Flight tối đa 6 loại rượu" }
+        }
+
+        const results: Array<{ productId: string; productName: string; portionsSold: number; error?: string }> = []
+        let total = 0
+
+        for (const productId of params.wineProductIds) {
+            const product = await prisma.product.findUnique({ where: { id: productId } })
+            if (!product) {
+                results.push({ productId, productName: "Unknown", portionsSold: 0, error: "Không tìm thấy" })
+                continue
+            }
+
+            const res = await sellWineTasting({
+                productId,
+                portions: params.portionsPerWine,
+                staffId: params.staffId,
+            })
+
+            results.push({
+                productId,
+                productName: product.name,
+                portionsSold: res.portionsSold,
+                error: res.error,
+            })
+            total += res.portionsSold
+        }
+
+        return { success: true, results, totalPortions: total }
+    } catch (e) {
+        console.error("createWineFlight error:", e)
+        return { success: false, results: [], totalPortions: 0, error: "Lỗi tạo flight" }
+    }
+}
+
+/**
+ * Get available wines for flight/tasting selection.
+ * Returns wines that have opened bottles with remaining portions.
+ */
+export async function getFlightOptions(): Promise<Array<{
+    productId: string
+    productName: string
+    tastingPortions: number
+    availableTastings: number
+    openedBottles: number
+    glassPrice: number
+    tastingPrice: number
+}>> {
+    const products = await prisma.product.findMany({
+        where: {
+            isActive: true,
+            type: { in: ["WINE_GLASS", "WINE_TASTING"] },
+        },
+    })
+
+    const result = []
+    for (const p of products) {
+        const openBottles = await prisma.wineBottle.findMany({
+            where: { productId: p.id, status: "OPENED", glassesRemaining: { gt: 0 } },
+        })
+
+        if (openBottles.length === 0) continue
+
+        const tastingPerBottle = p.tastingPortions > 0 ? p.tastingPortions : 12
+        const totalGlassesRemaining = openBottles.reduce((s, b) => s + (b.glassesRemaining ?? 0), 0)
+        const availableTastings = Math.floor((totalGlassesRemaining / Math.max(p.glassesPerBottle, 1)) * tastingPerBottle)
+        const glassPrice = Number(p.glassPrice ?? 0)
+        // Tasting price = glass price × (glass size / tasting size) ≈ glass price × 0.4
+        const tastingPrice = Math.round(glassPrice * (p.glassesPerBottle / Math.max(tastingPerBottle, 1)))
+
+        result.push({
+            productId: p.id,
+            productName: p.name,
+            tastingPortions: tastingPerBottle,
+            availableTastings,
+            openedBottles: openBottles.length,
+            glassPrice,
+            tastingPrice,
+        })
+    }
+
+    return result
 }

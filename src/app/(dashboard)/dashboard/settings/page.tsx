@@ -45,6 +45,7 @@ import { getServiceChargeConfig, updateServiceChargeConfig } from "@/actions/ope
 import { getBankConfig, updateBankConfig, type QRPaymentConfig } from "@/actions/qr-payment"
 import type { TaxRate } from "@/types"
 import { getHrConfig, updateHrConfig, type HrConfigData } from "@/actions/hr-config"
+import { ThemePicker } from "@/components/theme-switcher"
 
 type TaxReportLine = Awaited<ReturnType<typeof getTaxReport>>[number]
 type TaxBreakdown = Awaited<ReturnType<typeof getTaxBreakdownByRate>>[number]
@@ -784,6 +785,11 @@ function DisplaySettings() {
 
     return (
         <>
+            {/* Theme Picker */}
+            <ThemePicker />
+
+            <div className="my-5 border-t border-cream-300" />
+
             <SettingGroup title="Giao diện">
                 <SettingRow label="Chế độ tối" description="Sử dụng theme tối cho POS">
                     <Toggle checked={darkMode} onChange={setDarkMode} />

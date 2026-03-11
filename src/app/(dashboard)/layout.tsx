@@ -9,7 +9,6 @@ import {
     UtensilsCrossed,
     Armchair,
     Package,
-    DollarSign,
     Users,
     BarChart3,
     Settings,
@@ -38,14 +37,14 @@ const navSections = [
         label: "Tổng quan",
         items: [
             { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-            { label: "Analytics", href: "/dashboard/analytics", icon: PieChart },
+            { label: "Phân tích", href: "/dashboard/analytics", icon: PieChart },
         ],
     },
     {
         label: "Vận hành",
         items: [
             { label: "POS Terminal", href: "/pos", icon: Wine },
-            { label: "Kitchen Display", href: "/pos/kitchen", icon: ChefHat },
+            { label: "Kitchen Display", href: "/dashboard/kitchen", icon: ChefHat },
             { label: "Đơn hàng", href: "/pos/orders", icon: ClipboardList },
             { label: "Menu & Sản phẩm", href: "/dashboard/menu", icon: UtensilsCrossed },
             { label: "Quản lý Bàn", href: "/dashboard/tables", icon: Armchair },
@@ -58,9 +57,8 @@ const navSections = [
             { label: "Mua hàng", href: "/dashboard/procurement", icon: Truck },
             { label: "Kho hàng", href: "/dashboard/inventory", icon: Package },
             { label: "Ký gửi", href: "/dashboard/consignment", icon: Handshake },
-            { label: "Tài chính", href: "/dashboard/finance", icon: DollarSign },
             { label: "Nhân sự", href: "/dashboard/staff", icon: Users },
-            { label: "Báo cáo", href: "/dashboard/reports", icon: BarChart3 },
+            { label: "Lãi Lỗ (P&L)", href: "/dashboard/reports", icon: BarChart3 },
         ],
     },
     {

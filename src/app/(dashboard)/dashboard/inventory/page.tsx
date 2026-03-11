@@ -50,6 +50,7 @@ import {
     type DepreciationEntry,
 } from "@/actions/assets"
 import { useAuthStore } from "@/stores/auth-store"
+import { AddIngredientModal, RecipeManagerModal } from "@/components/recipe-ingredient-modals"
 
 function fmt(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -123,6 +124,8 @@ export default function InventoryPage() {
     const [recipes, setRecipes] = useState<Recipe[]>([])
     const [nplSubTab, setNplSubTab] = useState<"materials" | "recipes">("materials")
     const [selectedMat, setSelectedMat] = useState<RawMaterial | null>(null)
+    const [showAddIngredient, setShowAddIngredient] = useState(false)
+    const [editRecipe, setEditRecipe] = useState<{ productId: string; productName: string; recipe: Recipe | null } | null>(null)
 
     const [equipment, setEquipment] = useState<Equipment[]>([])
     const [eqStats, setEqStats] = useState<Awaited<ReturnType<typeof getEquipmentStats>> | null>(null)
@@ -363,10 +366,15 @@ export default function InventoryPage() {
                             <button onClick={() => setNplSubTab("recipes")} className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-all", nplSubTab === "recipes" ? "bg-green-900 text-cream-50" : "text-cream-500")}>🍳 Công thức ({recipes.length})</button>
                         </div>
                         {nplSubTab === "materials" && (
-                            <div className="relative max-w-[220px]">
-                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-400" />
-                                <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Tìm nguyên liệu..." className="h-8 pl-8 text-xs border-cream-300 bg-white" />
-                            </div>
+                            <>
+                                <div className="relative max-w-[220px]">
+                                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-400" />
+                                    <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Tìm nguyên liệu..." className="h-8 pl-8 text-xs border-cream-300 bg-white" />
+                                </div>
+                                <Button size="sm" className="bg-green-900 text-cream-50 hover:bg-green-800 ml-auto" onClick={() => setShowAddIngredient(true)}>
+                                    + Thêm NL
+                                </Button>
+                            </>
                         )}
                     </div>
 
@@ -435,7 +443,10 @@ export default function InventoryPage() {
                                             <CookingPot className="h-4 w-4 text-green-700" />
                                             <h3 className="text-sm font-bold text-green-900">{recipe.productName}</h3>
                                         </div>
-                                        <span className="font-mono text-xs font-bold text-wine-700">Giá vốn: ₫{fmt(recipe.totalCost)}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono text-xs font-bold text-wine-700">Giá vốn: ₫{fmt(recipe.totalCost)}</span>
+                                            <button onClick={() => setEditRecipe({ productId: recipe.productId, productName: recipe.productName, recipe })} className="px-2 py-1 text-[10px] font-medium bg-green-100 text-green-700 rounded hover:bg-green-200">Sửa</button>
+                                        </div>
                                     </div>
                                     <table className="w-full">
                                         <thead>
@@ -475,6 +486,22 @@ export default function InventoryPage() {
                                 <button onClick={() => setSelectedMat(null)} className="rounded-lg p-1.5 text-cream-400 hover:bg-cream-200"><X className="h-3.5 w-3.5" /></button>
                             </div>
                         </div>
+                    )}
+
+                    {/* GAP-15: Add Ingredient Modal */}
+                    {showAddIngredient && (
+                        <AddIngredientModal onClose={() => setShowAddIngredient(false)} onCreated={loadData} />
+                    )}
+
+                    {/* GAP-14: Recipe Editor Modal */}
+                    {editRecipe && (
+                        <RecipeManagerModal
+                            productId={editRecipe.productId}
+                            productName={editRecipe.productName}
+                            recipe={editRecipe.recipe}
+                            onClose={() => setEditRecipe(null)}
+                            onSaved={loadData}
+                        />
                     )}
                 </>
             )}
