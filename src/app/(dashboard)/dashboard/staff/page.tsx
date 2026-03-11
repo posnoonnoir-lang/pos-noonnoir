@@ -61,6 +61,7 @@ import {
     type AttendanceRecord,
 } from "@/actions/attendance"
 import { ROLE_LABELS, STATUS_LABELS } from "@/lib/staff-constants"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 import {
     calculatePayroll,
     exportPayrollCSV,
@@ -154,14 +155,23 @@ export default function StaffPage() {
 
     const loadStaff = useCallback(async () => {
         setLoading(true)
-        const data = await getStaffList()
-        setStaffList(data)
+        try {
+            const data = await getStaffList()
+            setStaffList(data)
+        } catch (err) {
+            console.error("[Staff] loadStaff failed:", err)
+            toast.error("Không thể tải danh sách nhân viên")
+        }
         setLoading(false)
     }, [])
 
     const loadAttendance = useCallback(async () => {
-        const data = await getTodayAttendance()
-        setTodayAttendance(data)
+        try {
+            const data = await getTodayAttendance()
+            setTodayAttendance(data)
+        } catch (err) {
+            console.error("[Staff] loadAttendance failed:", err)
+        }
     }, [])
 
     useEffect(() => {
@@ -353,6 +363,10 @@ export default function StaffPage() {
         { key: "payroll", label: "Bảng lương", icon: Wallet },
         { key: "schedule", label: "Lịch ca", icon: Calendar },
     ]
+
+    if (loading && staffList.length === 0) {
+        return <DashboardInlineSkeleton />
+    }
 
     return (
         <div className="min-h-screen bg-cream-50 p-6">

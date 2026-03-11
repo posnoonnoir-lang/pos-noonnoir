@@ -51,6 +51,7 @@ import {
 } from "@/actions/assets"
 import { useAuthStore } from "@/stores/auth-store"
 import { AddIngredientModal, RecipeManagerModal } from "@/components/recipe-ingredient-modals"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function fmt(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -138,14 +139,19 @@ export default function InventoryPage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [inv, st, mv, mats, nst, rec, eq, est, dh] = await Promise.all([
-            getInventory(), getInventoryStats(), getStockMovements(),
-            getRawMaterials(), getRawMaterialStats(), getRecipes(),
-            getEquipment(), getEquipmentStats(), getDepreciationHistory(),
-        ])
-        setItems(inv); setStats(st); setMovements(mv)
-        setMaterials(mats); setNplStats(nst); setRecipes(rec)
-        setEquipment(eq); setEqStats(est); setDepHistory(dh)
+        try {
+            const [inv, st, mv, mats, nst, rec, eq, est, dh] = await Promise.all([
+                getInventory(), getInventoryStats(), getStockMovements(),
+                getRawMaterials(), getRawMaterialStats(), getRecipes(),
+                getEquipment(), getEquipmentStats(), getDepreciationHistory(),
+            ])
+            setItems(inv); setStats(st); setMovements(mv)
+            setMaterials(mats); setNplStats(nst); setRecipes(rec)
+            setEquipment(eq); setEqStats(est); setDepHistory(dh)
+        } catch (err) {
+            console.error("[Inventory] loadData failed:", err)
+            toast.error("Không thể tải dữ liệu kho hàng")
+        }
         setLoading(false)
     }, [])
 
@@ -163,10 +169,15 @@ export default function InventoryPage() {
         !searchTerm || m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.sku.toLowerCase().includes(searchTerm.toLowerCase())
     )
 
+    // Show loading skeleton for first load
+    if (loading && items.length === 0 && materials.length === 0) {
+        return <DashboardInlineSkeleton />
+    }
+
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
             {/* ── Header ── */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
                         <Package className="h-5 w-5 text-green-700" />
