@@ -492,7 +492,7 @@ export default function POSPage() {
             )
         }
         return products
-    }, [activeCategory, searchTerm])
+    }, [activeCategory, searchTerm, dbProducts])
 
     const handleAddToCart = (product: Product) => {
         if (product86Ids.includes(product.id)) {
