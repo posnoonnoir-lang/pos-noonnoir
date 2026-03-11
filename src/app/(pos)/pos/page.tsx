@@ -67,6 +67,7 @@ import {
 } from "@/actions/tabs"
 import { getProducts, getCategories } from "@/actions/menu"
 import { getTables, getZones } from "@/actions/tables"
+import { getPOSInitialData } from "@/actions/pos-loader"
 import { getAllGlassStatuses, sellWineGlass, sellWineBottle, openBottle, pourFromBottle, getOpenedBottlesForProduct, getInStockBottlesForProduct, type GlassStatus, type OpenedBottleSummary } from "@/actions/wine"
 import { getCurrentShift, openShift, closeShift, addShiftExpense, type Shift } from "@/actions/shifts"
 import { getUnreadNotifications, markAsRead, markAllAsRead, type Notification } from "@/actions/notifications"
@@ -430,10 +431,6 @@ export default function POSPage() {
         setCurrentShift(shift)
     }, [])
 
-    useEffect(() => {
-        refreshShift()
-    }, [refreshShift])
-
     // Load notifications
     const refreshNotifications = useCallback(async () => {
         const list = await getUnreadNotifications()
@@ -460,40 +457,24 @@ export default function POSPage() {
         return () => clearInterval(interval)
     }, [currentShift])
 
-    // Phase 8A: Load 86 products
+    // Phase 8A: Load 86 products (for refresh after toggle)
     const refresh86 = useCallback(async () => {
         const ids = await get86ProductIds()
         setProduct86Ids(ids)
     }, [])
-    useEffect(() => { refresh86() }, [refresh86])
 
     // Phase 8A: Load held orders
     const refreshHeld = useCallback(async () => {
         const list = await getHeldOrders()
         setHeldOrders(list)
     }, [])
-    useEffect(() => { refreshHeld() }, [refreshHeld])
 
-    // Phase 8A: Load upcoming reservations
-    useEffect(() => {
-        getUpcomingReservations().then((list) => setUpcomingReservations(list))
-    }, [])
-
-    // Load products & categories from DB
-    useEffect(() => {
-        Promise.all([getProducts(), getCategories()]).then(([prods, cats]) => {
-            setDbProducts(prods)
-            setDbCategories(cats)
-        })
-    }, [])
-
-    // Load floor tables & zones from DB
+    // Load floor tables & zones from DB (for refresh after changes)
     const refreshFloorData = useCallback(async () => {
         const [zonesData, tablesData] = await Promise.all([getZones(), getTables()])
         setDbZones(zonesData)
         setDbTables(tablesData)
     }, [])
-    useEffect(() => { refreshFloorData() }, [refreshFloorData])
 
     // V2: Load push sale items (refresh every 5 minutes)
     const refreshPushSale = useCallback(async () => {
@@ -506,10 +487,22 @@ export default function POSPage() {
         return () => clearInterval(interval)
     }, [refreshPushSale])
 
-    // Load default tax rate + stock data on startup
+    // ★ CONSOLIDATED INITIAL LOAD — single server action replaces 8+ separate calls
     useEffect(() => {
-        getDefaultTaxRate().then((rate) => setTaxRate(rate))
-        getAllowNegativeStock().then(setAllowNegativeStock)
+        getPOSInitialData().then((data) => {
+            setDbProducts(data.products as Product[])
+            setDbCategories(data.categories as Category[])
+            setDbZones(data.zones as TableZone[])
+            setDbTables(data.tables as FloorTable[])
+            setCurrentShift(data.currentShift as unknown as Shift | null)
+            setProduct86Ids(data.out86Ids)
+            setTaxRate(data.taxRate)
+            setAllowNegativeStock(data.allowNegativeStock)
+        })
+        // Non-critical secondary loads — can be deferred
+        refreshHeld()
+        getUpcomingReservations().then((list) => setUpcomingReservations(list))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // Load stock for all wine products

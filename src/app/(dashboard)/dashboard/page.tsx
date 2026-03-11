@@ -21,9 +21,7 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
-import { getDashboardStats, getWeeklyRevenue, type DailyRevenue } from "@/actions/reports"
-import { getOrders, type Order } from "@/actions/orders"
-import { getTableStats } from "@/actions/tables"
+import { getDashboardInitialData } from "@/actions/dashboard-loader"
 
 function formatPrice(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -35,33 +33,24 @@ function formatCompact(amount: number): string {
     return String(amount)
 }
 
-function formatTime(date: Date): string {
+function formatTime(date: string | Date): string {
     return new Date(date).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
 }
 
+type DashboardData = Awaited<ReturnType<typeof getDashboardInitialData>>
+
 export default function DashboardPage() {
     const { staff } = useAuthStore()
-    const [stats, setStats] = useState<Awaited<ReturnType<typeof getDashboardStats>> | null>(null)
-    const [weeklyRevenue, setWeeklyRevenue] = useState<DailyRevenue[]>([])
+    const [data, setData] = useState<DashboardData | null>(null)
 
-    const [recentOrders, setRecentOrders] = useState<Order[]>([])
-    const [tableStats, setTableStats] = useState<Awaited<ReturnType<typeof getTableStats>> | null>(null)
-
-    const loadData = useCallback(async () => {
-        const [s, w, o, ts] = await Promise.all([
-            getDashboardStats(),
-            getWeeklyRevenue(),
-            getOrders(),
-            getTableStats(),
-        ])
-        setStats(s)
-        setWeeklyRevenue(w)
-        setRecentOrders(o.slice(0, 5))
-        setTableStats(ts)
+    useEffect(() => {
+        getDashboardInitialData().then(setData)
     }, [])
 
-    useEffect(() => { loadData() }, [loadData])
-
+    const weeklyRevenue = data?.weeklyRevenue ?? []
+    const stats = data?.stats ?? null
+    const tableStats = data?.tableStats ?? null
+    const recentOrders = data?.recentOrders ?? []
     const maxRevenue = Math.max(...weeklyRevenue.map((d) => d.revenue), 1)
     const greeting = (() => {
         const h = new Date().getHours()

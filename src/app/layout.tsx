@@ -5,28 +5,40 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/components/theme-switcher"
 import "./globals.css"
 
+// Critical body font — preload + swap
 const dmSans = DM_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "700"],
+  display: "swap",
+  preload: true,
 })
 
+// Display font — swap (not preloaded to save initial load)
 const playfair = Playfair_Display({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["400", "600", "700"],
+  weight: ["600", "700"],
+  display: "swap",
+  preload: false,
 })
 
+// Script font — minimal
 const caveat = Caveat({
   variable: "--font-script",
   subsets: ["latin"],
-  weight: ["400", "600"],
+  weight: ["400"],
+  display: "swap",
+  preload: false,
 })
 
+// Mono font — minimal
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  weight: ["400", "700"],
+  weight: ["400"],
+  display: "swap",
+  preload: false,
 })
 
 export const metadata: Metadata = {
@@ -34,6 +46,7 @@ export const metadata: Metadata = {
   description: "drink slowly · laugh quietly · stay longer",
   icons: { icon: "/favicon.ico" },
 }
+
 
 export default function RootLayout({
   children,
