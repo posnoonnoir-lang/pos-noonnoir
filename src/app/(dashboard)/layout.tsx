@@ -31,7 +31,15 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 import { PageTransition } from "@/components/page-transition"
+
+// Map routes to prefetch cache keys
+const PREFETCH_KEYS: Record<string, string> = {
+    "/pos": "pos",
+    "/dashboard": "dashboard",
+    "/dashboard/tables": "tables",
+}
 
 const navSections = [
     {
@@ -147,6 +155,10 @@ export default function DashboardLayout({
                                             key={item.href}
                                             href={item.href}
                                             prefetch={true}
+                                            onMouseEnter={() => {
+                                                const key = PREFETCH_KEYS[item.href]
+                                                if (key) usePrefetchStore.getState().prefetch(key)
+                                            }}
                                             className={cn(
                                                 "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium nav-link-smooth",
                                                 isActive

@@ -21,7 +21,9 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 import { getDashboardInitialData } from "@/actions/dashboard-loader"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function formatPrice(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -44,7 +46,24 @@ export default function DashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null)
 
     useEffect(() => {
-        getDashboardInitialData().then(setData)
+        const prefetchStore = usePrefetchStore.getState()
+        prefetchStore.registerPrefetch('dashboard', getDashboardInitialData)
+
+        // Try cache first
+        const cached = prefetchStore.get('dashboard')
+        if (cached) {
+            setData(cached)
+            // Refresh in background
+            getDashboardInitialData().then((fresh) => {
+                prefetchStore.set('dashboard', fresh)
+                setData(fresh)
+            }).catch(() => { })
+        } else {
+            getDashboardInitialData().then((d) => {
+                prefetchStore.set('dashboard', d)
+                setData(d)
+            })
+        }
     }, [])
 
     const weeklyRevenue = data?.weeklyRevenue ?? []
@@ -58,6 +77,11 @@ export default function DashboardPage() {
         if (h < 18) return "Chào buổi chiều"
         return "Chào buổi tối"
     })()
+
+    // Show skeleton while loading
+    if (!data) {
+        return <DashboardInlineSkeleton />
+    }
 
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-6">

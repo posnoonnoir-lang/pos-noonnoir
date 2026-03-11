@@ -92,6 +92,8 @@ import { getAllServingNotes, searchServingNotes, type WineServingNote } from "@/
 import { getDefaultTaxRate } from "@/actions/tax"
 import { checkPromotions, type AppliedPromo } from "@/actions/promotions"
 import { getProductStock, getAllowNegativeStock, getWineRecommendations, getAlternativesForOutOfStock, type WineRecommendation } from "@/actions/wine-advisor"
+import { POSInlineSkeleton } from "@/components/inline-skeletons"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 import type { Product, Category, Customer, CustomerTab } from "@/types"
 type FloorTable = Awaited<ReturnType<typeof getTables>>[number]
 type TableZone = Awaited<ReturnType<typeof getZones>>[number]
@@ -487,34 +489,55 @@ export default function POSPage() {
         return () => clearInterval(interval)
     }, [refreshPushSale])
 
-    // ★ CONSOLIDATED INITIAL LOAD — single server action replaces 8+ separate calls
+    // ★ CONSOLIDATED INITIAL LOAD — with prefetch cache support
     useEffect(() => {
-        getPOSInitialData()
-            .then((data) => {
-                setDbProducts(data.products as Product[])
-                setDbCategories(data.categories as Category[])
-                setDbZones(data.zones as TableZone[])
-                setDbTables(data.tables as FloorTable[])
-                setCurrentShift(data.currentShift as unknown as Shift | null)
-                setProduct86Ids(data.out86Ids)
-                setTaxRate(data.taxRate)
-                setAllowNegativeStock(data.allowNegativeStock)
-            })
-            .catch((err) => {
-                console.error("[POS] Consolidated loader failed, falling back:", err)
-                // Fallback to individual loaders
-                Promise.all([getProducts(), getCategories()]).then(([prods, cats]) => {
-                    setDbProducts(prods)
-                    setDbCategories(cats)
+        const prefetchStore = usePrefetchStore.getState()
+        // Register prefetcher for sidebar hover
+        prefetchStore.registerPrefetch('pos', getPOSInitialData)
+
+        // Try cache first for instant display
+        const cached = prefetchStore.get('pos')
+        const applyData = (data: any) => {
+            setDbProducts(data.products as Product[])
+            setDbCategories(data.categories as Category[])
+            setDbZones(data.zones as TableZone[])
+            setDbTables(data.tables as FloorTable[])
+            setCurrentShift(data.currentShift as unknown as Shift | null)
+            setProduct86Ids(data.out86Ids)
+            setTaxRate(data.taxRate)
+            setAllowNegativeStock(data.allowNegativeStock)
+        }
+
+        if (cached) {
+            // Instant render from cache
+            applyData(cached)
+            // Still refresh in background
+            getPOSInitialData().then((data) => {
+                prefetchStore.set('pos', data)
+                applyData(data)
+            }).catch(() => { })
+        } else {
+            // No cache — fetch fresh
+            getPOSInitialData()
+                .then((data) => {
+                    prefetchStore.set('pos', data)
+                    applyData(data)
                 })
-                Promise.all([getZones(), getTables()]).then(([z, t]) => {
-                    setDbZones(z)
-                    setDbTables(t)
+                .catch((err) => {
+                    console.error("[POS] Consolidated loader failed, falling back:", err)
+                    Promise.all([getProducts(), getCategories()]).then(([prods, cats]) => {
+                        setDbProducts(prods)
+                        setDbCategories(cats)
+                    })
+                    Promise.all([getZones(), getTables()]).then(([z, t]) => {
+                        setDbZones(z)
+                        setDbTables(t)
+                    })
+                    refreshShift()
+                    refresh86()
                 })
-                refreshShift()
-                refresh86()
-            })
-        // Non-critical secondary loads — can be deferred
+        }
+        // Non-critical secondary loads
         refreshHeld()
         getUpcomingReservations().then((list) => setUpcomingReservations(list))
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -952,6 +975,11 @@ export default function POSPage() {
             toast.error(result.error?.message ?? "Không thể thêm vào tab")
         }
         setIsSubmitting(false)
+    }
+
+    // Show inline skeleton while data loads
+    if (dbProducts.length === 0) {
+        return <POSInlineSkeleton />
     }
 
     return (

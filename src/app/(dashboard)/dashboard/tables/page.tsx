@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { updateTableStatus, createTable, createZone, deleteTable, deleteZone } from "@/actions/tables"
 import { getTablesPageData } from "@/actions/tables-loader"
+import { TablesInlineSkeleton } from "@/components/inline-skeletons"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 import dynamic from "next/dynamic"
 
 const FloorPlanEditor = dynamic(() => import("@/components/floor-plan-editor"), { ssr: false })
@@ -96,33 +98,49 @@ export default function TablesPage() {
     // Active orders keyed by tableId
     const [activeOrderMap, setActiveOrderMap] = useState<Record<string, { orderNo: string; total: number; createdAt: Date; itemCount: number }>>({})
 
+    const applyData = useCallback((data: any) => {
+        setZones(data.zones as TableZone[])
+        setTables(data.tables as FloorTable[])
+        setStats(data.stats)
+        const orderMap: Record<string, { orderNo: string; total: number; createdAt: Date; itemCount: number }> = {}
+        for (const [tableId, order] of Object.entries(data.activeOrderMap as Record<string, any>)) {
+            orderMap[tableId] = {
+                ...order,
+                createdAt: new Date(order.createdAt),
+            }
+        }
+        setActiveOrderMap(orderMap)
+    }, [])
+
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
             const data = await getTablesPageData(selectedZone === "all" ? undefined : selectedZone)
-            setZones(data.zones as TableZone[])
-            setTables(data.tables as FloorTable[])
-            setStats(data.stats)
-            // Convert server order map (string dates) to client map
-            const orderMap: Record<string, { orderNo: string; total: number; createdAt: Date; itemCount: number }> = {}
-            for (const [tableId, order] of Object.entries(data.activeOrderMap)) {
-                orderMap[tableId] = {
-                    ...order,
-                    createdAt: new Date(order.createdAt),
-                }
-            }
-            setActiveOrderMap(orderMap)
+            usePrefetchStore.getState().set('tables', data)
+            applyData(data)
         } catch {
             toast.error("Không thể tải dữ liệu bàn")
         }
         setLoading(false)
-    }, [selectedZone])
+    }, [selectedZone, applyData])
 
     useEffect(() => {
-        loadData()
+        const prefetchStore = usePrefetchStore.getState()
+        prefetchStore.registerPrefetch('tables', () => getTablesPageData())
+
+        // Try cache first for instant display
+        const cached = prefetchStore.get('tables')
+        if (cached) {
+            applyData(cached)
+            setLoading(false)
+            // Refresh in background
+            loadData()
+        } else {
+            loadData()
+        }
         const interval = setInterval(loadData, 30000)
         return () => clearInterval(interval)
-    }, [loadData])
+    }, [loadData, applyData])
 
     const handleStatusChange = async (tableId: string, newStatus: FloorTable["status"]) => {
         const result = await updateTableStatus(tableId, newStatus)
@@ -131,6 +149,11 @@ export default function TablesPage() {
             loadData()
             setSelectedTable(null)
         }
+    }
+
+    // Show inline skeleton while data loading (first load only)
+    if (loading && tables.length === 0) {
+        return <TablesInlineSkeleton />
     }
 
     return (

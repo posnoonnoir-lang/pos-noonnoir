@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ReportsInlineSkeleton } from "@/components/inline-skeletons"
 import {
     getPnLSummary,
     getWeeklyPnL,
@@ -59,7 +60,7 @@ export default function ReportsPage() {
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
                         <BarChart3 className="h-5 w-5 text-green-700" />
@@ -120,11 +121,7 @@ function DailyPnLView() {
 
     const day = weekData[selectedDay] ?? null
 
-    if (loading || !summary || !day) return (
-        <div className="flex items-center justify-center py-20">
-            <div className="animate-pulse text-sm text-cream-400">Đang tải báo cáo P&L...</div>
-        </div>
-    )
+    if (loading || !summary || !day) return <ReportsInlineSkeleton />
 
     const isToday = selectedDay === 0
     const dateStr = new Date(day.date).toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
@@ -325,11 +322,7 @@ function FinanceView() {
 
     useEffect(() => { loadData() }, [loadData])
 
-    if (loading) return (
-        <div className="flex items-center justify-center py-20">
-            <div className="animate-pulse text-sm text-cream-400">Đang tải dữ liệu tài chính...</div>
-        </div>
-    )
+    if (loading) return <ReportsInlineSkeleton />
 
     const TH = "px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-cream-400 bg-cream-50 border-b border-cream-200 whitespace-nowrap"
     const THR = cn(TH, "text-right")
