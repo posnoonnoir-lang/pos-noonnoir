@@ -5,14 +5,7 @@ import { useRouter } from "next/navigation"
 import { Wine, Delete, Loader2 } from "lucide-react"
 import { useAuthStore } from "@/stores/auth-store"
 import { toast } from "sonner"
-
-const MOCK_STAFF = [
-    { id: "1", fullName: "Chien (Owner)", role: "OWNER", pinCode: "1234" },
-    { id: "2", fullName: "Minh (Manager)", role: "MANAGER", pinCode: "5678" },
-    { id: "3", fullName: "Linh (Cashier)", role: "CASHIER", pinCode: "0000" },
-    { id: "4", fullName: "Tùng (Bartender)", role: "BARTENDER", pinCode: "1111" },
-    { id: "5", fullName: "Hương (Waiter)", role: "WAITER", pinCode: "2222" },
-]
+import { verifyStaffPin } from "@/actions/staff"
 
 export default function LoginPage() {
     const [pin, setPin] = useState("")
@@ -28,7 +21,7 @@ export default function LoginPage() {
         setPin(newPin)
 
         if (newPin.length >= 4) {
-            verifyPin(newPin)
+            verifyAndLogin(newPin)
         }
     }, [pin])
 
@@ -36,28 +29,30 @@ export default function LoginPage() {
         setPin((prev) => prev.slice(0, -1))
     }, [])
 
-    const verifyPin = async (enteredPin: string) => {
+    const verifyAndLogin = async (enteredPin: string) => {
         setIsLoading(true)
 
-        // Simulate network delay
-        await new Promise((r) => setTimeout(r, 400))
+        try {
+            const staff = await verifyStaffPin(enteredPin)
 
-        // Mock: check against hardcoded staff PINs
-        // TODO: Replace with Supabase Auth / Server Action
-        const staff = MOCK_STAFF.find((s) => s.pinCode === enteredPin)
-
-        if (staff) {
-            login({
-                id: staff.id,
-                fullName: staff.fullName,
-                role: staff.role,
-            })
-            toast.success(`Xin chào, ${staff.fullName}!`)
-            router.replace("/pos")
-        } else {
+            if (staff) {
+                login({
+                    id: staff.id,
+                    fullName: staff.fullName,
+                    role: staff.role,
+                })
+                toast.success(`Xin chào, ${staff.fullName}!`)
+                router.replace("/pos")
+            } else {
+                setShake(true)
+                setPin("")
+                toast.error("PIN không đúng")
+                setTimeout(() => setShake(false), 500)
+            }
+        } catch {
             setShake(true)
             setPin("")
-            toast.error("PIN không đúng")
+            toast.error("Lỗi kết nối server")
             setTimeout(() => setShake(false), 500)
         }
 
@@ -86,8 +81,8 @@ export default function LoginPage() {
                         <div
                             key={i}
                             className={`h-4 w-4 rounded-full border-2 transition-all duration-200 ${i < pin.length
-                                    ? "border-green-900 bg-green-900 scale-110"
-                                    : "border-cream-400 bg-cream-100"
+                                ? "border-green-900 bg-green-900 scale-110"
+                                : "border-cream-400 bg-cream-100"
                                 }`}
                         />
                     ))}

@@ -112,6 +112,13 @@ function TableSelector({
     const [viewingOrder, setViewingOrder] = useState<{ table: FloorTable; order: Order } | null>(null)
     const [loadingOrder, setLoadingOrder] = useState(false)
 
+    // Sync selectedZone when zones load (fixes empty table list on first open)
+    useEffect(() => {
+        if (zones.length > 0 && !selectedZone) {
+            setSelectedZone(zones[0].id)
+        }
+    }, [zones, selectedZone])
+
     if (!open) return null
 
     const filteredTables = tables.filter(
@@ -495,6 +502,16 @@ export default function POSPage() {
     }, [activeCategory, searchTerm, dbProducts])
 
     const handleAddToCart = (product: Product) => {
+        // Require table selection for dine-in before adding products
+        if (cart.orderType === "DINE_IN" && !cart.selectedTable) {
+            toast.error("Vui lòng chọn bàn trước", {
+                description: "Nhấn 'Chọn bàn...' để chọn bàn trước khi order",
+                duration: 3000,
+                action: { label: "Chọn bàn", onClick: () => setTableModalOpen(true) },
+            })
+            setTableModalOpen(true)
+            return
+        }
         if (product86Ids.includes(product.id)) {
             toast.error(`❌ 86: ${product.name} đã hết`, { description: "Sản phẩm không còn phục vụ", duration: 3000 })
             return

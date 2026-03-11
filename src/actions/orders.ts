@@ -118,7 +118,8 @@ export async function createOrder(params: {
         return { success: true, order: serializeOrder(order) }
     } catch (e) {
         console.error("createOrder error:", e)
-        return { success: false, error: "Không thể tạo đơn hàng" }
+        const msg = e instanceof Error ? e.message : String(e)
+        return { success: false, error: `Không thể tạo đơn hàng: ${msg}` }
     }
 }
 
