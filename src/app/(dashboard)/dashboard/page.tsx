@@ -62,7 +62,7 @@ export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up">
                 <div>
                     <h1 className="font-display text-2xl font-bold text-green-900">
                         {greeting}, {staff?.fullName?.split(" ").pop()} 👋
@@ -78,7 +78,7 @@ export default function DashboardPage() {
                 </div>
                 <Link
                     href="/pos"
-                    className="flex items-center gap-2 rounded-xl bg-green-900 px-5 py-2.5 text-sm font-medium text-cream-50 transition-all hover:bg-green-800 hover:shadow-lg"
+                    className="flex items-center gap-2 rounded-xl bg-green-900 px-5 py-2.5 text-sm font-medium text-cream-50 btn-press hover:bg-green-800 hover:shadow-lg"
                 >
                     <Wine className="h-4 w-4" />
                     Mở POS
@@ -295,9 +295,9 @@ function KPICard({
     }
     const c = colorMap[color]
     return (
-        <div className={cn("rounded-xl border p-4 transition-all hover:shadow-md", c.bg, c.border)}>
+        <div className={cn("rounded-xl border p-4 card-hover", c.bg, c.border)}>
             <div className="flex items-center justify-between mb-3">
-                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", c.icon)}>
+                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg icon-hover", c.icon)}>
                     <Icon className="h-4 w-4" />
                 </div>
                 {change !== undefined && (

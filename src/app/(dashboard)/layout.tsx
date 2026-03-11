@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
+import { PageTransition } from "@/components/page-transition"
 
 const navSections = [
     {
@@ -117,9 +118,9 @@ export default function DashboardLayout({
                 {/* Logo */}
                 <Link
                     href="/pos"
-                    className="flex items-center gap-3 px-4 py-5 border-b border-green-800"
+                    className="group flex items-center gap-3 px-4 py-5 border-b border-green-800 transition-all hover:bg-green-800/50"
                 >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-800">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-800 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110">
                         <Wine className="h-5 w-5 text-cream-50" />
                     </div>
                     <div>
@@ -145,17 +146,25 @@ export default function DashboardLayout({
                                         <Link
                                             key={item.href}
                                             href={item.href}
+                                            prefetch={true}
                                             className={cn(
-                                                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all",
+                                                "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium nav-link-smooth",
                                                 isActive
                                                     ? "bg-green-700 text-cream-50 shadow-sm"
                                                     : "text-green-300 hover:bg-green-800 hover:text-cream-50"
                                             )}
                                         >
-                                            <Icon className="h-4 w-4 shrink-0" />
+                                            {/* Active indicator bar */}
+                                            {isActive && (
+                                                <span
+                                                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-cream-50"
+                                                    style={{ animation: "navIndicator 200ms var(--ease-out-expo) forwards" }}
+                                                />
+                                            )}
+                                            <Icon className={cn("h-4 w-4 shrink-0 transition-transform duration-200", isActive && "scale-110")} />
                                             <span className="truncate">{item.label}</span>
                                             {isActive && (
-                                                <ChevronRight className="ml-auto h-3.5 w-3.5 text-green-400" />
+                                                <ChevronRight className="ml-auto h-3.5 w-3.5 text-green-400 animate-fade-in" />
                                             )}
                                         </Link>
                                     )
@@ -169,14 +178,15 @@ export default function DashboardLayout({
                 <div className="border-t border-green-800 px-3 py-2 space-y-0.5">
                     <Link
                         href="/dashboard/settings"
-                        className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-green-300 hover:bg-green-800 hover:text-cream-50 transition-all"
+                        prefetch={true}
+                        className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-green-300 nav-link-smooth hover:bg-green-800 hover:text-cream-50"
                     >
-                        <Settings className="h-4 w-4" />
+                        <Settings className="h-4 w-4 icon-hover" />
                         <span>Cài đặt</span>
                     </Link>
                     <button
                         onClick={handleLogout}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-green-300 hover:bg-wine-700 hover:text-white transition-all"
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-green-300 btn-press hover:bg-wine-700 hover:text-white"
                     >
                         <LogOut className="h-4 w-4" />
                         <span>{staff?.fullName ?? "Đăng xuất"}</span>
@@ -187,10 +197,13 @@ export default function DashboardLayout({
                 <div className="h-2 pattern-checkered-sm mx-2 mb-1 rounded-sm" />
             </aside>
 
-            {/* Main Content */}
+            {/* Main Content — with page transition animation */}
             <main className="ml-[220px] flex-1 min-h-screen bg-cream-50">
-                {children}
+                <PageTransition>
+                    {children}
+                </PageTransition>
             </main>
         </div>
     )
 }
+

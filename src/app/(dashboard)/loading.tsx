@@ -1,42 +1,43 @@
-import { Loader2 } from "lucide-react"
+import { Wine, Loader2 } from "lucide-react"
 
-export default function DashboardLoading() {
+export default function DashboardLayoutLoading() {
     return (
-        <div className="ml-[220px] min-h-screen bg-cream-50 p-6">
-            {/* Header skeleton */}
-            <div className="flex items-center justify-between mb-6 animate-pulse">
-                <div className="space-y-2">
-                    <div className="h-7 w-48 rounded-lg bg-cream-200" />
-                    <div className="h-4 w-32 rounded bg-cream-200" />
-                </div>
-                <div className="h-10 w-28 rounded-xl bg-cream-200" />
-            </div>
-
-            {/* KPI cards skeleton */}
-            <div className="grid grid-cols-4 gap-4 mb-6 animate-pulse">
-                {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="rounded-xl border border-cream-200 bg-cream-100 p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <div className="h-8 w-8 rounded-lg bg-cream-200" />
-                            <div className="h-5 w-12 rounded-full bg-cream-200" />
-                        </div>
-                        <div className="h-8 w-24 rounded bg-cream-200" />
-                        <div className="h-3 w-20 rounded bg-cream-200" />
+        <div className="flex min-h-screen">
+            {/* Sidebar skeleton */}
+            <aside className="fixed left-0 top-0 z-40 flex h-screen w-[220px] flex-col bg-green-900 animate-fade-in">
+                {/* Logo */}
+                <div className="flex items-center gap-3 px-4 py-5 border-b border-green-800">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-800">
+                        <Wine className="h-5 w-5 text-cream-50 animate-pulse" />
                     </div>
-                ))}
-            </div>
+                    <div>
+                        <p className="font-display text-sm font-bold text-cream-50">Noon & Noir</p>
+                        <p className="font-script text-xs text-green-300">Wine Alley</p>
+                    </div>
+                </div>
+
+                {/* Nav skeleton with stagger */}
+                <div className="flex-1 px-3 py-3 space-y-4">
+                    {[1, 2, 3].map((section) => (
+                        <div key={section} style={{ animation: `fadeInUp 300ms var(--ease-out-expo) ${section * 100}ms both` }}>
+                            <div className="h-3 w-16 rounded bg-green-700/50 mb-2 ml-2" />
+                            <div className="space-y-1">
+                                {[1, 2, 3].slice(0, section === 2 ? 3 : 2).map((item) => (
+                                    <div key={item} className="h-8 rounded-lg bg-green-800/40" />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </aside>
 
             {/* Content skeleton */}
-            <div className="grid grid-cols-3 gap-4 animate-pulse">
-                <div className="col-span-2 rounded-xl border border-cream-200 bg-cream-100 p-5 h-48" />
-                <div className="rounded-xl border border-cream-200 bg-cream-100 p-5 h-48" />
-            </div>
-
-            {/* Loading indicator */}
-            <div className="flex items-center justify-center mt-8">
-                <Loader2 className="h-5 w-5 animate-spin text-green-700" />
-                <span className="ml-2 text-xs text-cream-400">Đang tải dữ liệu...</span>
-            </div>
+            <main className="ml-[220px] flex-1 min-h-screen bg-cream-50 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+                    <span className="text-xs text-cream-400 animate-pulse">Đang tải...</span>
+                </div>
+            </main>
         </div>
     )
 }

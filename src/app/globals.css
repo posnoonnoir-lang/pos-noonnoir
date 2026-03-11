@@ -179,71 +179,269 @@ body {
   font-size: 24px;
 }
 
-/* ===== Animations ===== */
-@keyframes fadeIn {
+/* ===== Premium Animation System ===== */
+
+/* --- Easing Curves --- */
+:root {
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- Page Transitions (used by PageTransition component) --- */
+@keyframes pageEnter {
   from {
     opacity: 0;
+    transform: translateY(8px);
   }
-
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
+.page-enter {
+  animation: pageEnter 280ms var(--ease-out-expo) forwards;
+}
+
+.page-idle {
+  opacity: 1;
+  transform: none;
+}
+
+/* --- Fade Variants --- */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 250ms var(--ease-out-expo);
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 350ms var(--ease-out-expo);
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 300ms var(--ease-out-expo);
+}
+
+/* --- Slide Variants --- */
 @keyframes slideInRight {
   from {
     transform: translateX(100%);
     opacity: 0;
   }
-
   to {
     transform: translateX(0);
     opacity: 1;
   }
 }
 
-@keyframes pulse-status {
-
-  0%,
-  100% {
-    opacity: 1;
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
   }
-
-  50% {
-    opacity: 0.6;
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 
-.animate-fade-in {
-  animation: fadeIn 200ms ease-out;
+@keyframes slideInDown {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .animate-slide-in-right {
-  animation: slideInRight 300ms ease-out;
+  animation: slideInRight 350ms var(--ease-out-expo);
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 300ms var(--ease-out-expo);
+}
+
+.animate-slide-in-down {
+  animation: slideInDown 300ms var(--ease-out-expo);
+}
+
+/* --- Modal / Overlay Animations --- */
+@keyframes modalBackdrop {
+  from { opacity: 0; backdrop-filter: blur(0px); }
+  to { opacity: 1; backdrop-filter: blur(8px); }
+}
+
+@keyframes modalContent {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-backdrop {
+  animation: modalBackdrop 200ms var(--ease-smooth) forwards;
+}
+
+.animate-modal-content {
+  animation: modalContent 250ms var(--ease-out-back) forwards;
+}
+
+/* --- Skeleton Shimmer --- */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-cream-200) 25%,
+    var(--color-cream-100) 50%,
+    var(--color-cream-200) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s var(--ease-smooth) infinite;
+}
+
+/* --- Status / Notification Pulses --- */
+@keyframes pulse-status {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.8); opacity: 0; }
 }
 
 .animate-pulse-status {
   animation: pulse-status 500ms ease-in-out;
 }
 
+.animate-pulse-ring {
+  animation: pulseRing 1.2s var(--ease-smooth) infinite;
+}
+
+/* --- Shake (Error) --- */
 @keyframes shake {
-
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-
-  20%,
-  60% {
-    transform: translateX(-8px);
-  }
-
-  40%,
-  80% {
-    transform: translateX(8px);
-  }
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
 }
 
 .animate-shake {
   animation: shake 400ms ease-in-out;
+}
+
+/* --- Sidebar Nav Active Indicator --- */
+@keyframes navIndicator {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* --- Micro-interactions --- */
+
+/* Button press feel */
+.btn-press {
+  transition: transform 150ms var(--ease-out-expo), box-shadow 150ms var(--ease-smooth);
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+.btn-press:hover {
+  box-shadow: 0 2px 8px rgba(27, 58, 45, 0.12);
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform 250ms var(--ease-out-expo), box-shadow 250ms var(--ease-smooth);
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(27, 58, 45, 0.08);
+}
+
+/* Sidebar link — smooth bg and color transitions */
+.nav-link-smooth {
+  transition: background-color 200ms var(--ease-smooth),
+              color 200ms var(--ease-smooth),
+              padding-left 200ms var(--ease-out-expo);
+}
+.nav-link-smooth:hover {
+  padding-left: 14px;
+}
+
+/* Icon scale on hover */
+.icon-hover {
+  transition: transform 200ms var(--ease-out-expo);
+}
+.icon-hover:hover {
+  transform: scale(1.1);
+}
+
+/* Smooth content swap (for loading → content) */
+.content-appear {
+  animation: fadeInUp 400ms var(--ease-out-expo) forwards;
+}
+
+/* --- Stagger Delays (utility classes) --- */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+.stagger-6 { animation-delay: 300ms; }
+
+/* --- Reduce Motion for Accessibility --- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .page-enter {
+    animation: none;
+    opacity: 1;
+  }
 }
