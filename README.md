@@ -219,7 +219,7 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Module | Tính năng chính | Priority |
 |--------|----------------|:--------:|
 | ~~**Real DB Queries**~~ | ~~Connect mock → real Prisma queries~~ | ~~P1~~ ✅ Done |
-| **Seed Data** | Populate DB with initial data (prisma/seed.ts) | P1 |
+| ~~**Seed Data**~~ | ~~Populate DB with initial data (prisma/seed.ts)~~ | ~~P1~~ ✅ Done |
 | **Supabase Auth** | Replace PIN mock → Supabase Auth with RLS | P1 |
 | **Telegram Bot** | Low-rating alerts, oxidation alerts, shift reports | P2 |
 | **QR Code Generator** | Auto-print QR on receipt for feedback | P2 |
