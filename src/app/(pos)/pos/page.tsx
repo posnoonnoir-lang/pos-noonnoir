@@ -489,16 +489,31 @@ export default function POSPage() {
 
     // ★ CONSOLIDATED INITIAL LOAD — single server action replaces 8+ separate calls
     useEffect(() => {
-        getPOSInitialData().then((data) => {
-            setDbProducts(data.products as Product[])
-            setDbCategories(data.categories as Category[])
-            setDbZones(data.zones as TableZone[])
-            setDbTables(data.tables as FloorTable[])
-            setCurrentShift(data.currentShift as unknown as Shift | null)
-            setProduct86Ids(data.out86Ids)
-            setTaxRate(data.taxRate)
-            setAllowNegativeStock(data.allowNegativeStock)
-        })
+        getPOSInitialData()
+            .then((data) => {
+                setDbProducts(data.products as Product[])
+                setDbCategories(data.categories as Category[])
+                setDbZones(data.zones as TableZone[])
+                setDbTables(data.tables as FloorTable[])
+                setCurrentShift(data.currentShift as unknown as Shift | null)
+                setProduct86Ids(data.out86Ids)
+                setTaxRate(data.taxRate)
+                setAllowNegativeStock(data.allowNegativeStock)
+            })
+            .catch((err) => {
+                console.error("[POS] Consolidated loader failed, falling back:", err)
+                // Fallback to individual loaders
+                Promise.all([getProducts(), getCategories()]).then(([prods, cats]) => {
+                    setDbProducts(prods)
+                    setDbCategories(cats)
+                })
+                Promise.all([getZones(), getTables()]).then(([z, t]) => {
+                    setDbZones(z)
+                    setDbTables(t)
+                })
+                refreshShift()
+                refresh86()
+            })
         // Non-critical secondary loads — can be deferred
         refreshHeld()
         getUpcomingReservations().then((list) => setUpcomingReservations(list))
