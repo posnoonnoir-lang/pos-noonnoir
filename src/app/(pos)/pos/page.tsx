@@ -60,7 +60,8 @@ import {
     closeTab,
     removeTabItem,
 } from "@/actions/tabs"
-import { MOCK_CATEGORIES, MOCK_PRODUCTS, MOCK_TABLES, MOCK_ZONES } from "@/lib/mock-data"
+import { getProducts, getCategories } from "@/actions/menu"
+import { getTables, getZones } from "@/actions/tables"
 import { getAllGlassStatuses, sellWineGlass, sellWineBottle, type GlassStatus } from "@/actions/wine"
 import { getCurrentShift, openShift, closeShift, addShiftExpense, type Shift } from "@/actions/shifts"
 import { getUnreadNotifications, markAsRead, markAllAsRead, type Notification } from "@/actions/notifications"
@@ -81,8 +82,9 @@ import {
 } from "@/actions/operational"
 import { getUpcomingReservations, type Reservation } from "@/actions/reservations"
 import { getPushSaleItems, type PushSaleItem } from "@/actions/push-sale"
-import type { Product, Customer, CustomerTab } from "@/types"
-import type { FloorTable } from "@/lib/mock-data"
+import type { Product, Category, Customer, CustomerTab } from "@/types"
+type FloorTable = Awaited<ReturnType<typeof getTables>>[number]
+type TableZone = Awaited<ReturnType<typeof getZones>>[number]
 
 function formatPrice(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -96,19 +98,23 @@ function TableSelector({
     onClose,
     onSelect,
     onSelectOccupied,
+    zones,
+    tables,
 }: {
     open: boolean
     onClose: () => void
     onSelect: (table: FloorTable) => void
     onSelectOccupied?: (table: FloorTable, order: Order) => void
+    zones: TableZone[]
+    tables: FloorTable[]
 }) {
-    const [selectedZone, setSelectedZone] = useState(MOCK_ZONES[0]?.id)
+    const [selectedZone, setSelectedZone] = useState(zones[0]?.id ?? "")
     const [viewingOrder, setViewingOrder] = useState<{ table: FloorTable; order: Order } | null>(null)
     const [loadingOrder, setLoadingOrder] = useState(false)
 
     if (!open) return null
 
-    const filteredTables = MOCK_TABLES.filter(
+    const filteredTables = tables.filter(
         (t) => t.zoneId === selectedZone && t.isActive
     )
 
@@ -166,7 +172,7 @@ function TableSelector({
 
                     {/* Zone tabs */}
                     <div className="flex gap-1 border-b border-cream-300 px-4 py-2 overflow-x-auto">
-                        {MOCK_ZONES.map((zone) => (
+                        {zones.map((zone) => (
                             <button
                                 key={zone.id}
                                 onClick={() => { setSelectedZone(zone.id); setViewingOrder(null) }}
@@ -213,16 +219,6 @@ function TableSelector({
                                     >
                                         {statusLabels[table.status]}
                                     </span>
-                                    {table.status === "OCCUPIED" && table.currentOrderTotal && (
-                                        <span className="mt-1 font-mono text-[10px] font-bold text-wine-600">
-                                            ₫{formatPrice(table.currentOrderTotal)}
-                                        </span>
-                                    )}
-                                    {table.status === "OCCUPIED" && table.guestCount && (
-                                        <span className="text-[9px] text-cream-400">
-                                            👤 {table.guestCount} khách
-                                        </span>
-                                    )}
                                 </button>
                             )
                         })}
@@ -355,6 +351,14 @@ export default function POSPage() {
     const [pushSidebarOpen, setPushSidebarOpen] = useState(true)
     const [pushSaleItems, setPushSaleItems] = useState<PushSaleItem[]>([])
 
+    // Products & Categories from DB
+    const [dbProducts, setDbProducts] = useState<Product[]>([])
+    const [dbCategories, setDbCategories] = useState<Category[]>([])
+
+    // Floor tables from DB
+    const [dbZones, setDbZones] = useState<TableZone[]>([])
+    const [dbTables, setDbTables] = useState<FloorTable[]>([])
+
     const { staff } = useAuthStore()
     const cart = useCartStore()
 
@@ -435,6 +439,22 @@ export default function POSPage() {
         getUpcomingReservations().then((list) => setUpcomingReservations(list))
     }, [])
 
+    // Load products & categories from DB
+    useEffect(() => {
+        Promise.all([getProducts(), getCategories()]).then(([prods, cats]) => {
+            setDbProducts(prods)
+            setDbCategories(cats)
+        })
+    }, [])
+
+    // Load floor tables & zones from DB
+    const refreshFloorData = useCallback(async () => {
+        const [zonesData, tablesData] = await Promise.all([getZones(), getTables()])
+        setDbZones(zonesData)
+        setDbTables(tablesData)
+    }, [])
+    useEffect(() => { refreshFloorData() }, [refreshFloorData])
+
     // V2: Load push sale items (refresh every 5 minutes)
     const refreshPushSale = useCallback(async () => {
         const items = await getPushSaleItems()
@@ -457,7 +477,7 @@ export default function POSPage() {
 
     // Filter products
     const filteredProducts = useMemo(() => {
-        let products = MOCK_PRODUCTS.filter((p) => p.isActive)
+        let products = dbProducts.filter((p) => p.isActive)
 
         if (activeCategory !== "all") {
             products = products.filter((p) => p.categoryId === activeCategory)
@@ -546,7 +566,7 @@ export default function POSPage() {
             // Restore cart items
             cart.clearCart()
             for (const item of result.order.items) {
-                const product = MOCK_PRODUCTS.find((p) => p.id === item.productId)
+                const product = dbProducts.find((p) => p.id === item.productId)
                 if (product) {
                     for (let i = 0; i < item.quantity; i++) cart.addItem(product)
                     if (item.note) {
@@ -556,7 +576,7 @@ export default function POSPage() {
                 }
             }
             if (result.order.tableId) {
-                const table = MOCK_TABLES.find((t) => t.id === result.order!.tableId)
+                const table = dbTables.find((t) => t.id === result.order!.tableId)
                 if (table) cart.selectTable(table)
             }
             toast.success(`▶️ Đã khôi phục: ${result.order.label}`)
@@ -992,7 +1012,7 @@ export default function POSPage() {
                         <Hash className="h-3 w-3" />
                         Tất cả
                     </button>
-                    {MOCK_CATEGORIES.filter((c) => c.isActive).map((cat) => (
+                    {dbCategories.filter((c) => c.isActive).map((cat) => (
                         <button
                             key={cat.id}
                             onClick={() => setActiveCategory(cat.id)}
@@ -1595,7 +1615,9 @@ export default function POSPage() {
             <TableSelector
                 open={tableModalOpen}
                 onClose={() => setTableModalOpen(false)}
-                onSelect={(table) => { cart.selectTable(table); setActiveOrderId(null) }}
+                zones={dbZones}
+                tables={dbTables}
+                onSelect={(table) => { cart.selectTable(table); setActiveOrderId(null); refreshFloorData() }}
                 onSelectOccupied={(table, order) => {
                     cart.selectTable(table)
                     setActiveOrderId(order.id)

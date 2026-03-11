@@ -1,175 +1,66 @@
 "use server"
 
-// ============================================================
-// WINE SERVING NOTES (US-2.5)
-// Tasting notes, serving temp, pairing, decanting recommendations
-// ============================================================
+import { prisma } from "@/lib/prisma"
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+// ============================================================
+// WINE SERVING NOTES — Prisma version
+// Reads from Product model fields
+// ============================================================
 
 export type WineServingNote = {
-    id: string
-    productId: string
-    productName: string
-    vintage: string | null
-    region: string
-    grape: string
-    servingTemp: string
-    decantTime: string | null
-    glassType: string
-    tastingNotes: {
-        nose: string[]
-        palate: string[]
-        finish: string
-    }
-    pairings: string[]
-    staffNotes: string | null
-    addedBy: string
-    updatedAt: Date
+    id: string; productId: string; productName: string; vintage: string | null
+    region: string; grape: string; servingTemp: string; decantTime: string | null
+    glassType: string; tastingNotes: { nose: string[]; palate: string[]; finish: string }
+    pairings: string[]; staffNotes: string | null; addedBy: string; updatedAt: Date
 }
 
-// ============================================================
-// MOCK SERVING NOTES
-// ============================================================
+function toServingNote(p: Awaited<ReturnType<typeof prisma.product.findFirst>>): WineServingNote | null {
+    if (!p) return null
+    return {
+        id: p.id, productId: p.id, productName: p.name,
+        vintage: p.vintage ? String(p.vintage) : null,
+        region: [p.region, p.country].filter(Boolean).join(", "),
+        grape: p.grapeVariety ?? "", servingTemp: p.servingTemp ?? "16-18°C",
+        decantTime: p.decantingTime, glassType: p.glassType ?? "Standard",
+        tastingNotes: parseTasting(p.tastingNotes),
+        pairings: [], staffNotes: p.description, addedBy: "", updatedAt: p.updatedAt,
+    }
+}
 
-const SERVING_NOTES: WineServingNote[] = [
-    {
-        id: "sn-1",
-        productId: "prod-1",
-        productName: "Château Margaux 2018",
-        vintage: "2018",
-        region: "Bordeaux, France",
-        grape: "Cabernet Sauvignon, Merlot, Petit Verdot",
-        servingTemp: "16-18°C",
-        decantTime: "2-3 giờ trước khi phục vụ",
-        glassType: "Bordeaux Glass (ly lớn)",
-        tastingNotes: {
-            nose: ["Blackcurrant", "Violet", "Cedarwood", "Dark chocolate"],
-            palate: ["Tannin mịn", "Full-body", "Blackberry", "Tobacco", "Vanilla"],
-            finish: "Dài, thanh lịch, nhẹ hương gỗ sồi",
-        },
-        pairings: ["Bò Wagyu nướng", "Phô mai Comté", "Lamb rack", "Duck confit"],
-        staffNotes: "💡 Luôn decant trước. Khách VIP thường gọi chai này — phục vụ cùng Cheese Board.",
-        addedBy: "Chien",
-        updatedAt: new Date("2026-03-10"),
-    },
-    {
-        id: "sn-2",
-        productId: "prod-2",
-        productName: "Opus One 2019",
-        vintage: "2019",
-        region: "Napa Valley, USA",
-        grape: "Cabernet Sauvignon, Merlot, Cabernet Franc",
-        servingTemp: "17-19°C",
-        decantTime: "1-2 giờ",
-        glassType: "Bordeaux Glass",
-        tastingNotes: {
-            nose: ["Cassis", "Black cherry", "Dark plum", "Espresso", "Cedar"],
-            palate: ["Velvety tannins", "Full-body", "Blackberry", "Mocha", "Graphite"],
-            finish: "Rất dài, phức tạp, hương trái cây đen kéo dài",
-        },
-        pairings: ["Prime rib", "Bò bít tết", "Phô mai Gruyère", "Truffle dishes"],
-        staffNotes: "🏆 Rượu flagship. High-margin. Đề xuất cho khách muốn trải nghiệm premium.",
-        addedBy: "Chien",
-        updatedAt: new Date("2026-03-08"),
-    },
-    {
-        id: "sn-3",
-        productId: "prod-3",
-        productName: "Cloudy Bay Sauvignon Blanc 2022",
-        vintage: "2022",
-        region: "Marlborough, New Zealand",
-        grape: "Sauvignon Blanc",
-        servingTemp: "8-10°C",
-        decantTime: null,
-        glassType: "White Wine Glass (ly nhỏ)",
-        tastingNotes: {
-            nose: ["Chanh", "Bưởi", "Cỏ tươi", "Passion fruit"],
-            palate: ["Crisp acidity", "Light-body", "Citrus", "Gooseberry", "Mineral"],
-            finish: "Sạch sẽ, tươi mát, vị chanh kéo dài",
-        },
-        pairings: ["Hàu tươi", "Salad Caesar", "Sushi", "Cá hồi nướng", "Gỏi cuốn"],
-        staffNotes: "🧊 Phục vụ lạnh! Rất dễ uống, phù hợp khách mới làm quen với rượu.",
-        addedBy: "Linh",
-        updatedAt: new Date("2026-03-09"),
-    },
-    {
-        id: "sn-4",
-        productId: "prod-cab-glass",
-        productName: "Cabernet Sauvignon (by Glass)",
-        vintage: null,
-        region: "Multi-region blend",
-        grape: "Cabernet Sauvignon",
-        servingTemp: "16-18°C",
-        decantTime: null,
-        glassType: "Red Wine Glass",
-        tastingNotes: {
-            nose: ["Blackcurrant", "Bell pepper", "Plum"],
-            palate: ["Medium-full body", "Cherry", "Tannin vừa", "Spice"],
-            finish: "Trung bình, ấm, hương quả đen",
-        },
-        pairings: ["Bruschetta", "Cold Cut Board", "Pasta", "Burger"],
-        staffNotes: "🍷 House pour. Giới thiệu cho khách chưa quen rượu đỏ. Happy Hour -15%!",
-        addedBy: "Hao",
-        updatedAt: new Date("2026-03-07"),
-    },
-    {
-        id: "sn-5",
-        productId: "prod-champagne",
-        productName: "Champagne Dom Pérignon",
-        vintage: "2012",
-        region: "Champagne, France",
-        grape: "Chardonnay, Pinot Noir",
-        servingTemp: "8-10°C",
-        decantTime: null,
-        glassType: "Champagne Flute",
-        tastingNotes: {
-            nose: ["Toast", "White flowers", "Citrus", "Almond", "Brioche"],
-            palate: ["Fine bubbles", "Creamy", "Apple", "Lemon zest", "Honey"],
-            finish: "Thanh lịch, bọt nhẹ, vị khoáng kéo dài",
-        },
-        pairings: ["Caviar", "Hàu Pháp", "Lobster", "Foie gras"],
-        staffNotes: "👑 Ultra-premium. Chỉ phục vụ trong ly sạch, lạnh trước. Khách Platinum thường order.",
-        addedBy: "Chien",
-        updatedAt: new Date("2026-03-10"),
-    },
-]
-
-// ============================================================
-// ACTIONS
-// ============================================================
+function parseTasting(notes: string | null): { nose: string[]; palate: string[]; finish: string } {
+    if (!notes) return { nose: [], palate: [], finish: "" }
+    try { return JSON.parse(notes) } catch { return { nose: [], palate: [notes], finish: "" } }
+}
 
 export async function getAllServingNotes(): Promise<WineServingNote[]> {
-    await delay(80)
-    return [...SERVING_NOTES].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    const products = await prisma.product.findMany({
+        where: { isActive: true, type: { in: ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"] } },
+        orderBy: { updatedAt: "desc" },
+    })
+    return products.map(toServingNote).filter(Boolean) as WineServingNote[]
 }
 
 export async function getServingNoteByProduct(productId: string): Promise<WineServingNote | null> {
-    await delay(50)
-    return SERVING_NOTES.find((n) => n.productId === productId) ?? null
+    const p = await prisma.product.findUnique({ where: { id: productId } })
+    return toServingNote(p)
 }
 
 export async function searchServingNotes(query: string): Promise<WineServingNote[]> {
-    await delay(80)
-    if (!query) return [...SERVING_NOTES]
-    const q = query.toLowerCase()
-    return SERVING_NOTES.filter((n) =>
-        n.productName.toLowerCase().includes(q) ||
-        n.grape.toLowerCase().includes(q) ||
-        n.region.toLowerCase().includes(q) ||
-        n.pairings.some((p) => p.toLowerCase().includes(q))
-    )
+    if (!query) return getAllServingNotes()
+    const q = `%${query}%`
+    const products = await prisma.product.findMany({
+        where: {
+            isActive: true, type: { in: ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"] },
+            OR: [{ name: { contains: query, mode: "insensitive" } }, { grapeVariety: { contains: query, mode: "insensitive" } }, { region: { contains: query, mode: "insensitive" } }],
+        },
+    })
+    void q // used in the Prisma query above via contains
+    return products.map(toServingNote).filter(Boolean) as WineServingNote[]
 }
 
-export async function updateServingNote(id: string, updates: {
-    staffNotes?: string
-    pairings?: string[]
-}): Promise<{ success: boolean }> {
-    await delay(100)
-    const note = SERVING_NOTES.find((n) => n.id === id)
-    if (!note) return { success: false }
-    if (updates.staffNotes !== undefined) note.staffNotes = updates.staffNotes
-    if (updates.pairings) note.pairings = updates.pairings
-    note.updatedAt = new Date()
-    return { success: true }
+export async function updateServingNote(id: string, updates: { staffNotes?: string; pairings?: string[] }): Promise<{ success: boolean }> {
+    try {
+        await prisma.product.update({ where: { id }, data: { description: updates.staffNotes } })
+        return { success: true }
+    } catch { return { success: false } }
 }

@@ -36,7 +36,7 @@ import {
     type Reservation,
     type ReservationStatus,
 } from "@/actions/reservations"
-import { MOCK_TABLES, MOCK_ZONES } from "@/lib/mock-data"
+import { getTables, getZones } from "@/actions/tables"
 
 const STATUS_CONFIG: Record<ReservationStatus, { label: string; color: string; icon: string }> = {
     PENDING: { label: "Chờ xác nhận", color: "bg-amber-100 border-amber-300 text-amber-700", icon: "⏳" },
@@ -65,6 +65,12 @@ export default function ReservationsPage() {
     const [showAddModal, setShowAddModal] = useState(false)
     const [showAssignModal, setShowAssignModal] = useState<string | null>(null)
 
+    // Floor data from DB
+    type DbZone = Awaited<ReturnType<typeof getZones>>[number]
+    type DbTable = Awaited<ReturnType<typeof getTables>>[number]
+    const [dbZones, setDbZones] = useState<DbZone[]>([])
+    const [dbTables, setDbTables] = useState<DbTable[]>([])
+
     const loadData = useCallback(async () => {
         setLoading(true)
         const params: { date?: string; status?: ReservationStatus } = {}
@@ -81,6 +87,11 @@ export default function ReservationsPage() {
     }, [dateFilter, statusFilter])
 
     useEffect(() => { loadData() }, [loadData])
+
+    // Load floor data
+    useEffect(() => {
+        Promise.all([getZones(), getTables()]).then(([z, t]) => { setDbZones(z); setDbTables(t) })
+    }, [])
 
     const handleStatusChange = async (id: string, status: ReservationStatus) => {
         const result = await updateReservationStatus(id, status)
@@ -312,6 +323,7 @@ export default function ReservationsPage() {
                 <AddReservationModal
                     onClose={() => setShowAddModal(false)}
                     onCreated={() => { setShowAddModal(false); loadData(); toast.success("✅ Đặt bàn thành công!") }}
+                    zones={dbZones}
                 />
             )}
 
@@ -322,6 +334,8 @@ export default function ReservationsPage() {
                     reservation={reservations.find((r) => r.id === showAssignModal)!}
                     onClose={() => setShowAssignModal(null)}
                     onAssigned={() => { setShowAssignModal(null); loadData(); toast.success("✅ Đã xếp bàn!") }}
+                    zones={dbZones}
+                    tables={dbTables}
                 />
             )}
         </div>
@@ -331,7 +345,7 @@ export default function ReservationsPage() {
 // ============================================================
 // ADD RESERVATION MODAL
 // ============================================================
-function AddReservationModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function AddReservationModal({ onClose, onCreated, zones }: { onClose: () => void; onCreated: () => void; zones: Awaited<ReturnType<typeof getZones>> }) {
     const [name, setName] = useState("")
     const [phone, setPhone] = useState("")
     const [email, setEmail] = useState("")
@@ -443,7 +457,7 @@ function AddReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
                                 className="h-9 w-full rounded-md border border-cream-300 bg-white px-3 text-xs text-green-900"
                             >
                                 <option value="">Bất kỳ</option>
-                                {MOCK_ZONES.map((z) => (
+                                {zones.map((z) => (
                                     <option key={z.id} value={z.name}>{z.name}</option>
                                 ))}
                             </select>
@@ -496,15 +510,19 @@ function AssignTableModal({
     reservation,
     onClose,
     onAssigned,
+    zones,
+    tables,
 }: {
     reservationId: string
     reservation: Reservation
     onClose: () => void
     onAssigned: () => void
+    zones: Awaited<ReturnType<typeof getZones>>
+    tables: Awaited<ReturnType<typeof getTables>>
 }) {
-    const [selectedZone, setSelectedZone] = useState(MOCK_ZONES[0]?.id)
+    const [selectedZone, setSelectedZone] = useState(zones[0]?.id ?? "")
 
-    const filteredTables = MOCK_TABLES.filter(
+    const filteredTables = tables.filter(
         (t) => t.zoneId === selectedZone && t.isActive && t.status === "AVAILABLE" && t.seats >= reservation.guestCount
     )
 
@@ -527,7 +545,7 @@ function AssignTableModal({
 
                 {/* Zone tabs */}
                 <div className="flex gap-1 border-b border-cream-200 px-4 py-2">
-                    {MOCK_ZONES.map((z) => (
+                    {zones.map((z) => (
                         <button
                             key={z.id}
                             onClick={() => setSelectedZone(z.id)}

@@ -21,7 +21,9 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getTables, getZones, updateTableStatus, getTableStats, createTable, createZone, deleteTable, deleteZone } from "@/actions/tables"
-import type { FloorTable, TableZone } from "@/lib/mock-data"
+import { getActiveOrders } from "@/actions/orders"
+type FloorTable = Awaited<ReturnType<typeof getTables>>[number]
+type TableZone = Awaited<ReturnType<typeof getZones>>[number]
 
 function formatPrice(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -85,17 +87,35 @@ export default function TablesPage() {
     const [showAddTable, setShowAddTable] = useState(false)
     const [showZoneManager, setShowZoneManager] = useState(false)
 
+    // Active orders keyed by tableId
+    const [activeOrderMap, setActiveOrderMap] = useState<Record<string, { orderNo: string; total: number; createdAt: Date; itemCount: number }>>({})
+
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
-            const [zonesData, tablesData, statsData] = await Promise.all([
+            const [zonesData, tablesData, statsData, activeOrders] = await Promise.all([
                 getZones(),
                 getTables(selectedZone === "all" ? undefined : selectedZone),
                 getTableStats(),
+                getActiveOrders(),
             ])
             setZones(zonesData)
             setTables(tablesData)
             setStats(statsData)
+
+            // Build order map by tableId
+            const orderMap: Record<string, { orderNo: string; total: number; createdAt: Date; itemCount: number }> = {}
+            for (const order of activeOrders) {
+                if (order.tableId) {
+                    orderMap[order.tableId] = {
+                        orderNo: order.orderNumber,
+                        total: order.total,
+                        createdAt: new Date(order.createdAt),
+                        itemCount: order.items.length,
+                    }
+                }
+            }
+            setActiveOrderMap(orderMap)
         } catch {
             toast.error("Không thể tải dữ liệu bàn")
         }
@@ -104,6 +124,9 @@ export default function TablesPage() {
 
     useEffect(() => {
         loadData()
+        // Auto-refresh every 30 seconds
+        const interval = setInterval(loadData, 30000)
+        return () => clearInterval(interval)
     }, [loadData])
 
     const handleStatusChange = async (tableId: string, newStatus: FloorTable["status"]) => {
@@ -258,27 +281,28 @@ export default function TablesPage() {
                                 {cfg.label}
                             </span>
 
-                            {/* Occupied info */}
-                            {table.status === "OCCUPIED" && (
-                                <div className="mt-2 space-y-0.5 text-center">
-                                    {table.guestCount && (
-                                        <p className="text-[10px] text-wine-600">
-                                            👤 {table.guestCount} khách
+                            {/* Occupied info — from real active orders */}
+                            {table.status === "OCCUPIED" && activeOrderMap[table.id] && (() => {
+                                const order = activeOrderMap[table.id]
+                                const elapsed = Math.floor((Date.now() - order.createdAt.getTime()) / 60000)
+                                return (
+                                    <div className="mt-2 space-y-0.5 text-center">
+                                        <p className="text-[10px] text-cream-500 font-mono">
+                                            {order.orderNo}
                                         </p>
-                                    )}
-                                    {table.occupiedMinutes && (
+                                        <p className="text-[10px] text-wine-600">
+                                            🍽 {order.itemCount} món
+                                        </p>
                                         <p className="flex items-center justify-center gap-0.5 text-[10px] text-cream-500">
                                             <Clock className="h-2.5 w-2.5" />
-                                            {formatDuration(table.occupiedMinutes)}
+                                            {formatDuration(elapsed)}
                                         </p>
-                                    )}
-                                    {table.currentOrderTotal && (
                                         <p className="font-mono text-xs font-bold text-wine-700">
-                                            ₫{formatPrice(table.currentOrderTotal)}
+                                            ₫{formatPrice(order.total)}
                                         </p>
-                                    )}
-                                </div>
-                            )}
+                                    </div>
+                                )
+                            })()}
                         </button>
                     )
                 })}
