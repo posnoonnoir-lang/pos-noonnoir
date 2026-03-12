@@ -404,6 +404,7 @@ export default function POSPage() {
 
     const { staff } = useAuthStore()
     const cart = useCartStore()
+    const [posLoading, setPosLoading] = useState(true)
 
     // Load active tabs
     const refreshTabs = useCallback(async () => {
@@ -413,19 +414,11 @@ export default function POSPage() {
         setTabsLoading(false)
     }, [])
 
-    useEffect(() => {
-        refreshTabs()
-    }, [refreshTabs])
-
     // Load wine glass statuses
     const refreshGlassStatuses = useCallback(async () => {
         const statuses = await getAllGlassStatuses()
         setGlassStatuses(statuses)
     }, [])
-
-    useEffect(() => {
-        refreshGlassStatuses()
-    }, [refreshGlassStatuses])
 
     // Load current shift
     const refreshShift = useCallback(async () => {
@@ -438,12 +431,6 @@ export default function POSPage() {
         const list = await getUnreadNotifications()
         setNotifications(list)
     }, [])
-
-    useEffect(() => {
-        refreshNotifications()
-        const interval = setInterval(refreshNotifications, 60000)
-        return () => clearInterval(interval)
-    }, [refreshNotifications])
 
     // Shift timer — update elapsed time every 30s
     useEffect(() => {
@@ -478,25 +465,17 @@ export default function POSPage() {
         setDbTables(tablesData)
     }, [])
 
-    // V2: Load push sale items (refresh every 5 minutes)
+    // V2: Load push sale items
     const refreshPushSale = useCallback(async () => {
         const items = await getPushSaleItems()
         setPushSaleItems(items)
     }, [])
-    useEffect(() => {
-        refreshPushSale()
-        const interval = setInterval(refreshPushSale, 300000) // 5 min
-        return () => clearInterval(interval)
-    }, [refreshPushSale])
 
-    // ★ CONSOLIDATED INITIAL LOAD — with prefetch cache support
+    // ★ CONSOLIDATED INITIAL LOAD — prioritized: main data FIRST, secondary AFTER
     useEffect(() => {
         const prefetchStore = usePrefetchStore.getState()
-        // Register prefetcher for sidebar hover
         prefetchStore.registerPrefetch('pos', getPOSInitialData)
 
-        // Try cache first for instant display
-        const cached = prefetchStore.get('pos')
         const applyData = (data: any) => {
             setDbProducts(data.products as Product[])
             setDbCategories(data.categories as Category[])
@@ -506,25 +485,39 @@ export default function POSPage() {
             setProduct86Ids(data.out86Ids)
             setTaxRate(data.taxRate)
             setAllowNegativeStock(data.allowNegativeStock)
+            setPosLoading(false)
         }
 
+        const loadSecondary = () => {
+            // These run AFTER main data loaded — don't compete for connections
+            refreshTabs()
+            refreshGlassStatuses()
+            refreshNotifications()
+            refreshHeld()
+            refreshPushSale()
+            getUpcomingReservations().then((list) => setUpcomingReservations(list)).catch(() => { })
+        }
+
+        const cached = prefetchStore.get('pos')
         if (cached) {
-            // Instant render from cache
             applyData(cached)
-            // Still refresh in background
+            loadSecondary()
+            // Background refresh
             getPOSInitialData().then((data) => {
                 prefetchStore.set('pos', data)
                 applyData(data)
             }).catch(() => { })
         } else {
-            // No cache — fetch fresh
             getPOSInitialData()
                 .then((data) => {
                     prefetchStore.set('pos', data)
                     applyData(data)
+                    // Load secondary only AFTER main data
+                    loadSecondary()
                 })
                 .catch((err) => {
                     console.error("[POS] Consolidated loader failed, falling back:", err)
+                    setPosLoading(false)
                     Promise.all([getProducts(), getCategories()]).then(([prods, cats]) => {
                         setDbProducts(prods)
                         setDbCategories(cats)
@@ -537,9 +530,11 @@ export default function POSPage() {
                     refresh86()
                 })
         }
-        // Non-critical secondary loads
-        refreshHeld()
-        getUpcomingReservations().then((list) => setUpcomingReservations(list))
+
+        // Notifications poll (starts after initial)
+        const notifInterval = setInterval(refreshNotifications, 60000)
+        const pushInterval = setInterval(refreshPushSale, 300000)
+        return () => { clearInterval(notifInterval); clearInterval(pushInterval) }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -978,7 +973,7 @@ export default function POSPage() {
     }
 
     // Show inline skeleton while data loads
-    if (dbProducts.length === 0) {
+    if (posLoading) {
         return <POSInlineSkeleton />
     }
 

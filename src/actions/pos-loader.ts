@@ -4,59 +4,54 @@ import { prisma } from "@/lib/prisma"
 
 /**
  * Consolidated initial data loader for POS page.
- * Batches 8+ separate DB queries into a single server action call
- * to avoid waterfall and reduce cold-start overhead.
+ * Split into 2 sequential batches to avoid exhausting connection pool.
+ * Batch 1: Products + Categories (critical, display first)
+ * Batch 2: Tables, Shift, 86, Tax, Settings (secondary)
  */
 export async function getPOSInitialData() {
+    const start = Date.now()
     try {
-        const [
-            products,
-            categories,
-            zones,
-            tables,
-            shift,
-            out86Records,
-            taxRate,
-            storeSettings,
-        ] = await Promise.all([
-            // Products (active only)
+        // Batch 1 — Critical data for product grid (highest priority)
+        const [products, categories] = await Promise.all([
             prisma.product.findMany({
                 where: { isActive: true },
                 include: { category: true },
                 orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
             }),
-            // Categories (active only)
             prisma.category.findMany({
                 where: { isActive: true },
                 orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
             }),
-            // Table zones
+        ])
+
+        // Batch 2 — Secondary data (tables, shift, etc.)
+        const [zones, tables, shift, out86Records, taxRate, storeSettings] = await Promise.all([
             prisma.tableZone.findMany({
                 where: { isActive: true },
                 orderBy: { sortOrder: "asc" },
             }),
-            // Floor tables
             prisma.floorTable.findMany({
                 where: { isActive: true },
                 orderBy: { tableNumber: "asc" },
             }),
-            // Current open shift (join staff for name)
             prisma.shiftRecord.findFirst({
                 where: { closedAt: null },
                 orderBy: { openedAt: "desc" },
                 include: { staff: { select: { fullName: true } } },
             }),
-            // 86 out of stock — from Out86 model (NOT auditLog)
             prisma.out86.findMany({
                 select: { productId: true },
             }),
-            // Default tax rate
             prisma.taxRate.findFirst({
                 where: { isDefault: true, isActive: true },
             }),
-            // Store settings (negative stock flag)
             prisma.storeSettings.findFirst(),
         ])
+
+        const elapsed = Date.now() - start
+        if (elapsed > 3000) {
+            console.warn(`[POS] Slow initial load: ${elapsed}ms`)
+        }
 
         // Serialize Decimal/Date fields for client consumption
         const serializedProducts = products.map((p: any) => ({
@@ -153,7 +148,6 @@ export async function getPOSInitialData() {
         }
     } catch (error) {
         console.error("[getPOSInitialData] Error:", error)
-        // Return safe defaults so POS page still loads
         return {
             products: [],
             categories: [],
