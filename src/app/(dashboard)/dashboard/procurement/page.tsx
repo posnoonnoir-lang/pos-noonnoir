@@ -803,12 +803,14 @@ export default function ProcurementPage() {
 
 /* ─── Create PO Modal ─── */
 type NewItem = { productName: string; sku: string; quantity: string; unitPrice: string; unit: string; category: "GOODS" | "NPL" | "CCDC" }
+const UNIT_OPTIONS = ["chai", "thùng", "kg", "g", "lít", "lon", "hộp", "gói", "bộ", "cái", "m", "cuộn"]
 
 function CreatePOModal({ suppliers, staffName, onClose, onCreated }: { suppliers: Supplier[]; staffName: string; onClose: () => void; onCreated: () => void }) {
     const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "")
     const [expectedDate, setExpectedDate] = useState("")
     const [notes, setNotes] = useState("")
     const [items, setItems] = useState<NewItem[]>([{ productName: "", sku: "", quantity: "", unitPrice: "", unit: "chai", category: "GOODS" }])
+    const [vatRate, setVatRate] = useState(10)
     const [submitting, setSubmitting] = useState(false)
 
     const addItem = () => setItems([...items, { productName: "", sku: "", quantity: "", unitPrice: "", unit: "chai", category: "GOODS" }])
@@ -893,59 +895,75 @@ function CreatePOModal({ suppliers, staffName, onClose, onCreated }: { suppliers
                                 <Plus className="h-3 w-3" /> Thêm dòng
                             </button>
                         </div>
-                        <table className="w-full">
-                            <thead>
-                                <tr>
-                                    <th className="text-left text-[9px] font-bold text-cream-400 pb-1.5">Tên SP</th>
-                                    <th className="text-left text-[9px] font-bold text-cream-400 pb-1.5" style={{ width: 70 }}>SKU</th>
-                                    <th className="text-center text-[9px] font-bold text-cream-400 pb-1.5" style={{ width: 55 }}>Loại</th>
-                                    <th className="text-center text-[9px] font-bold text-cream-400 pb-1.5" style={{ width: 50 }}>SL</th>
-                                    <th className="text-left text-[9px] font-bold text-cream-400 pb-1.5" style={{ width: 45 }}>ĐVT</th>
-                                    <th className="text-right text-[9px] font-bold text-cream-400 pb-1.5" style={{ width: 90 }}>Đơn giá</th>
-                                    <th className="text-right text-[9px] font-bold text-cream-400 pb-1.5" style={{ width: 90 }}>Thành tiền</th>
-                                    <th style={{ width: 30 }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {items.map((item, i) => {
-                                    const subtotal = (parseInt(item.quantity) || 0) * (parseInt(item.unitPrice) || 0)
-                                    return (
-                                        <tr key={i} className="border-t border-cream-100">
-                                            <td className="py-1.5 pr-1.5">
-                                                <Input value={item.productName} onChange={(e) => updateItem(i, "productName", e.target.value)} placeholder="Tên sản phẩm" className="h-8 text-xs border-cream-300 bg-white" />
-                                            </td>
-                                            <td className="py-1.5 px-1">
-                                                <Input value={item.sku} onChange={(e) => updateItem(i, "sku", e.target.value)} placeholder="SKU" className="h-8 text-xs border-cream-300 bg-white" />
-                                            </td>
-                                            <td className="py-1.5 px-1">
-                                                <select value={item.category} onChange={(e) => updateItem(i, "category", e.target.value)} className="h-8 w-full rounded-md border border-cream-300 bg-white px-1 text-[10px]">
-                                                    <option value="GOODS">Hàng</option>
-                                                    <option value="NPL">NPL</option>
-                                                    <option value="CCDC">CCDC</option>
-                                                </select>
-                                            </td>
-                                            <td className="py-1.5 px-1">
-                                                <Input value={item.quantity} onChange={(e) => updateItem(i, "quantity", e.target.value.replace(/\D/g, ""))} placeholder="0" className="h-8 text-xs text-center border-cream-300 bg-white" />
-                                            </td>
-                                            <td className="py-1.5 px-1">
-                                                <Input value={item.unit} onChange={(e) => updateItem(i, "unit", e.target.value)} className="h-8 text-xs border-cream-300 bg-white" />
-                                            </td>
-                                            <td className="py-1.5 px-1">
-                                                <Input value={item.unitPrice} onChange={(e) => updateItem(i, "unitPrice", e.target.value.replace(/\D/g, ""))} placeholder="0" className="h-8 text-xs text-right border-cream-300 bg-white" />
-                                            </td>
-                                            <td className="py-1.5 px-1 text-right font-mono text-[11px] font-bold text-wine-700">
-                                                {subtotal > 0 ? `₫${fmt(subtotal)}` : "—"}
-                                            </td>
-                                            <td className="py-1.5 pl-1">
-                                                {items.length > 1 && (
-                                                    <button onClick={() => removeItem(i)} className="p-1 rounded hover:bg-red-50 text-cream-400 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
+                        <div className="rounded-lg border border-cream-200 overflow-hidden">
+                            <table className="w-full table-fixed">
+                                <colgroup>
+                                    <col />
+                                    <col style={{ width: 72 }} />
+                                    <col style={{ width: 62 }} />
+                                    <col style={{ width: 56 }} />
+                                    <col style={{ width: 80 }} />
+                                    <col style={{ width: 100 }} />
+                                    <col style={{ width: 100 }} />
+                                    <col style={{ width: 32 }} />
+                                </colgroup>
+                                <thead>
+                                    <tr className="bg-cream-50 border-b border-cream-200">
+                                        <th className="text-left text-[10px] font-bold text-cream-500 px-2.5 py-2">Tên SP</th>
+                                        <th className="text-left text-[10px] font-bold text-cream-500 px-1 py-2">SKU</th>
+                                        <th className="text-center text-[10px] font-bold text-cream-500 px-1 py-2">Loại</th>
+                                        <th className="text-center text-[10px] font-bold text-cream-500 px-1 py-2">SL</th>
+                                        <th className="text-center text-[10px] font-bold text-cream-500 px-1 py-2">ĐVT</th>
+                                        <th className="text-right text-[10px] font-bold text-cream-500 px-1 py-2">Đơn giá</th>
+                                        <th className="text-right text-[10px] font-bold text-cream-500 px-2.5 py-2">Thành tiền</th>
+                                        <th className="px-1 py-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {items.map((item, i) => {
+                                        const subtotal = (parseInt(item.quantity) || 0) * (parseInt(item.unitPrice) || 0)
+                                        return (
+                                            <tr key={i} className="border-t border-cream-100 hover:bg-cream-50/50">
+                                                <td className="py-1.5 px-2.5">
+                                                    <Input value={item.productName} onChange={(e) => updateItem(i, "productName", e.target.value)} placeholder="Tên sản phẩm" className="h-9 text-xs border-cream-300 bg-white" />
+                                                </td>
+                                                <td className="py-1.5 px-1">
+                                                    <Input value={item.sku} onChange={(e) => updateItem(i, "sku", e.target.value)} placeholder="SKU" className="h-9 text-xs border-cream-300 bg-white" />
+                                                </td>
+                                                <td className="py-1.5 px-1">
+                                                    <select value={item.category} onChange={(e) => updateItem(i, "category", e.target.value)} className="h-9 w-full rounded-lg border border-cream-300 bg-white px-1.5 text-xs font-medium text-green-900 focus:outline-none focus:ring-2 focus:ring-green-200">
+                                                        <option value="GOODS">Hàng</option>
+                                                        <option value="NPL">NPL</option>
+                                                        <option value="CCDC">CCDC</option>
+                                                    </select>
+                                                </td>
+                                                <td className="py-1.5 px-1">
+                                                    <Input value={item.quantity} onChange={(e) => updateItem(i, "quantity", e.target.value.replace(/\D/g, ""))} placeholder="0" className="h-9 text-xs text-center border-cream-300 bg-white font-mono" />
+                                                </td>
+                                                <td className="py-1.5 px-1">
+                                                    <select value={item.unit} onChange={(e) => updateItem(i, "unit", e.target.value)} className="h-9 w-full rounded-lg border border-cream-300 bg-white px-1.5 text-sm font-semibold text-green-900 focus:outline-none focus:ring-2 focus:ring-green-200">
+                                                        {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                                                    </select>
+                                                </td>
+                                                <td className="py-1.5 px-1">
+                                                    <Input value={item.unitPrice} onChange={(e) => updateItem(i, "unitPrice", e.target.value.replace(/\D/g, ""))} placeholder="0" className="h-9 text-xs text-right border-cream-300 bg-white font-mono" />
+                                                </td>
+                                                <td className="py-1.5 px-2.5 text-right">
+                                                    <span className="font-mono text-sm font-bold text-wine-700">
+                                                        {subtotal > 0 ? `₫${fmt(subtotal)}` : "—"}
+                                                    </span>
+                                                </td>
+                                                <td className="py-1.5 px-1">
+                                                    {items.length > 1 && (
+                                                        <button onClick={() => removeItem(i)} className="p-1 rounded hover:bg-red-50 text-cream-400 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     {/* Notes */}
@@ -957,10 +975,26 @@ function CreatePOModal({ suppliers, staffName, onClose, onCreated }: { suppliers
 
                 {/* Modal Footer */}
                 <div className="flex items-center justify-between px-6 py-4 border-t border-cream-200 bg-cream-50 rounded-b-2xl">
-                    <div className="text-sm">
-                        <span className="text-cream-500">{items.filter((i) => i.productName).length} sản phẩm · </span>
-                        <span className="font-mono font-bold text-wine-700">Tạm tính: ₫{fmt(total)}</span>
-                        <span className="text-cream-400 ml-2">(+VAT 10% = ₫{fmt(Math.round(total * 1.1))})</span>
+                    <div className="flex items-center gap-4">
+                        <div className="text-sm">
+                            <span className="text-cream-500">{items.filter((i) => i.productName).length} sản phẩm · </span>
+                            <span className="font-mono font-bold text-wine-700">Tạm tính: ₫{fmt(total)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 rounded-lg border border-cream-300 bg-white px-2 py-1">
+                            <span className="text-[10px] font-bold text-cream-500">VAT</span>
+                            <select
+                                value={vatRate}
+                                onChange={(e) => setVatRate(parseInt(e.target.value))}
+                                className="h-6 rounded border-0 bg-transparent text-sm font-bold text-green-900 focus:outline-none focus:ring-0 pr-1 appearance-none cursor-pointer"
+                            >
+                                <option value={0}>0%</option>
+                                <option value={5}>5%</option>
+                                <option value={8}>8%</option>
+                                <option value={10}>10%</option>
+                            </select>
+                            <span className="text-xs text-cream-400">= ₫{fmt(Math.round(total * vatRate / 100))}</span>
+                        </div>
+                        <span className="font-mono text-sm font-bold text-green-900">Tổng: ₫{fmt(Math.round(total * (1 + vatRate / 100)))}</span>
                     </div>
                     <div className="flex gap-2">
                         <Button onClick={onClose} variant="outline" size="sm" className="border-cream-300 text-cream-500">Hủy</Button>
