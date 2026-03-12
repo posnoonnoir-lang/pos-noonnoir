@@ -139,7 +139,7 @@ export async function createOrder(params: {
             }
         } catch { /* promo is non-critical */ }
 
-        revalidatePath("/pos")
+        // revalidatePath("/pos") — removed for perf (POS is client-side)
         revalidatePath("/dashboard/tables")
         return { success: true, order: serializeOrder(order) }
     } catch (e) {
@@ -149,13 +149,18 @@ export async function createOrder(params: {
     }
 }
 
-export async function getOrders(params?: { status?: OrderStatus; limit?: number }) {
+export async function getOrders(params?: { status?: OrderStatus; limit?: number; todayOnly?: boolean }) {
+    const todayOnly = params?.todayOnly !== false // default true
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
     const orders = await prisma.order.findMany({
-        where: params?.status ? { status: params.status } : {},
+        where: {
+            ...(params?.status ? { status: params.status } : {}),
+            ...(todayOnly ? { createdAt: { gte: todayStart } } : {}),
+        },
         include: {
-            items: { include: { product: true } },
-            table: true,
-            staff: true,
+            items: { include: { product: { select: { name: true } } } },
             payments: true,
         },
         orderBy: { createdAt: "desc" },
@@ -186,7 +191,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
                 ...(status === "PAID" ? { closedAt: new Date() } : {}),
             },
         })
-        revalidatePath("/pos")
+        // revalidatePath("/pos")
         return { success: true }
     } catch {
         return { success: false }
@@ -241,7 +246,7 @@ export async function voidOrder(
                 : []),
         ])
 
-        revalidatePath("/pos")
+        // revalidatePath("/pos")
         revalidatePath("/dashboard/tables")
         return { success: true }
     } catch (e) {
@@ -318,7 +323,7 @@ export async function payOrder(
                 : []),
         ])
 
-        revalidatePath("/pos")
+        // revalidatePath("/pos")
         revalidatePath("/dashboard/tables")
 
         // GAP-09: Update customer loyalty if order has a customer
@@ -360,10 +365,7 @@ export async function getActiveOrderByTable(tableId: string) {
             status: { in: ["OPEN", "PREPARING", "SERVED"] },
         },
         include: {
-            items: { include: { product: true } },
-            table: true,
-            staff: true,
-            payments: true,
+            items: { include: { product: { select: { name: true } } } },
         },
         orderBy: { createdAt: "desc" },
     })
@@ -416,7 +418,7 @@ export async function addItemsToOrder(
             },
         })
 
-        revalidatePath("/pos")
+        // revalidatePath("/pos")
         return { success: true, order: serializeOrder(updated) }
     } catch {
         return { success: false, error: "Không thể thêm món" }
@@ -538,7 +540,7 @@ export async function sendToKitchen(orderId: string, itemIds?: string[]) {
             data: { status: "PREPARING" },
         })
 
-        revalidatePath("/pos")
+        // revalidatePath("/pos")
         revalidatePath("/dashboard/kitchen")
         return { success: true, itemsSent: result.count }
     } catch {
@@ -576,7 +578,7 @@ export async function updateItemStatus(
             }
         }
 
-        revalidatePath("/pos")
+        // revalidatePath("/pos")
         revalidatePath("/dashboard/kitchen")
         return { success: true }
     } catch {
@@ -658,7 +660,7 @@ export async function removeItemFromOrder(orderId: string, itemId: string) {
             }),
         ])
 
-        revalidatePath("/pos")
+        // revalidatePath("/pos")
         return { success: true }
     } catch {
         return { success: false, error: "Lỗi xóa món" }

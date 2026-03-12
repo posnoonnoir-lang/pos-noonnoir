@@ -92,10 +92,10 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
 
     const stats = {
         total: orders.length,
-        completed: orders.filter((o) => o.status === "COMPLETED").length,
-        active: orders.filter((o) => !["COMPLETED", "CANCELLED"].includes(o.status)).length,
+        completed: orders.filter((o) => ["COMPLETED", "PAID"].includes(o.status)).length,
+        active: orders.filter((o) => !["COMPLETED", "PAID", "CANCELLED", "VOID"].includes(o.status)).length,
         revenue: orders
-            .filter((o) => o.status === "COMPLETED")
+            .filter((o) => ["COMPLETED", "PAID"].includes(o.status))
             .reduce((sum, o) => sum + o.total, 0),
     }
 
