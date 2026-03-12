@@ -88,7 +88,7 @@ import {
 } from "@/actions/operational"
 import { getUpcomingReservations, type Reservation } from "@/actions/reservations"
 import { getPushSaleItems, type PushSaleItem } from "@/actions/push-sale"
-import { getAllServingNotes, searchServingNotes, type WineServingNote } from "@/actions/serving-notes"
+import { getAllServingNotes, searchServingNotes, getPairingsForProduct, type WineServingNote } from "@/actions/serving-notes"
 import { getDefaultTaxRate } from "@/actions/tax"
 import { checkPromotions, type AppliedPromo } from "@/actions/promotions"
 import { getProductStock, getAllowNegativeStock, getWineRecommendations, getAlternativesForOutOfStock, type WineRecommendation } from "@/actions/wine-advisor"
@@ -389,6 +389,7 @@ export default function POSPage() {
     // V2: Wine Guide popup
     const [wineGuideProduct, setWineGuideProduct] = useState<Product | null>(null)
     const [showWineGuidePopup, setShowWineGuidePopup] = useState(false)
+    const [foodPairingProduct, setFoodPairingProduct] = useState<Product | null>(null)
 
     // V2: Push Sale sidebar
     const [pushSidebarOpen, setPushSidebarOpen] = useState(true)
@@ -1346,6 +1347,20 @@ export default function POSPage() {
                                                         <span className="text-[8px] font-bold">Gợi ý</span>
                                                     </button>
                                                 </>
+                                            )}
+                                            {/* Food Pairing button — for food/drink items */}
+                                            {(product.type === "FOOD" || product.type === "DRINK" || product.type === "OTHER") && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setFoodPairingProduct(product)
+                                                    }}
+                                                    className="flex items-center gap-1 rounded-md bg-wine-50 border border-wine-200 px-1.5 py-0.5 text-wine-700 hover:bg-wine-100 hover:border-wine-400 transition-all"
+                                                    title="Rượu hợp uống cùng"
+                                                >
+                                                    <Wine className="h-3 w-3" />
+                                                    <span className="text-[8px] font-bold">Rượu kèm</span>
+                                                </button>
                                             )}
                                         </div>
                                     </button>
@@ -2473,6 +2488,14 @@ export default function POSPage() {
                 <WineGuideModal
                     product={wineGuideProduct}
                     onClose={() => setWineGuideProduct(null)}
+                />
+            )}
+
+            {/* ============ Food Pairing Popup (food → wines) ============ */}
+            {foodPairingProduct && (
+                <FoodPairingPopup
+                    product={foodPairingProduct}
+                    onClose={() => setFoodPairingProduct(null)}
                 />
             )}
 
@@ -3801,6 +3824,9 @@ function WineGuideModal({
                         </div>
                     )}
 
+                    {/* Food Pairing */}
+                    <PairingSection productId={product.id} isWine={true} />
+
                     {/* Description */}
                     {product.description && (
                         <div>
@@ -3822,6 +3848,96 @@ function WineGuideModal({
                         size="sm"
                         className="bg-green-900 text-cream-50 hover:bg-green-800 text-xs"
                     >
+                        Đóng
+                    </Button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ============================================================
+// PAIRING SECTION — Shows paired items for any product
+// ============================================================
+function PairingSection({ productId, isWine }: { productId: string; isWine: boolean }) {
+    const [pairings, setPairings] = useState<{ id: string; name: string; type: string; sellPrice: number }[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        setLoading(true)
+        getPairingsForProduct(productId).then(setPairings).finally(() => setLoading(false))
+    }, [productId])
+
+    if (loading) return (
+        <div className="py-2">
+            <p className="text-[10px] text-cream-400 animate-pulse">Đang tải pairing...</p>
+        </div>
+    )
+    if (pairings.length === 0) return null
+
+    return (
+        <div>
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-cream-400 flex items-center gap-1.5 mb-1.5">
+                {isWine ? <Utensils className="h-3 w-3" /> : <Wine className="h-3 w-3" />}
+                {isWine ? "Đồ ăn kèm gợi ý" : "Rượu hợp uống cùng"}
+            </h4>
+            <div className="space-y-1">
+                {pairings.map(p => (
+                    <div key={p.id} className="flex items-center gap-2 rounded-lg bg-cream-100 border border-cream-200 px-3 py-2">
+                        <span className="text-sm">{isWine ? "🍽️" : "🍷"}</span>
+                        <span className="text-xs font-semibold text-green-900 flex-1">{p.name}</span>
+                        <span className="text-[10px] font-mono text-cream-500">₫{new Intl.NumberFormat("vi-VN").format(p.sellPrice)}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ============================================================
+// FOOD PAIRING POPUP — Shows wine suggestions for food items
+// ============================================================
+function FoodPairingPopup({
+    product,
+    onClose,
+}: {
+    product: Product
+    onClose: () => void
+}) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+            <div
+                className="relative w-full max-w-sm mx-4 rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="bg-green-900 px-5 py-3">
+                    <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                            <p className="text-[10px] uppercase tracking-wider text-cream-400">
+                                🍽️ {product.type === "FOOD" ? "Món ăn" : product.type === "DRINK" ? "Đồ uống" : "Sản phẩm"}
+                            </p>
+                            <h3 className="font-display text-lg font-bold text-cream-50 mt-0.5">
+                                {product.name}
+                            </h3>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="rounded-full p-1.5 text-cream-400 hover:text-cream-50 hover:bg-green-800 transition-all"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Pairing Content */}
+                <div className="px-5 py-4 max-h-[50vh] overflow-y-auto">
+                    <PairingSection productId={product.id} isWine={false} />
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-cream-300 bg-cream-100 px-5 py-3 flex justify-end">
+                    <Button onClick={onClose} size="sm" className="bg-green-900 text-cream-50 hover:bg-green-800 text-xs">
                         Đóng
                     </Button>
                 </div>

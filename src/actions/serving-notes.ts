@@ -117,3 +117,74 @@ export async function updateWineGuideInfo(id: string, updates: {
 export async function updateServingNote(id: string, updates: { staffNotes?: string; pairings?: string[] }): Promise<{ success: boolean }> {
     return updateWineGuideInfo(id, updates)
 }
+
+// ============================================================
+// FOOD PAIRING — Select from menu items
+// ============================================================
+
+export type FoodMenuItem = { id: string; name: string; type: string; categoryName: string | null; sellPrice: number }
+
+/** Get all food/drink products for pairing selection */
+export async function getFoodProducts(): Promise<FoodMenuItem[]> {
+    const products = await prisma.product.findMany({
+        where: { isActive: true, type: { in: ["FOOD", "DRINK", "OTHER"] } },
+        include: { category: { select: { name: true } } },
+        orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
+    })
+    return products.map(p => ({
+        id: p.id,
+        name: p.name,
+        type: p.type,
+        categoryName: p.category?.name ?? null,
+        sellPrice: Number(p.sellPrice),
+    }))
+}
+
+/** Update wine pairings using product IDs (stored as JSON array of {id, name}) */
+export async function updateWinePairings(wineId: string, pairedProductIds: string[]): Promise<{ success: boolean; error?: string }> {
+    try {
+        const products = await prisma.product.findMany({
+            where: { id: { in: pairedProductIds } },
+            select: { id: true, name: true },
+        })
+        const pairings = products.map(p => `${p.id}::${p.name}`)
+
+        const existing = await prisma.product.findUnique({ where: { id: wineId } })
+        if (!existing) return { success: false, error: "Không tìm thấy rượu" }
+
+        const currentTasting = existing.tastingNotes ? JSON.parse(existing.tastingNotes as string) : {}
+        const newTasting = { ...currentTasting, pairings }
+        await prisma.product.update({ where: { id: wineId }, data: { tastingNotes: JSON.stringify(newTasting) } })
+        return { success: true }
+    } catch (err) {
+        return { success: false, error: String(err) }
+    }
+}
+
+/** Get bidirectional pairing: for a product, find all wines that pair with it (food→wines) or all foods paired with it (wine→foods) */
+export async function getPairingsForProduct(productId: string): Promise<{ id: string; name: string; type: string; sellPrice: number }[]> {
+    const product = await prisma.product.findUnique({ where: { id: productId } })
+    if (!product) return []
+
+    const isWine = ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"].includes(product.type)
+
+    if (isWine) {
+        // Wine → return paired food products
+        const tasting = product.tastingNotes ? JSON.parse(product.tastingNotes as string) : {}
+        const pairings: string[] = tasting.pairings ?? []
+        const ids = pairings.map(p => p.split("::")[0]).filter(Boolean)
+        if (ids.length === 0) return []
+        const foods = await prisma.product.findMany({ where: { id: { in: ids }, isActive: true } })
+        return foods.map(f => ({ id: f.id, name: f.name, type: f.type, sellPrice: Number(f.sellPrice) }))
+    } else {
+        // Food → find all wines that have this food in their pairings
+        const wines = await prisma.product.findMany({
+            where: {
+                isActive: true,
+                type: { in: ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"] },
+                tastingNotes: { contains: productId },
+            },
+        })
+        return wines.map(w => ({ id: w.id, name: w.name, type: w.type, sellPrice: Number(w.sellPrice) }))
+    }
+}

@@ -29,7 +29,10 @@ import {
     getAllServingNotes,
     searchServingNotes,
     updateWineGuideInfo,
+    getFoodProducts,
+    updateWinePairings,
     type WineServingNote,
+    type FoodMenuItem,
 } from "@/actions/serving-notes"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
@@ -49,9 +52,12 @@ export default function WineGuidePage() {
     const [editPalate, setEditPalate] = useState<string[]>([])
     const [editFinish, setEditFinish] = useState("")
     const [editPairings, setEditPairings] = useState<string[]>([])
+    const [editPairedIds, setEditPairedIds] = useState<string[]>([])
+    const [foodProducts, setFoodProducts] = useState<FoodMenuItem[]>([])
     const [newNoseItem, setNewNoseItem] = useState("")
     const [newPalateItem, setNewPalateItem] = useState("")
     const [newPairingItem, setNewPairingItem] = useState("")
+    const [pairingSearch, setPairingSearch] = useState("")
     const [saving, setSaving] = useState(false)
 
     const loadData = useCallback(async () => {
@@ -68,6 +74,10 @@ export default function WineGuidePage() {
 
     useEffect(() => { loadData() }, [loadData])
 
+    useEffect(() => {
+        getFoodProducts().then(setFoodProducts).catch(() => { })
+    }, [])
+
     const startEditing = (note: WineServingNote) => {
         setEditingId(note.id)
         setExpandedId(note.id)
@@ -79,9 +89,12 @@ export default function WineGuidePage() {
         setEditPalate([...note.tastingNotes.palate])
         setEditFinish(note.tastingNotes.finish)
         setEditPairings([...note.pairings])
+        // Parse paired product IDs from "id::name" format
+        setEditPairedIds(note.pairings.map(p => p.split("::")[0]).filter(id => id.length > 10))
         setNewNoseItem("")
         setNewPalateItem("")
         setNewPairingItem("")
+        setPairingSearch("")
     }
 
     const cancelEditing = () => {
@@ -89,10 +102,12 @@ export default function WineGuidePage() {
         setNewNoseItem("")
         setNewPalateItem("")
         setNewPairingItem("")
+        setPairingSearch("")
     }
 
     const handleSave = async (noteId: string) => {
         setSaving(true)
+        // Save wine guide info (tasting notes, serving, etc.)
         const result = await updateWineGuideInfo(noteId, {
             servingTemp: editServingTemp || undefined,
             decantTime: editDecantTime || null,
@@ -101,6 +116,10 @@ export default function WineGuidePage() {
             tastingNotes: { nose: editNose, palate: editPalate, finish: editFinish },
             pairings: editPairings,
         })
+        // Save food pairings by product ID
+        if (editPairedIds.length > 0) {
+            await updateWinePairings(noteId, editPairedIds)
+        }
         setSaving(false)
         if (result.success) {
             toast.success("✅ Đã lưu Wine Guide thành công!")
@@ -439,52 +458,91 @@ export default function WineGuidePage() {
                                             <h4 className="text-[10px] font-bold uppercase text-cream-400 flex items-center gap-1"><Utensils className="h-3 w-3" /> FOOD PAIRING</h4>
                                             <div className="rounded-lg bg-white border border-cream-200 p-3">
                                                 <div className="space-y-1.5">
-                                                    {(isEditing ? editPairings : note.pairings).map((p, i) => (
-                                                        <div key={i} className="flex items-center gap-2 py-1">
-                                                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[9px] font-bold text-green-700 shrink-0">{i + 1}</span>
-                                                            <span className="text-xs text-green-900 font-medium flex-1">{p}</span>
-                                                            {isEditing && (
-                                                                <button
-                                                                    onClick={() => removeTag(setEditPairings, i)}
-                                                                    className="text-red-400 hover:text-red-600 p-0.5"
-                                                                >
-                                                                    <Trash2 className="h-3 w-3" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    {(isEditing ? editPairings : note.pairings).length === 0 && (
-                                                        <p className="text-[10px] text-cream-400 italic py-2">Chưa có food pairing. {isEditing ? "Thêm bên dưới ↓" : "Ấn Chỉnh sửa để thêm."}</p>
-                                                    )}
+                                                    {(() => {
+                                                        const pairings = isEditing ? editPairedIds : note.pairings
+                                                        if (pairings.length === 0) return (
+                                                            <p className="text-[10px] text-cream-400 italic py-2">
+                                                                Chưa có food pairing. {isEditing ? "Chọn từ menu bên dưới ↓" : "Ấn Chỉnh sửa để thêm."}
+                                                            </p>
+                                                        )
+
+                                                        if (isEditing) {
+                                                            // Show selected food items by ID
+                                                            return editPairedIds.map((pid, i) => {
+                                                                const fp = foodProducts.find(f => f.id === pid)
+                                                                return (
+                                                                    <div key={pid} className="flex items-center gap-2 py-1">
+                                                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[9px] font-bold text-green-700 shrink-0">{i + 1}</span>
+                                                                        <span className="text-xs text-green-900 font-medium flex-1">
+                                                                            {fp?.name ?? pid.split("::")[1] ?? pid}
+                                                                            {fp?.categoryName && <span className="text-[9px] text-cream-400 ml-1">({fp.categoryName})</span>}
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => setEditPairedIds(prev => prev.filter(x => x !== pid))}
+                                                                            className="text-red-400 hover:text-red-600 p-0.5"
+                                                                        >
+                                                                            <Trash2 className="h-3 w-3" />
+                                                                        </button>
+                                                                    </div>
+                                                                )
+                                                            })
+                                                        }
+
+                                                        // View mode: show pairing names
+                                                        return note.pairings.map((p, i) => {
+                                                            const displayName = p.includes("::") ? p.split("::")[1] : p
+                                                            return (
+                                                                <div key={i} className="flex items-center gap-2 py-1">
+                                                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[9px] font-bold text-green-700 shrink-0">{i + 1}</span>
+                                                                    <span className="text-xs text-green-900 font-medium flex-1">{displayName}</span>
+                                                                </div>
+                                                            )
+                                                        })
+                                                    })()}
                                                 </div>
                                                 {isEditing && (
-                                                    <div className="flex gap-1 mt-2 pt-2 border-t border-cream-200">
+                                                    <div className="mt-2 pt-2 border-t border-cream-200">
                                                         <Input
-                                                            value={newPairingItem}
-                                                            onChange={(e) => setNewPairingItem(e.target.value)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter") {
-                                                                    e.preventDefault()
-                                                                    addTag(setEditPairings, newPairingItem, setNewPairingItem)
-                                                                }
-                                                            }}
-                                                            placeholder="VD: Wagyu Steak, Truffle Fries..."
-                                                            className="h-7 text-[10px] border-cream-300 flex-1"
+                                                            value={pairingSearch}
+                                                            onChange={(e) => setPairingSearch(e.target.value)}
+                                                            placeholder="🔍 Tìm món ăn trong menu..."
+                                                            className="h-7 text-[10px] border-cream-300 mb-2"
                                                         />
-                                                        <Button
-                                                            onClick={() => addTag(setEditPairings, newPairingItem, setNewPairingItem)}
-                                                            size="sm"
-                                                            className="h-7 bg-green-700 hover:bg-green-800 text-white text-[10px] px-2"
-                                                        >
-                                                            <Plus className="mr-0.5 h-3 w-3" />
-                                                            Thêm
-                                                        </Button>
+                                                        <div className="max-h-[160px] overflow-y-auto space-y-0.5 rounded-lg border border-cream-200 bg-cream-50 p-1">
+                                                            {(() => {
+                                                                const filtered = foodProducts.filter(f =>
+                                                                    !editPairedIds.includes(f.id) &&
+                                                                    (pairingSearch === "" || f.name.toLowerCase().includes(pairingSearch.toLowerCase()) || (f.categoryName ?? "").toLowerCase().includes(pairingSearch.toLowerCase()))
+                                                                )
+                                                                if (filtered.length === 0) return <p className="text-[9px] text-cream-400 py-2 text-center">Không tìm thấy món ăn</p>
+                                                                let lastCat = ""
+                                                                return filtered.map(f => {
+                                                                    const showCat = f.categoryName !== lastCat
+                                                                    lastCat = f.categoryName ?? ""
+                                                                    return (
+                                                                        <div key={f.id}>
+                                                                            {showCat && f.categoryName && (
+                                                                                <p className="text-[8px] font-bold text-cream-400 uppercase px-2 pt-1.5 pb-0.5">{f.categoryName}</p>
+                                                                            )}
+                                                                            <button
+                                                                                onClick={() => setEditPairedIds(prev => [...prev, f.id])}
+                                                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-green-50 transition-colors"
+                                                                            >
+                                                                                <Plus className="h-3 w-3 text-green-600 shrink-0" />
+                                                                                <span className="text-[11px] text-green-900 font-medium flex-1 truncate">{f.name}</span>
+                                                                                <span className="text-[9px] text-cream-400 font-mono">₫{new Intl.NumberFormat("vi-VN").format(f.sellPrice)}</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    )
+                                                                })
+                                                            })()}
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Upsell suggestion */}
-                                            {(isEditing ? editPairings : note.pairings).length > 0 && (
+                                            {(isEditing ? editPairedIds : note.pairings).length > 0 && (
                                                 <div className="rounded-lg bg-green-50 border border-green-200 p-3">
                                                     <p className="text-[9px] font-bold uppercase text-green-500 mb-1">💡 GỢI Ý UPSELL (tự động)</p>
                                                     <p className="text-[10px] text-green-700 leading-relaxed">
