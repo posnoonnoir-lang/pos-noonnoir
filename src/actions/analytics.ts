@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { parallelLimit } from "@/lib/parallel-limit"
 
 // ============================================================
 // ANALYTICS — M6 Advanced Reports (Prisma queries)
@@ -83,8 +84,8 @@ export async function getMonthlyRevenue(): Promise<MonthlyRevenue[]> {
         return { start, end, monthLabel }
     })
 
-    const results = await Promise.all(
-        months.map(async ({ start, end, monthLabel }) => {
+    const results = await parallelLimit(
+        months.map(({ start, end, monthLabel }) => async () => {
             const orders = await prisma.order.findMany({
                 where: { createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
                 include: { items: { include: { product: true } } },
@@ -96,7 +97,7 @@ export async function getMonthlyRevenue(): Promise<MonthlyRevenue[]> {
             const profit = revenue - cogs
             const avgTicket = orders.length > 0 ? Math.round(revenue / orders.length) : 0
             return { month: monthLabel, revenue, profit, orders: orders.length, avgTicket }
-        })
+        }), 2
     )
     return results
 }
@@ -212,8 +213,8 @@ export async function getHourlyHeatmap(): Promise<HourlyHeatmap[]> {
         return { start, end, dayLabel, dayIndex: start.getDay() }
     })
 
-    const result = await Promise.all(
-        dayConfigs.map(async ({ start, end, dayLabel, dayIndex }) => {
+    const result = await parallelLimit(
+        dayConfigs.map(({ start, end, dayLabel, dayIndex }) => async () => {
             const orders = await prisma.order.findMany({
                 where: { createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
             })
@@ -234,7 +235,7 @@ export async function getHourlyHeatmap(): Promise<HourlyHeatmap[]> {
             }
 
             return { day: dayLabel, dayIndex, hours } as HourlyHeatmap
-        })
+        }), 2
     )
 
     // Normalize intensity

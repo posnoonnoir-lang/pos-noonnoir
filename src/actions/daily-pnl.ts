@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { parallelLimit } from "@/lib/parallel-limit"
 
 // ============================================================
 // DAILY P&L REPORT — Prisma version (OPTIMIZED)
@@ -105,7 +106,8 @@ export async function getPnLSummary(): Promise<PnLSummary> {
         dates.push(new Date(Date.now() - i * 86400000).toISOString().split("T")[0])
     }
 
-    const allPnL = await Promise.all(dates.map(d => buildPnL(d)))
+    // Build days with LIMITED concurrency (max 2) to not exhaust pool
+    const allPnL = await parallelLimit(dates.map(d => () => buildPnL(d)), 2)
 
     const todayPnL = allPnL[allPnL.length - 1]
     const weeklyTrend: PnLTrend[] = allPnL.map(pnl => ({
@@ -137,5 +139,5 @@ export async function getWeeklyPnL(): Promise<DailyPnL[]> {
     for (let i = 6; i >= 0; i--) {
         dates.push(new Date(Date.now() - i * 86400000).toISOString().split("T")[0])
     }
-    return Promise.all(dates.map(d => buildPnL(d)))
+    return parallelLimit(dates.map(d => () => buildPnL(d)), 2)
 }
