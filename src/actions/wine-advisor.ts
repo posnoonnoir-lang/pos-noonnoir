@@ -125,11 +125,12 @@ export async function checkCartStock(items: Array<{ productId: string; quantity:
 
 // Recommend similar wines (by profile, grape, region)
 export async function getWineRecommendations(productId: string): Promise<WineRecommendation[]> {
+    // Query 1: Get source product (lean select, no joins)
     const source = await prisma.product.findUnique({
         where: { id: productId },
-        include: {
-            category: true,
-            _count: { select: { wineBottles: { where: { status: "IN_STOCK" } } } },
+        select: {
+            id: true, grapeVariety: true, country: true, region: true,
+            alcoholPct: true, categoryId: true, type: true,
         },
     })
     if (!source) return []
@@ -137,19 +138,29 @@ export async function getWineRecommendations(productId: string): Promise<WineRec
     const sourceProfile = getWineProfile(source.grapeVariety ?? "", Number(source.alcoholPct ?? 0))
     const sourceGrapes = (source.grapeVariety ?? "").toLowerCase().split(",").map(g => g.trim())
 
-    // Get all wine products except the source
+    // Query 2: Get all wine products (lean select, no joins)
     const wines = await prisma.product.findMany({
         where: {
             isActive: true,
             type: { in: ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"] },
             id: { not: productId },
         },
-        include: {
-            category: true,
-            _count: { select: { wineBottles: { where: { status: "IN_STOCK" } } } },
+        select: {
+            id: true, name: true, sku: true, grapeVariety: true,
+            country: true, region: true, alcoholPct: true, sellPrice: true,
+            glassPrice: true, isByGlass: true, categoryId: true, type: true,
         },
     })
 
+    // Query 3: Batch stock count (single groupBy instead of N subqueries)
+    const stockCounts = await prisma.wineBottle.groupBy({
+        by: ["productId"],
+        where: { status: "IN_STOCK" },
+        _count: { id: true },
+    })
+    const stockMap = new Map(stockCounts.map(s => [s.productId, s._count.id]))
+
+    // Score in-memory (fast)
     const recommendations: WineRecommendation[] = wines.map(w => {
         const wineProfile = getWineProfile(w.grapeVariety ?? "", Number(w.alcoholPct ?? 0))
         const targetGrapes = (w.grapeVariety ?? "").toLowerCase().split(",").map(g => g.trim())
@@ -159,31 +170,21 @@ export async function getWineRecommendations(productId: string): Promise<WineRec
 
         // Bonus: same grape
         const sameGrape = sourceGrapes.some(sg => targetGrapes.some(tg => tg.includes(sg) || sg.includes(tg)))
-        if (sameGrape) {
-            score += 20
-            reasons.push("Cùng giống nho")
-        }
+        if (sameGrape) { score += 20; reasons.push("Cùng giống nho") }
 
         // Bonus: same region
         if (source.region && w.region && source.region === w.region) {
-            score += 15
-            reasons.push("Cùng vùng")
+            score += 15; reasons.push("Cùng vùng")
         } else if (source.country && w.country && source.country === w.country) {
-            score += 8
-            reasons.push("Cùng quốc gia")
+            score += 8; reasons.push("Cùng quốc gia")
         }
 
         // Bonus: similar alcohol
         const alcoholDiff = Math.abs(Number(source.alcoholPct ?? 0) - Number(w.alcoholPct ?? 0))
-        if (alcoholDiff <= 1) {
-            score += 10
-            reasons.push("Nồng độ tương đương")
-        }
+        if (alcoholDiff <= 1) { score += 10; reasons.push("Nồng độ tương đương") }
 
         // Bonus: same category
-        if (source.categoryId === w.categoryId) {
-            score += 5
-        }
+        if (source.categoryId === w.categoryId) score += 5
 
         // Profile description
         const bodyLabels = { light: "Nhẹ", medium: "Vừa", full: "Đậm" }
@@ -201,10 +202,10 @@ export async function getWineRecommendations(productId: string): Promise<WineRec
             sellPrice: Number(w.sellPrice),
             glassPrice: w.glassPrice ? Number(w.glassPrice) : null,
             isByGlass: w.isByGlass,
-            inStock: w._count.wineBottles,
+            inStock: stockMap.get(w.id) ?? 0,
             matchReason: reasons.join(" · "),
             matchScore: score,
-            category: w.category.name,
+            category: "",
             type: w.type,
         }
     })
@@ -234,11 +235,20 @@ export async function filterWinesByProfile(params: {
             ...(params.minAlcohol && { alcoholPct: { gte: params.minAlcohol } }),
             ...(params.maxPrice && { sellPrice: { lte: params.maxPrice } }),
         },
-        include: {
-            category: true,
-            _count: { select: { wineBottles: { where: { status: "IN_STOCK" } } } },
+        select: {
+            id: true, name: true, sku: true, grapeVariety: true,
+            country: true, region: true, alcoholPct: true, sellPrice: true,
+            glassPrice: true, isByGlass: true, type: true,
         },
     })
+
+    // Batch stock count
+    const stockCounts = await prisma.wineBottle.groupBy({
+        by: ["productId"],
+        where: { status: "IN_STOCK" },
+        _count: { id: true },
+    })
+    const stockMap = new Map(stockCounts.map(s => [s.productId, s._count.id]))
 
     const results: WineRecommendation[] = wines
         .map(w => {
@@ -248,6 +258,7 @@ export async function filterWinesByProfile(params: {
 
             const bodyLabels = { light: "Nhẹ", medium: "Vừa", full: "Đậm" }
             const acidLabels = { low: "Ít chua", medium: "Chua vừa", high: "Chua cao" }
+            const stock = stockMap.get(w.id) ?? 0
 
             return {
                 id: w.id,
@@ -260,10 +271,10 @@ export async function filterWinesByProfile(params: {
                 sellPrice: Number(w.sellPrice),
                 glassPrice: w.glassPrice ? Number(w.glassPrice) : null,
                 isByGlass: w.isByGlass,
-                inStock: w._count.wineBottles,
+                inStock: stock,
                 matchReason: `${bodyLabels[profile.body]} · ${acidLabels[profile.acidity]}`,
-                matchScore: w._count.wineBottles > 0 ? 50 : 10,
-                category: w.category.name,
+                matchScore: stock > 0 ? 50 : 10,
+                category: "",
                 type: w.type,
             }
         })
