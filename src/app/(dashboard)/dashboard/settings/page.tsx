@@ -26,6 +26,7 @@ import {
     Calendar,
     Wallet,
     Briefcase,
+    CreditCard,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -45,14 +46,16 @@ import { getServiceChargeConfig, updateServiceChargeConfig } from "@/actions/ope
 import { getBankConfig, updateBankConfig, type QRPaymentConfig } from "@/actions/qr-payment"
 import type { TaxRate } from "@/types"
 import { getHrConfig, updateHrConfig, type HrConfigData } from "@/actions/hr-config"
+import { getPosConfig, updatePosConfig, type PosConfig, type PaymentMode } from "@/actions/pos-config"
 import { ThemePicker } from "@/components/theme-switcher"
 
 type TaxReportLine = Awaited<ReturnType<typeof getTaxReport>>[number]
 type TaxBreakdown = Awaited<ReturnType<typeof getTaxBreakdownByRate>>[number]
 
-type SettingSection = "store" | "tax" | "service-charge" | "payment" | "receipt" | "notification" | "display" | "operational" | "system" | "hr"
+type SettingSection = "setup" | "store" | "tax" | "service-charge" | "payment" | "receipt" | "notification" | "display" | "operational" | "system" | "hr"
 
 const NAV_ITEMS: { id: SettingSection; label: string; icon: typeof Store }[] = [
+    { id: "setup", label: "Setup ban đầu", icon: Settings },
     { id: "store", label: "Cửa hàng", icon: Store },
     { id: "tax", label: "Thuế (VAT)", icon: Receipt },
     { id: "service-charge", label: "Phí dịch vụ", icon: HandCoins },
@@ -127,6 +130,7 @@ export default function SettingsPage() {
 
                 {/* Settings Content */}
                 <div className="rounded-xl border border-cream-300 bg-cream-100 p-6">
+                    {activeSection === "setup" && <SetupSettings />}
                     {activeSection === "store" && <StoreSettings />}
                     {activeSection === "tax" && <TaxSettings />}
                     {activeSection === "service-charge" && <ServiceChargeSettings />}
@@ -1654,7 +1658,7 @@ function OperationalSettings() {
                 </SettingRow>
             </SettingGroup>
 
-            <SettingGroup title="Manager PIN’s">
+            <SettingGroup title="Manager PIN's">
                 <div className="rounded-lg bg-cream-50 border border-cream-200 p-3">
                     <p className="text-[10px] text-cream-500 mb-2">Danh sách PIN Manager/Owner được quản lý qua module Nhân sự. Nhân viên có role MANAGER hoặc OWNER được dùng PIN để xác thực giảm giá.</p>
                     <p className="text-[10px] text-cream-400">Đi đến: Quản lý → Nhân sự để cập nhật PIN.</p>
@@ -1666,6 +1670,163 @@ function OperationalSettings() {
                     <p className="text-[10px] text-cream-500">Sản phẩm bị đánh dấu 86 (hết hàng) sẽ tự động ẩn khỏi POS. Nhân viên bếp có thể đánh dấu/bỏ đánh dấu trực tiếp từ Kitchen Display.</p>
                 </div>
             </SettingGroup>
+        </>
+    )
+}
+
+// ============================================================
+// SETUP BAN ĐẦU — One-time POS configuration
+// ============================================================
+function SetupSettings() {
+    const [paymentMode, setPaymentMode] = useState<PaymentMode>("PAY_AFTER")
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        getPosConfig().then(config => {
+            setPaymentMode(config.paymentMode)
+            setLoading(false)
+        }).catch(() => setLoading(false))
+    }, [])
+
+    const handleModeChange = async (mode: PaymentMode) => {
+        setPaymentMode(mode)
+        setSaving(true)
+        const res = await updatePosConfig({ paymentMode: mode })
+        setSaving(false)
+        if (res.success) {
+            toast.success(mode === "PAY_FIRST" ? "✅ Đã chuyển sang Thanh toán trước" : "✅ Đã chuyển sang Thanh toán sau")
+        } else {
+            toast.error("Lỗi khi lưu cài đặt")
+        }
+    }
+
+    if (loading) return <div className="text-center py-12 text-cream-400 text-sm">Đang tải...</div>
+
+    return (
+        <>
+            <SettingGroup title="🏪 Chế độ thanh toán POS">
+                <p className="text-[10px] text-cream-500 mb-4">Chọn quy trình thanh toán phù hợp với mô hình kinh doanh của bạn. Có thể đổi lại bất cứ lúc nào.</p>
+
+                <div className="grid grid-cols-2 gap-4">
+                    {/* PAY AFTER */}
+                    <button
+                        onClick={() => handleModeChange("PAY_AFTER")}
+                        disabled={saving}
+                        className={cn(
+                            "rounded-xl border-2 p-4 text-left transition-all",
+                            paymentMode === "PAY_AFTER"
+                                ? "border-green-600 bg-green-50 shadow-md"
+                                : "border-cream-200 bg-cream-50 hover:border-cream-400"
+                        )}
+                    >
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className={cn(
+                                "flex h-8 w-8 items-center justify-center rounded-lg",
+                                paymentMode === "PAY_AFTER" ? "bg-green-600 text-white" : "bg-cream-200 text-cream-500"
+                            )}>
+                                <Banknote className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <p className={cn("text-sm font-bold", paymentMode === "PAY_AFTER" ? "text-green-900" : "text-cream-600")}>Thanh toán sau</p>
+                                <p className="text-[9px] text-cream-400">Nhà hàng · Wine bar · Bistro</p>
+                            </div>
+                            {paymentMode === "PAY_AFTER" && <Check className="h-4 w-4 text-green-600 ml-auto" />}
+                        </div>
+                        <div className="space-y-1 mt-3">
+                            <div className="flex items-center gap-1.5 text-[10px] text-cream-600">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[8px] font-bold text-blue-700">1</span>
+                                Chọn bàn
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-cream-600">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[8px] font-bold text-blue-700">2</span>
+                                Gọi món → Gửi bếp
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-cream-600">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[8px] font-bold text-blue-700">3</span>
+                                Phục vụ (có thể gọi thêm)
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-cream-600">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-100 text-[8px] font-bold text-green-700">4</span>
+                                <strong>Thanh toán</strong> khi xong
+                            </div>
+                        </div>
+                    </button>
+
+                    {/* PAY FIRST */}
+                    <button
+                        onClick={() => handleModeChange("PAY_FIRST")}
+                        disabled={saving}
+                        className={cn(
+                            "rounded-xl border-2 p-4 text-left transition-all",
+                            paymentMode === "PAY_FIRST"
+                                ? "border-green-600 bg-green-50 shadow-md"
+                                : "border-cream-200 bg-cream-50 hover:border-cream-400"
+                        )}
+                    >
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className={cn(
+                                "flex h-8 w-8 items-center justify-center rounded-lg",
+                                paymentMode === "PAY_FIRST" ? "bg-green-600 text-white" : "bg-cream-200 text-cream-500"
+                            )}>
+                                <CreditCard className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <p className={cn("text-sm font-bold", paymentMode === "PAY_FIRST" ? "text-green-900" : "text-cream-600")}>Thanh toán trước</p>
+                                <p className="text-[9px] text-cream-400">Coffee shop · Trà sữa · Fast food</p>
+                            </div>
+                            {paymentMode === "PAY_FIRST" && <Check className="h-4 w-4 text-green-600 ml-auto" />}
+                        </div>
+                        <div className="space-y-1 mt-3">
+                            <div className="flex items-center gap-1.5 text-[10px] text-cream-600">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[8px] font-bold text-blue-700">1</span>
+                                Chọn món
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-cream-600">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-100 text-[8px] font-bold text-green-700">2</span>
+                                <strong>Thanh toán</strong> ngay
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-cream-600">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[8px] font-bold text-blue-700">3</span>
+                                Gửi bếp pha chế
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-cream-600">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[8px] font-bold text-blue-700">4</span>
+                                Chọn bàn phục vụ (tuỳ chọn)
+                            </div>
+                        </div>
+                    </button>
+                </div>
+            </SettingGroup>
+
+            {/* Current mode indicator */}
+            <div className={cn(
+                "rounded-xl border p-4 mt-4",
+                paymentMode === "PAY_FIRST" ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200"
+            )}>
+                <p className={cn("text-xs font-bold mb-1", paymentMode === "PAY_FIRST" ? "text-amber-800" : "text-green-800")}>
+                    {paymentMode === "PAY_FIRST" ? "☕ Chế độ: Thanh toán trước" : "🍷 Chế độ: Thanh toán sau"}
+                </p>
+                <ul className="text-[10px] space-y-0.5 list-disc list-inside">
+                    {paymentMode === "PAY_FIRST" ? (
+                        <>
+                            <li className="text-amber-700">Khách thanh toán ngay khi gọi món</li>
+                            <li className="text-amber-700">Không cần chọn bàn trước</li>
+                            <li className="text-amber-700">Có thể gán bàn sau khi phục vụ</li>
+                            <li className="text-amber-700">Takeaway luôn thanh toán trước</li>
+                        </>
+                    ) : (
+                        <>
+                            <li className="text-green-700">Khách ngồi bàn → gọi món → thanh toán khi xong</li>
+                            <li className="text-green-700">Bắt buộc chọn bàn trước khi gọi</li>
+                            <li className="text-green-700">Có thể gọi thêm nhiều lần</li>
+                            <li className="text-green-700">Takeaway vẫn luôn thanh toán trước</li>
+                        </>
+                    )}
+                </ul>
+            </div>
+
+            {saving && <p className="text-center text-xs text-cream-400 mt-3 animate-pulse">Đang lưu...</p>}
         </>
     )
 }

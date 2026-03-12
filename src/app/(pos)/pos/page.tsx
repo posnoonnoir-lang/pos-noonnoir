@@ -90,6 +90,7 @@ import { getUpcomingReservations, type Reservation } from "@/actions/reservation
 import { getPushSaleItems, type PushSaleItem } from "@/actions/push-sale"
 import { getAllServingNotes, searchServingNotes, getPairingsForProduct, type WineServingNote } from "@/actions/serving-notes"
 import { getDefaultTaxRate } from "@/actions/tax"
+import { getPosConfig, type PaymentMode } from "@/actions/pos-config"
 import { checkPromotions, type AppliedPromo } from "@/actions/promotions"
 import { getProductStock, getAllowNegativeStock, getWineRecommendations, getAlternativesForOutOfStock, type WineRecommendation } from "@/actions/wine-advisor"
 import { POSInlineSkeleton } from "@/components/inline-skeletons"
@@ -406,6 +407,7 @@ export default function POSPage() {
     const { staff } = useAuthStore()
     const cart = useCartStore()
     const [posLoading, setPosLoading] = useState(true)
+    const [paymentMode, setPaymentMode] = useState<PaymentMode>("PAY_AFTER")
 
     // Load active tabs
     const refreshTabs = useCallback(async () => {
@@ -501,6 +503,7 @@ export default function POSPage() {
             refreshHeld()
             refreshPushSale()
             getUpcomingReservations().then((list) => setUpcomingReservations(list)).catch(() => { })
+            getPosConfig().then(cfg => setPaymentMode(cfg.paymentMode)).catch(() => { })
         }
 
         // Try cache first (even expired — use 10min window for stale-while-revalidate)
@@ -618,8 +621,9 @@ export default function POSPage() {
     }, [activeCategory, searchTerm, dbProducts])
 
     const handleAddToCart = (product: Product) => {
-        // Require table selection for dine-in before adding products
-        if (cart.orderType === "DINE_IN" && !cart.selectedTable) {
+        // Require table selection for dine-in before adding products (PAY_AFTER only)
+        const needsTable = paymentMode === "PAY_AFTER" && cart.orderType === "DINE_IN" && !cart.selectedTable
+        if (needsTable) {
             toast.error("Vui lòng chọn bàn trước", {
                 description: "Nhấn 'Chọn bàn...' để chọn bàn trước khi order",
                 duration: 3000,
@@ -762,7 +766,7 @@ export default function POSPage() {
             toast.error("Giỏ hàng trống")
             return
         }
-        if (cart.orderType === "DINE_IN" && !cart.selectedTable) {
+        if (cart.orderType === "DINE_IN" && !cart.selectedTable && paymentMode === "PAY_AFTER") {
             toast.error("Chọn bàn trước khi gửi bếp")
             setTableModalOpen(true)
             return
@@ -835,7 +839,7 @@ export default function POSPage() {
             toast.error("Giỏ hàng trống")
             return
         }
-        if (cart.orderType === "DINE_IN" && !cart.selectedTable) {
+        if (cart.orderType === "DINE_IN" && !cart.selectedTable && paymentMode === "PAY_AFTER") {
             toast.error("Chọn bàn trước khi thanh toán")
             setTableModalOpen(true)
             return
@@ -930,6 +934,12 @@ export default function POSPage() {
                 // Refresh glass statuses after wine operations
                 refreshGlassStatuses()
 
+                // PAY_FIRST: auto-send to kitchen after payment
+                if (paymentMode === "PAY_FIRST") {
+                    await sendToKitchenAction(result.order.id)
+                    toast.info("🍳 Đã gửi bếp tự động (thanh toán trước)", { duration: 3000 })
+                }
+
                 cart.clearCart()
                 setTimeout(() => setLastOrder(null), 5000)
             } else {
@@ -1023,6 +1033,16 @@ export default function POSPage() {
                             <ShoppingCart className="h-3.5 w-3.5" />
                             Mang đi
                         </button>
+                    </div>
+
+                    {/* Payment mode indicator */}
+                    <div className={cn(
+                        "rounded-md px-2 py-1 text-[9px] font-bold",
+                        paymentMode === "PAY_FIRST"
+                            ? "bg-amber-100 text-amber-700 border border-amber-200"
+                            : "bg-green-50 text-green-600 border border-green-200"
+                    )}>
+                        {paymentMode === "PAY_FIRST" ? "☕ TT Trước" : "🍷 TT Sau"}
                     </div>
 
                     {/* Table indicator */}
@@ -1686,30 +1706,50 @@ export default function POSPage() {
                             </div>
                         )}
 
-                        {/* Send to Kitchen */}
+                        {/* Main Action Button */}
                         <div className="px-4 pb-3">
-                            <Button
-                                onClick={sendToKitchen}
-                                disabled={isSubmitting}
-                                className={cn(
-                                    "w-full font-semibold disabled:opacity-70",
-                                    activeOrderId
-                                        ? "bg-wine-700 text-white hover:bg-wine-600"
-                                        : "bg-green-900 text-cream-50 hover:bg-green-800"
-                                )}
-                                size="lg"
-                            >
-                                {isSubmitting ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Receipt className="mr-2 h-4 w-4" />
-                                )}
-                                {isSubmitting
-                                    ? "Đang gửi..."
-                                    : activeOrderId
-                                        ? `➕ Thêm ${cart.itemCount()} món · ₫${formatPrice(cart.subtotal())}`
-                                        : `🍳 Gửi bếp · ₫${formatPrice(cart.subtotal())}`}
-                            </Button>
+                            {paymentMode === "PAY_FIRST" && !activeOrderId ? (
+                                /* PAY_FIRST: Button = Thanh toán ngay (auto-sends to kitchen after) */
+                                <Button
+                                    onClick={() => handleCheckout("CASH")}
+                                    disabled={isSubmitting || cart.items.length === 0}
+                                    className="w-full font-semibold bg-green-700 text-white hover:bg-green-600 disabled:opacity-70"
+                                    size="lg"
+                                >
+                                    {isSubmitting ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Banknote className="mr-2 h-4 w-4" />
+                                    )}
+                                    {isSubmitting
+                                        ? "Đang xử lý..."
+                                        : `💳 Thanh toán · ₫${formatPrice(cart.subtotal())}`}
+                                </Button>
+                            ) : (
+                                /* PAY_AFTER: Button = Gửi bếp (pay later) */
+                                <Button
+                                    onClick={sendToKitchen}
+                                    disabled={isSubmitting}
+                                    className={cn(
+                                        "w-full font-semibold disabled:opacity-70",
+                                        activeOrderId
+                                            ? "bg-wine-700 text-white hover:bg-wine-600"
+                                            : "bg-green-900 text-cream-50 hover:bg-green-800"
+                                    )}
+                                    size="lg"
+                                >
+                                    {isSubmitting ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Receipt className="mr-2 h-4 w-4" />
+                                    )}
+                                    {isSubmitting
+                                        ? "Đang gửi..."
+                                        : activeOrderId
+                                            ? `➕ Thêm ${cart.itemCount()} món · ₫${formatPrice(cart.subtotal())}`
+                                            : `🍳 Gửi bếp · ₫${formatPrice(cart.subtotal())}`}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 )}
