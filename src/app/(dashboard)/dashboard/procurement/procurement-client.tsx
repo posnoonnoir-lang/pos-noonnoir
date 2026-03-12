@@ -36,16 +36,20 @@ import {
     getGoodsReceipts,
     getFIFOBatches,
     getProcurementStats,
+    getPurchaseReceipts,
     updatePOStatus,
     receivePurchaseOrder,
     createPurchaseOrder,
     createSupplier,
+    createPurchaseReceipt,
     type PurchaseOrder,
     type Supplier,
     type GoodsReceipt,
     type FIFOBatch,
     type POStatus,
+    type PurchaseReceipt,
 } from "@/actions/procurement"
+import { getRawMaterials, type RawMaterial } from "@/actions/assets"
 import {
     getConsignments,
     getSettlements,
@@ -95,7 +99,7 @@ function StatCard({ label, value, color, icon: Icon }: { label: string; value: s
     )
 }
 
-type TabType = "orders" | "suppliers" | "receipts" | "fifo" | "consignment" | "settlement"
+type TabType = "purchase" | "orders" | "suppliers" | "receipts" | "fifo" | "consignment" | "settlement"
 
 export interface ProcurementInitialData {
     orders: PurchaseOrder[]
@@ -106,11 +110,13 @@ export interface ProcurementInitialData {
     consignments: Consignment[]
     settlements: ConsignmentSettlement[]
     csmStats: Awaited<ReturnType<typeof getConsignmentStats>>
+    purchaseReceipts: PurchaseReceipt[]
+    ingredients: RawMaterial[]
 }
 
 export function ProcurementClient({ initial }: { initial: ProcurementInitialData }) {
     const { staff } = useAuthStore()
-    const [tab, setTab] = useState<TabType>("orders")
+    const [tab, setTab] = useState<TabType>("purchase")
     const [searchTerm, setSearchTerm] = useState("")
     const [statusFilter, setStatusFilter] = useState<POStatus | "ALL">("ALL")
     const [expandedPO, setExpandedPO] = useState<string | null>(null)
@@ -126,14 +132,51 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
     const [consignments, setConsignments] = useState(initial.consignments)
     const [settlements, setSettlements] = useState(initial.settlements)
     const [csmStats, setCsmStats] = useState(initial.csmStats)
+    const [purchaseReceipts, setPurchaseReceipts] = useState(initial.purchaseReceipts)
+    const [ingredientsList, setIngredientsList] = useState(initial.ingredients)
+
+    // Purchase receipt form state
+    const [prSupplierId, setPrSupplierId] = useState("")
+    const [prNotes, setPrNotes] = useState("")
+    const [prItems, setPrItems] = useState<Array<{ ingredientId: string; quantity: string; unitCost: string }>>([{ ingredientId: "", quantity: "", unitCost: "" }])
+    const [prSubmitting, setPrSubmitting] = useState(false)
 
     const loadData = async () => {
-        const [o, s, r, f, st, c, se, cs] = await Promise.all([
+        const [o, s, r, f, st, c, se, cs, pr, ing] = await Promise.all([
             getPurchaseOrders(), getSuppliers(), getGoodsReceipts(), getFIFOBatches(),
             getProcurementStats(), getConsignments(), getSettlements(), getConsignmentStats(),
+            getPurchaseReceipts(), getRawMaterials(),
         ])
         setOrders(o); setSuppliers(s); setReceipts(r); setFifoBatches(f)
         setStats(st); setConsignments(c); setSettlements(se); setCsmStats(cs)
+        setPurchaseReceipts(pr); setIngredientsList(ing)
+    }
+
+    const handlePurchaseReceipt = async () => {
+        if (!prSupplierId) { toast.error("Chọn nhà cung cấp"); return }
+        const validItems = prItems.filter(i => i.ingredientId && Number(i.quantity) > 0 && Number(i.unitCost) > 0)
+        if (validItems.length === 0) { toast.error("Thêm ít nhất 1 nguyên liệu"); return }
+        setPrSubmitting(true)
+        const result = await createPurchaseReceipt({
+            supplierId: prSupplierId,
+            items: validItems.map(i => ({ ingredientId: i.ingredientId, quantity: Number(i.quantity), unitCost: Number(i.unitCost) })),
+            notes: prNotes || undefined,
+        })
+        setPrSubmitting(false)
+        if (result.success) {
+            toast.success(`Nhập hàng thành công! ${result.receiptNo}`)
+            if (result.results) {
+                for (const r of result.results) {
+                    if (r.oldCost !== r.newCost) {
+                        toast.info(`${r.ingredientName}: ₫${fmt(r.oldCost)} → ₫${fmt(r.newCost)}`, { duration: 5000 })
+                    }
+                }
+            }
+            setPrSupplierId(""); setPrNotes(""); setPrItems([{ ingredientId: "", quantity: "", unitCost: "" }])
+            loadData()
+        } else {
+            toast.error(result.error ?? "Lỗi tạo phiếu nhập")
+        }
     }
 
     const filteredOrders = orders.filter((po) => {
@@ -202,6 +245,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
             <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5">
                     {([
+                        { key: "purchase" as TabType, label: "📥 Nhập hàng", count: purchaseReceipts.length },
                         { key: "orders" as TabType, label: "📦 Đơn nhập", count: orders.length },
                         { key: "suppliers" as TabType, label: "🏢 NCC", count: suppliers.length },
                         { key: "receipts" as TabType, label: "📋 Phiếu nhận", count: receipts.length },
@@ -232,6 +276,163 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
                     </>
                 )}
             </div>
+
+            {/* ═══════════ PURCHASE RECEIPT TAB (NHẬP HÀNG) ═══════════ */}
+            {tab === "purchase" && (
+                <div className="space-y-5">
+                    {/* Create Receipt Form */}
+                    <div className="rounded-xl border border-cream-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">
+                            <Plus className="h-4 w-4" /> Tạo phiếu nhập hàng
+                        </h3>
+                        <div className="grid grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label className="text-[10px] font-bold uppercase text-cream-400 mb-1 block">Nhà cung cấp *</label>
+                                <select
+                                    value={prSupplierId}
+                                    onChange={(e) => setPrSupplierId(e.target.value)}
+                                    className="w-full rounded-lg border border-cream-300 px-3 py-2 text-xs text-green-900 bg-white focus:ring-2 focus:ring-green-200 focus:border-green-400"
+                                >
+                                    <option value="">Chọn NCC...</option>
+                                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="col-span-2">
+                                <label className="text-[10px] font-bold uppercase text-cream-400 mb-1 block">Ghi chú</label>
+                                <Input value={prNotes} onChange={(e) => setPrNotes(e.target.value)} placeholder="Mặt hàng bổ sung, số HĐ..." className="h-9 text-xs border-cream-300" />
+                            </div>
+                        </div>
+
+                        {/* Item Lines */}
+                        <div className="space-y-2 mb-4">
+                            <div className="grid grid-cols-12 gap-2 text-[10px] font-bold uppercase text-cream-400">
+                                <div className="col-span-5">Nguyên liệu</div>
+                                <div className="col-span-2">Số lượng (base unit)</div>
+                                <div className="col-span-2">Đơn giá / base unit (₫)</div>
+                                <div className="col-span-2 text-right">Thành tiền</div>
+                                <div className="col-span-1"></div>
+                            </div>
+                            {prItems.map((item, idx) => {
+                                const ing = ingredientsList.find(i => i.id === item.ingredientId)
+                                const lineTotal = (Number(item.quantity) || 0) * (Number(item.unitCost) || 0)
+                                return (
+                                    <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                                        <div className="col-span-5">
+                                            <select
+                                                value={item.ingredientId}
+                                                onChange={(e) => {
+                                                    const newItems = [...prItems]
+                                                    newItems[idx].ingredientId = e.target.value
+                                                    setPrItems(newItems)
+                                                }}
+                                                className="w-full rounded-lg border border-cream-300 px-3 py-2 text-xs"
+                                            >
+                                                <option value="">Chọn nguyên liệu...</option>
+                                                {ingredientsList.map(i => (
+                                                    <option key={i.id} value={i.id}>{i.name} ({i.baseUnit}) — Tồn: {i.currentStock} · GV: ₫{fmt(i.costPrice)}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <Input
+                                                type="number"
+                                                value={item.quantity}
+                                                onChange={(e) => {
+                                                    const newItems = [...prItems]
+                                                    newItems[idx].quantity = e.target.value
+                                                    setPrItems(newItems)
+                                                }}
+                                                placeholder={ing ? ing.baseUnit : "SL"}
+                                                className="h-9 text-xs border-cream-300 font-mono"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <Input
+                                                type="number"
+                                                value={item.unitCost}
+                                                onChange={(e) => {
+                                                    const newItems = [...prItems]
+                                                    newItems[idx].unitCost = e.target.value
+                                                    setPrItems(newItems)
+                                                }}
+                                                placeholder="₫"
+                                                className="h-9 text-xs border-cream-300 font-mono"
+                                            />
+                                        </div>
+                                        <div className="col-span-2 text-right font-mono text-xs font-bold text-wine-700">
+                                            {lineTotal > 0 ? `₫${fmt(Math.round(lineTotal))}` : "—"}
+                                        </div>
+                                        <div className="col-span-1 text-center">
+                                            {prItems.length > 1 && (
+                                                <button onClick={() => setPrItems(prItems.filter((_, i) => i !== idx))} className="text-cream-400 hover:text-red-500 transition-colors">
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <Button onClick={() => setPrItems([...prItems, { ingredientId: "", quantity: "", unitCost: "" }])} variant="outline" size="sm" className="h-8 text-xs border-cream-300 text-cream-500">
+                                <Plus className="mr-1 h-3 w-3" /> Thêm dòng
+                            </Button>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs text-cream-500">Tổng: <span className="font-mono font-bold text-green-900">₫{fmt(Math.round(prItems.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitCost) || 0), 0)))}</span></span>
+                                <Button onClick={handlePurchaseReceipt} disabled={prSubmitting} size="sm" className="bg-green-900 text-white hover:bg-green-800">
+                                    {prSubmitting ? "Đang xử lý..." : "📥 Nhập hàng"}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Purchase History */}
+                    <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                        <div className="px-4 py-3 border-b border-cream-200 bg-cream-50">
+                            <h3 className="text-xs font-bold text-green-900 uppercase tracking-wider">Lịch sử nhập hàng</h3>
+                        </div>
+                        <table className="w-full">
+                            <thead>
+                                <tr>
+                                    <th className={TH}>Phiếu nhập</th>
+                                    <th className={TH}>NCC</th>
+                                    <th className={TH}>Nguyên liệu</th>
+                                    <th className={THR} style={{ width: 120 }}>Tổng tiền</th>
+                                    <th className={TH} style={{ width: 130 }}>Ngày nhập</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {purchaseReceipts.map((pr) => (
+                                    <tr key={pr.receiptNo} className="hover:bg-green-50/50 transition-colors align-top">
+                                        <td className={TD}>
+                                            <span className="font-mono font-bold text-green-900">{pr.receiptNo}</span>
+                                        </td>
+                                        <td className={cn(TD, "font-medium")}>{pr.supplierName}</td>
+                                        <td className={TD}>
+                                            <div className="space-y-0.5">
+                                                {pr.items.map((item, i) => (
+                                                    <p key={i} className="text-[11px] text-cream-600 leading-tight">
+                                                        <span className="text-green-600">✓</span> {item.ingredientName}{" "}
+                                                        <span className="font-mono">×{item.quantity} {item.unit}</span>{" "}
+                                                        <span className="text-cream-400">@₫{fmt(Math.round(item.unitCost))}/{item.unit}</span>
+                                                        {item.balanceCost !== null && (
+                                                            <span className="ml-1.5 text-[10px] text-blue-600 font-medium">→ BQGQ: ₫{fmt(Math.round(item.balanceCost))}</span>
+                                                        )}
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        </td>
+                                        <td className={cn(TDR, "font-bold text-wine-700")}>₫{fmtK(pr.totalAmount)}</td>
+                                        <td className={cn(TD, "text-[11px] text-cream-500")}>{new Date(pr.date).toLocaleString("vi-VN")}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {purchaseReceipts.length === 0 && <div className="py-12 text-center text-sm text-cream-400">Chưa có phiếu nhập hàng nào</div>}
+                    </div>
+                </div>
+            )}
 
             {/* ═══════════ ORDERS TAB ═══════════ */}
             {tab === "orders" && (

@@ -474,42 +474,129 @@ export async function processOrderWithCOGS(
         return { success: false, orderId, deductions: [], stockWarnings: [], totalIngredientCost: 0, errors: [payResult.error ?? "Payment failed"] }
     }
 
-    // 2. Deduct ingredients for food / drink items with recipes
+    // 2. Load order with product + recipe + wine bottle data
     const order = await prisma.order.findUnique({
         where: { id: orderId },
-        include: { items: { include: { product: true } } },
+        include: {
+            items: {
+                include: {
+                    product: { include: { recipes: true } },
+                    wineBottle: true,
+                },
+            },
+        },
     })
     if (!order) return { success: true, orderId, deductions: [], stockWarnings: [], totalIngredientCost: 0, errors: [] }
 
     const allDeductions: Array<{ productName: string; materialName: string; qtyUsed: number; unit: string; warning: string | null }> = []
     const stockWarnings: string[] = []
     const errors: string[] = []
-    let totalIngredientCost = 0
+    let totalCOGS = 0
 
-    // Only deduct for food/drink items (wine bottles handled separately)
-    const deductibleItems = order.items.filter(i =>
-        ["FOOD", "DRINK", "OTHER"].includes(i.product.type)
-    )
+    for (const item of order.items) {
+        const product = item.product
+        const hasRecipe = product.recipes.length > 0
+        const costPrice = Number(product.costPrice)
+        const bottleCost = item.wineBottle ? Number(item.wineBottle.costPrice ?? 0) : 0
 
-    for (const item of deductibleItems) {
-        const result = await deductRecipeIngredients(item.productId, item.quantity)
-        if (result.deductions.length > 0) {
-            totalIngredientCost += result.totalIngredientCost
-            for (const d of result.deductions) {
-                allDeductions.push({
-                    productName: result.productName,
-                    materialName: d.materialName,
-                    qtyUsed: d.qtyUsed,
-                    unit: d.unit,
-                    warning: d.warning,
-                })
-                if (d.warning) stockWarnings.push(`${result.productName} → ${d.warning}`)
+        // ─── CASE 1: Product has recipe → deduct ingredients (food, cocktails) ───
+        if (hasRecipe && ["FOOD", "DRINK", "OTHER"].includes(product.type)) {
+            const result = await deductRecipeIngredients(item.productId, item.quantity)
+            if (result.deductions.length > 0) {
+                totalCOGS += result.totalIngredientCost
+                for (const d of result.deductions) {
+                    allDeductions.push({
+                        productName: result.productName,
+                        materialName: d.materialName,
+                        qtyUsed: d.qtyUsed,
+                        unit: d.unit,
+                        warning: d.warning,
+                    })
+                    if (d.warning) stockWarnings.push(`${result.productName} → ${d.warning}`)
+
+                    // Record stock movement for ingredient deduction
+                    try {
+                        await prisma.stockMovement.create({
+                            data: {
+                                type: "SALE",
+                                productId: item.productId,
+                                quantity: -d.qtyUsed,
+                                unitCost: d.costPerUnit,
+                                reason: `Bán ${result.productName} x${item.quantity} → trừ ${d.materialName}`,
+                                createdBy: order.createdBy,
+                            },
+                        })
+                    } catch { /* non-critical */ }
+                }
             }
+            if (result.errors.length > 0) errors.push(...result.errors)
         }
-        if (result.errors.length > 0) errors.push(...result.errors)
+
+        // ─── CASE 2: Wine bottle with costPrice → COGS from bottle cost ───
+        else if (item.wineBottleId && bottleCost > 0) {
+            // For glass pours, prorate cost: bottleCost / glassesPerBottle
+            let itemCOGS: number
+            if (item.isGlassPour && product.glassesPerBottle > 0) {
+                itemCOGS = Math.round((bottleCost / product.glassesPerBottle) * item.quantity)
+            } else {
+                itemCOGS = Math.round(bottleCost * item.quantity)
+            }
+            totalCOGS += itemCOGS
+
+            allDeductions.push({
+                productName: product.name,
+                materialName: item.isGlassPour ? `Ly rượu (1/${product.glassesPerBottle} chai)` : "Chai rượu",
+                qtyUsed: item.quantity,
+                unit: item.isGlassPour ? "ly" : "chai",
+                warning: null,
+            })
+        }
+
+        // ─── CASE 3: No recipe, no bottle, but has costPrice → fallback COGS ───
+        else if (costPrice > 0) {
+            const itemCOGS = Math.round(costPrice * item.quantity)
+            totalCOGS += itemCOGS
+
+            allDeductions.push({
+                productName: product.name,
+                materialName: `Giá nhập (costPrice)`,
+                qtyUsed: item.quantity,
+                unit: "phần",
+                warning: null,
+            })
+        }
     }
 
-    return { success: true, orderId, deductions: allDeductions, stockWarnings, totalIngredientCost, errors }
+    // 3. Record COGS as FundTransaction for Finance reporting
+    if (totalCOGS > 0) {
+        try {
+            const productNames = order.items.map(i => i.product.name).join(", ")
+            await prisma.fundTransaction.create({
+                data: {
+                    transactionType: "EXPENSE",
+                    category: "Giá vốn hàng bán (COGS)",
+                    amount: totalCOGS,
+                    description: `COGS đơn ${order.orderNo}: ${productNames}`,
+                    orderId: order.id,
+                },
+            })
+        } catch { /* non-critical */ }
+    }
+
+    // 4. Record revenue as FundTransaction
+    try {
+        await prisma.fundTransaction.create({
+            data: {
+                transactionType: "REVENUE",
+                category: "Doanh thu bán hàng",
+                amount: Number(order.totalAmount),
+                description: `Đơn ${order.orderNo}`,
+                orderId: order.id,
+            },
+        })
+    } catch { /* non-critical */ }
+
+    return { success: true, orderId, deductions: allDeductions, stockWarnings, totalIngredientCost: totalCOGS, errors }
 }
 
 // ============================================================

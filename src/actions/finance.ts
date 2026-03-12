@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import type { TransactionType } from "@prisma/client"
 
 // ============================================================
-// FINANCE — Fund Transactions + Debt Records
+// FINANCE — Fund Transactions + Debt Records + REAL COGS
 // ============================================================
 
 export async function getFundTransactions(params?: { startDate?: Date; endDate?: Date; type?: TransactionType }) {
@@ -157,7 +157,10 @@ export async function getJournalEntries() { return [] }
 export async function getTrialBalance() { return { accounts: [], totalDebit: 0, totalCredit: 0, isBalanced: true } }
 export async function getAccountLedger() { return { account: null, entries: [], openingBalance: 0, closingBalance: 0 } }
 
-// Types needed by finance page
+// ============================================================
+// TYPES
+// ============================================================
+
 export type COGSRecord = {
     id: string; orderId: string; orderNo: string; date: Date
     productName?: string; batchesUsed?: number; soldDate?: Date; soldQty?: number
@@ -168,8 +171,8 @@ export type COGSRecord = {
 
 export type FinanceSummary = {
     todayRevenue: number; todayExpenses: number; todayCOGS: number; todayProfit: number
-    totalRevenue?: number; totalCOGS?: number; grossProfit?: number; grossMargin?: number
-    operatingExpenses?: number; depreciationExpense?: number; netProfit?: number; netMargin?: number
+    totalRevenue: number; totalCOGS: number; grossProfit: number; grossMargin: number
+    operatingExpenses: number; depreciationExpense: number; netProfit: number; netMargin: number
     monthRevenue: number; monthExpenses: number; monthCOGS: number; monthProfit: number
     totalPayable: number; totalReceivable: number
 }
@@ -178,14 +181,337 @@ export type ExpenseCategory = {
     category: string; amount: number; percentage: number; color: string
 }
 
-// Stub functions for finance page
-export async function getCOGSRecords(): Promise<COGSRecord[]> { return [] }
+/**
+ * Get COGS records from PAID orders.
+ * Calculates cost for EVERY item:
+ *   1. Recipe-based (food/drink with ingredients) → sum ingredient costs
+ *   2. Wine bottles → WineBottle.costPrice (prorated for glass pours)
+ *   3. Fallback → Product.costPrice
+ */
+export async function getCOGSRecords(): Promise<COGSRecord[]> {
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+
+    const paidOrders = await prisma.order.findMany({
+        where: {
+            status: "PAID",
+            closedAt: { gte: monthStart },
+        },
+        include: {
+            items: {
+                include: {
+                    product: {
+                        include: {
+                            recipes: { include: { ingredient: true } },
+                        },
+                    },
+                    wineBottle: true,
+                },
+            },
+        },
+        orderBy: { closedAt: "desc" },
+        take: 200,
+    })
+
+    const records: COGSRecord[] = []
+
+    for (const order of paidOrders) {
+        let orderCOGS = 0
+        let orderRevenue = 0
+        const items: COGSRecord["items"] = []
+
+        for (const item of order.items) {
+            const product = item.product
+            const sellingPrice = Number(item.unitPrice) * item.quantity
+            orderRevenue += sellingPrice
+
+            let itemCOGS = 0
+
+            // CASE 1: Recipe-based (food, cocktails, etc.)
+            if (product.recipes.length > 0) {
+                for (const recipe of product.recipes) {
+                    const mat = recipe.ingredient
+                    const qtyNeeded = Number(recipe.quantity) * item.quantity
+                    const baseQty = Number(mat.baseQuantity)
+                    const costPerDisplayUnit = Number(mat.costPerUnit)
+                    const costPerBase = baseQty > 0 ? costPerDisplayUnit / baseQty : costPerDisplayUnit
+                    itemCOGS += qtyNeeded * costPerBase
+                }
+            }
+            // CASE 2: Wine bottle with costPrice
+            else if (item.wineBottle && Number(item.wineBottle.costPrice ?? 0) > 0) {
+                const bottleCost = Number(item.wineBottle.costPrice!)
+                if (item.isGlassPour && product.glassesPerBottle > 0) {
+                    itemCOGS = (bottleCost / product.glassesPerBottle) * item.quantity
+                } else {
+                    itemCOGS = bottleCost * item.quantity
+                }
+            }
+            // CASE 3: Fallback to product costPrice
+            else if (Number(product.costPrice) > 0) {
+                itemCOGS = Number(product.costPrice) * item.quantity
+            }
+
+            itemCOGS = Math.round(itemCOGS)
+            orderCOGS += itemCOGS
+
+            // Only include items with calculable cost
+            if (itemCOGS > 0 || sellingPrice > 0) {
+                items.push({
+                    productName: product.name,
+                    qty: item.quantity,
+                    ingredientCost: itemCOGS,
+                    sellingPrice,
+                })
+            }
+        }
+
+        // Skip orders where we have nothing to report
+        if (items.length === 0) continue
+
+        const grossProfit = orderRevenue - orderCOGS
+        const marginPct = orderRevenue > 0 ? Math.round((grossProfit / orderRevenue) * 100) : 0
+
+        records.push({
+            id: order.id,
+            orderId: order.id,
+            orderNo: order.orderNo,
+            date: order.closedAt ?? order.createdAt,
+            productName: items.map(i => i.productName).join(", "),
+            soldDate: order.closedAt ?? order.createdAt,
+            soldQty: items.reduce((s, i) => s + i.qty, 0),
+            sellingPrice: orderRevenue,
+            fifoCost: orderCOGS,
+            grossMargin: marginPct,
+            batchesUsed: items.length,
+            items,
+            totalCOGS: orderCOGS,
+            totalRevenue: orderRevenue,
+            grossProfit,
+            marginPct,
+        })
+    }
+
+    return records
+}
+
+/**
+ * COGS Summary — aggregated from real order data
+ */
 export async function getCOGSSummary() {
-    return { todayCOGS: 0, monthCOGS: 0, avgMargin: 0, totalOrders: 0, topMarginProduct: null, lowestMarginProduct: null }
+    const records = await getCOGSRecords()
+
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const todayRecords = records.filter(r => new Date(r.date) >= todayStart)
+
+    const totalCOGS = records.reduce((s, r) => s + r.totalCOGS, 0)
+    const todayCOGS = todayRecords.reduce((s, r) => s + r.totalCOGS, 0)
+    const avgMargin = records.length > 0
+        ? Math.round(records.reduce((s, r) => s + r.marginPct, 0) / records.length)
+        : 0
+
+    // Find top/lowest margin products
+    const productMap = new Map<string, { revenue: number; cogs: number }>()
+    for (const r of records) {
+        for (const item of r.items) {
+            const existing = productMap.get(item.productName) ?? { revenue: 0, cogs: 0 }
+            existing.revenue += item.sellingPrice
+            existing.cogs += item.ingredientCost
+            productMap.set(item.productName, existing)
+        }
+    }
+    const products = Array.from(productMap.entries()).map(([name, data]) => ({
+        name,
+        margin: data.revenue > 0 ? Math.round(((data.revenue - data.cogs) / data.revenue) * 100) : 0,
+    }))
+    products.sort((a, b) => b.margin - a.margin)
+
+    return {
+        todayCOGS,
+        monthCOGS: totalCOGS,
+        avgMargin,
+        totalOrders: records.length,
+        topMarginProduct: products[0] ? `${products[0].name} (${products[0].margin}%)` : "N/A",
+        lowestMarginProduct: products.length > 0
+            ? `${products[products.length - 1].name} (${products[products.length - 1].margin}%)`
+            : "N/A",
+    }
 }
+
+/**
+ * COGS by product — real breakdown per product
+ */
+export async function getCOGSByProduct() {
+    const records = await getCOGSRecords()
+
+    const productMap = new Map<string, { revenue: number; cogs: number; qty: number }>()
+    for (const r of records) {
+        for (const item of r.items) {
+            const existing = productMap.get(item.productName) ?? { revenue: 0, cogs: 0, qty: 0 }
+            existing.revenue += item.sellingPrice
+            existing.cogs += item.ingredientCost
+            existing.qty += item.qty
+            productMap.set(item.productName, existing)
+        }
+    }
+
+    return Array.from(productMap.entries())
+        .map(([productName, data]) => ({
+            productName,
+            totalRevenue: data.revenue,
+            totalCOGS: data.cogs,
+            grossProfit: data.revenue - data.cogs,
+            grossMargin: data.revenue > 0 ? Math.round(((data.revenue - data.cogs) / data.revenue) * 100) : 0,
+            totalQty: data.qty,
+        }))
+        .sort((a, b) => b.grossProfit - a.grossProfit)
+}
+
+/**
+ * Finance Summary — REAL data from Orders, FundTransactions, Equipment
+ */
 export async function getFinanceSummary(): Promise<FinanceSummary> {
-    const stats = await getFinanceStats()
-    return { ...stats, todayCOGS: 0, monthRevenue: 0, monthExpenses: 0, monthCOGS: 0, monthProfit: 0 }
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+
+    // Revenue from PAID orders
+    const [todayOrders, monthOrders] = await Promise.all([
+        prisma.order.findMany({
+            where: { status: "PAID", closedAt: { gte: todayStart } },
+            select: { totalAmount: true },
+        }),
+        prisma.order.findMany({
+            where: { status: "PAID", closedAt: { gte: monthStart } },
+            select: { totalAmount: true },
+        }),
+    ])
+
+    const todayRevenue = todayOrders.reduce((s, o) => s + Number(o.totalAmount), 0)
+    const monthRevenue = monthOrders.reduce((s, o) => s + Number(o.totalAmount), 0)
+
+    // COGS from recipes
+    const cogsSummary = await getCOGSSummary()
+    const todayCOGS = cogsSummary.todayCOGS
+    const monthCOGS = cogsSummary.monthCOGS
+
+    // Operating expenses from FundTransaction
+    const [todayExpAgg, monthExpAgg] = await Promise.all([
+        prisma.fundTransaction.aggregate({
+            where: { transactionType: "EXPENSE", date: { gte: todayStart } },
+            _sum: { amount: true },
+        }),
+        prisma.fundTransaction.aggregate({
+            where: { transactionType: "EXPENSE", date: { gte: monthStart } },
+            _sum: { amount: true },
+        }),
+    ])
+    const todayExpenses = Number(todayExpAgg._sum.amount ?? 0)
+    const monthExpenses = Number(monthExpAgg._sum.amount ?? 0)
+
+    // Depreciation from Equipment
+    const depreciationExpense = await prisma.equipment.aggregate({
+        where: { status: "ACTIVE" },
+        _sum: { monthlyDepreciation: true },
+    }).then(r => Number(r._sum.monthlyDepreciation ?? 0))
+
+    // Debt
+    const debts = await prisma.debtRecord.findMany({
+        where: { status: { in: ["OUTSTANDING", "PARTIAL"] } },
+    })
+    const totalPayable = debts.filter(d => d.debtType === "PAYABLE").reduce((s, d) => s + Number(d.amount) - Number(d.paidAmount), 0)
+    const totalReceivable = debts.filter(d => d.debtType === "RECEIVABLE").reduce((s, d) => s + Number(d.amount) - Number(d.paidAmount), 0)
+
+    // Calculations
+    const totalRevenue = monthRevenue
+    const totalCOGS = monthCOGS
+    const grossProfit = totalRevenue - totalCOGS
+    const grossMargin = totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 100) : 0
+    const operatingExpenses = monthExpenses
+    const netProfit = grossProfit - operatingExpenses - depreciationExpense
+    const netMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100) : 0
+
+    return {
+        todayRevenue,
+        todayExpenses,
+        todayCOGS,
+        todayProfit: todayRevenue - todayCOGS - todayExpenses,
+        totalRevenue,
+        totalCOGS,
+        grossProfit,
+        grossMargin,
+        operatingExpenses,
+        depreciationExpense,
+        netProfit,
+        netMargin,
+        monthRevenue,
+        monthExpenses,
+        monthCOGS,
+        monthProfit: grossProfit - operatingExpenses - depreciationExpense,
+        totalPayable,
+        totalReceivable,
+    }
 }
-export async function getExpenseBreakdown(): Promise<ExpenseCategory[]> { return [] }
-export async function getCOGSByProduct() { return [] }
+
+/**
+ * Expense Breakdown — categorize by COGS vs Operating vs Depreciation
+ */
+export async function getExpenseBreakdown(): Promise<ExpenseCategory[]> {
+    const summary = await getFinanceSummary()
+
+    const categories: ExpenseCategory[] = []
+    const total = summary.totalCOGS + summary.operatingExpenses + summary.depreciationExpense
+
+    if (total === 0) return []
+
+    if (summary.totalCOGS > 0) {
+        categories.push({
+            category: "Giá vốn hàng bán (COGS)",
+            amount: summary.totalCOGS,
+            percentage: Math.round((summary.totalCOGS / total) * 100),
+            color: "#991b1b",
+        })
+    }
+
+    // Break down operating expenses by category from FundTransaction
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+
+    const expByCategory = await prisma.fundTransaction.groupBy({
+        by: ["category"],
+        where: { transactionType: "EXPENSE", date: { gte: monthStart } },
+        _sum: { amount: true },
+    })
+
+    const colors = ["#1e40af", "#047857", "#b45309", "#6d28d9", "#be185d", "#0f766e"]
+    for (let i = 0; i < expByCategory.length; i++) {
+        const exp = expByCategory[i]
+        const amount = Number(exp._sum.amount ?? 0)
+        if (amount > 0) {
+            categories.push({
+                category: exp.category,
+                amount,
+                percentage: Math.round((amount / total) * 100),
+                color: colors[i % colors.length],
+            })
+        }
+    }
+
+    if (summary.depreciationExpense > 0) {
+        categories.push({
+            category: "Khấu hao CCDC/Thiết bị",
+            amount: summary.depreciationExpense,
+            percentage: Math.round((summary.depreciationExpense / total) * 100),
+            color: "#92400e",
+        })
+    }
+
+    return categories.sort((a, b) => b.amount - a.amount)
+}

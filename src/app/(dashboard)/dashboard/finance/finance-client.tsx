@@ -28,8 +28,6 @@ import {
     type ExpenseCategory,
 } from "@/actions/finance"
 import { toast } from "sonner"
-import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
-import { useMultiCachedData } from "@/hooks/use-cached-data"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -61,26 +59,43 @@ function StatCard({ label, value, sub, color, icon: Icon, accent }: { label: str
 
 type TabType = "overview" | "cogs" | "products"
 
-export function FinanceClient() {
+type FinanceInitialData = {
+    cogsRecords: COGSRecord[]
+    cogsSummary: Awaited<ReturnType<typeof getCOGSSummary>>
+    financeSummary: FinanceSummary
+    expenses: ExpenseCategory[]
+    productCOGS: Awaited<ReturnType<typeof getCOGSByProduct>>
+}
+
+export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
     const [tab, setTab] = useState<TabType>("overview")
+    const [cogsRecords, setCogsRecords] = useState(initial.cogsRecords)
+    const [cogsSummary, setCogsSummary] = useState(initial.cogsSummary)
+    const [financeSummary, setFinanceSummary] = useState(initial.financeSummary)
+    const [expenses, setExpenses] = useState(initial.expenses)
+    const [productCOGS, setProductCOGS] = useState(initial.productCOGS)
+    const [refreshing, setRefreshing] = useState(false)
 
-    const { data, loading, refresh } = useMultiCachedData<[COGSRecord[], Awaited<ReturnType<typeof getCOGSSummary>>, FinanceSummary, ExpenseCategory[], Awaited<ReturnType<typeof getCOGSByProduct>>]>([
-        { key: "finance:cogs", fetcher: getCOGSRecords },
-        { key: "finance:cogsSummary", fetcher: getCOGSSummary },
-        { key: "finance:summary", fetcher: getFinanceSummary },
-        { key: "finance:expenses", fetcher: getExpenseBreakdown },
-        { key: "finance:products", fetcher: getCOGSByProduct },
-    ])
-
-    const cogsRecords = data[0] ?? []
-    const cogsSummary = data[1]
-    const financeSummary = data[2]
-    const expenses = data[3] ?? []
-    const productCOGS = data[4] ?? []
-
-    if (loading && !financeSummary) {
-        return <DashboardInlineSkeleton />
+    const refresh = async () => {
+        setRefreshing(true)
+        try {
+            const [r, cs, fs, ex, pc] = await Promise.all([
+                getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
+            ])
+            setCogsRecords(r)
+            setCogsSummary(cs)
+            setFinanceSummary(fs)
+            setExpenses(ex)
+            setProductCOGS(pc)
+            toast.success("Đã cập nhật dữ liệu tài chính")
+        } catch {
+            toast.error("Lỗi tải dữ liệu")
+        }
+        setRefreshing(false)
     }
+
+    const now = new Date()
+    const monthLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`
 
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
@@ -92,31 +107,29 @@ export function FinanceClient() {
                     </div>
                     <div>
                         <h1 className="font-display text-2xl font-bold text-green-900">Tài chính</h1>
-                        <p className="text-sm text-cream-500">Giá vốn FIFO, P&L & phân tích biên lợi nhuận</p>
+                        <p className="text-sm text-cream-500">Giá vốn COGS, P&L & phân tích biên lợi nhuận — dữ liệu thực</p>
                     </div>
                 </div>
-                <Button onClick={refresh} variant="outline" size="sm" className="border-cream-300 text-cream-500">
-                    <RefreshCcw className="mr-1.5 h-3.5 w-3.5" /> Refresh
+                <Button onClick={refresh} variant="outline" size="sm" disabled={refreshing} className="border-cream-300 text-cream-500">
+                    <RefreshCcw className={cn("mr-1.5 h-3.5 w-3.5", refreshing && "animate-spin")} /> {refreshing ? "Đang tải..." : "Refresh"}
                 </Button>
             </div>
 
             {/* KPI Cards */}
-            {financeSummary && cogsSummary && (
-                <div className="grid grid-cols-6 gap-3">
-                    <StatCard label="Doanh thu" value={`₫${fmtK(financeSummary.totalRevenue)}`} sub="Tháng 3/2026" color="text-green-700" icon={TrendingUp} accent="bg-green-100" />
-                    <StatCard label="Giá vốn (COGS)" value={`₫${fmtK(financeSummary.totalCOGS)}`} sub="FIFO method" color="text-wine-700" icon={Package} accent="bg-wine-100" />
-                    <StatCard label="Lợi nhuận gộp" value={`₫${fmtK(financeSummary.grossProfit)}`} sub={`GM: ${financeSummary.grossMargin}%`} color="text-green-600" icon={ArrowUpRight} accent="bg-green-100" />
-                    <StatCard label="Chi phí vận hành" value={`₫${fmtK(financeSummary.operatingExpenses)}`} sub="Nhân sự, mặt bằng..." color="text-blue-600" icon={Layers} accent="bg-blue-100" />
-                    <StatCard label="Khấu hao CCDC" value={`₫${fmtK(financeSummary.depreciationExpense)}`} sub="Tháng này" color="text-amber-600" icon={TrendingDown} accent="bg-amber-100" />
-                    <StatCard
-                        label="Lợi nhuận ròng" value={`₫${fmtK(financeSummary.netProfit)}`}
-                        sub={`NM: ${financeSummary.netMargin}%`}
-                        color={financeSummary.netProfit >= 0 ? "text-green-700" : "text-red-600"}
-                        icon={financeSummary.netProfit >= 0 ? ArrowUpRight : ArrowDownRight}
-                        accent={financeSummary.netProfit >= 0 ? "bg-green-100" : "bg-red-100"}
-                    />
-                </div>
-            )}
+            <div className="grid grid-cols-6 gap-3">
+                <StatCard label="Doanh thu" value={`₫${fmtK(financeSummary.totalRevenue)}`} sub={monthLabel} color="text-green-700" icon={TrendingUp} accent="bg-green-100" />
+                <StatCard label="Giá vốn (COGS)" value={`₫${fmtK(financeSummary.totalCOGS)}`} sub="Tính từ công thức" color="text-wine-700" icon={Package} accent="bg-wine-100" />
+                <StatCard label="Lợi nhuận gộp" value={`₫${fmtK(financeSummary.grossProfit)}`} sub={`GM: ${financeSummary.grossMargin}%`} color="text-green-600" icon={ArrowUpRight} accent="bg-green-100" />
+                <StatCard label="Chi phí vận hành" value={`₫${fmtK(financeSummary.operatingExpenses)}`} sub="Nhân sự, mặt bằng..." color="text-blue-600" icon={Layers} accent="bg-blue-100" />
+                <StatCard label="Khấu hao CCDC" value={`₫${fmtK(financeSummary.depreciationExpense)}`} sub="Tháng này" color="text-amber-600" icon={TrendingDown} accent="bg-amber-100" />
+                <StatCard
+                    label="Lợi nhuận ròng" value={`₫${fmtK(financeSummary.netProfit)}`}
+                    sub={`NM: ${financeSummary.netMargin}%`}
+                    color={financeSummary.netProfit >= 0 ? "text-green-700" : "text-red-600"}
+                    icon={financeSummary.netProfit >= 0 ? ArrowUpRight : ArrowDownRight}
+                    accent={financeSummary.netProfit >= 0 ? "bg-green-100" : "bg-red-100"}
+                />
+            </div>
 
             {/* Tab Switch */}
             <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5 w-fit">
@@ -136,13 +149,13 @@ export function FinanceClient() {
             </div>
 
             {/* ═══════════ P&L OVERVIEW ═══════════ */}
-            {tab === "overview" && financeSummary && (
+            {tab === "overview" && (
                 <div className="grid grid-cols-5 gap-4">
                     {/* P&L Statement */}
                     <div className="col-span-3 rounded-xl border border-cream-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">
                             <BarChart3 className="h-4 w-4 text-green-700" />
-                            Báo cáo Lãi / Lỗ — Tháng 3/2026
+                            Báo cáo Lãi / Lỗ — {monthLabel}
                         </h3>
                         <div className="space-y-0.5">
                             <div className="flex items-center justify-between rounded-lg bg-green-50 px-4 py-2.5">
@@ -150,7 +163,7 @@ export function FinanceClient() {
                                 <span className="font-mono text-sm font-bold text-green-700">₫{fmt(financeSummary.totalRevenue)}</span>
                             </div>
                             <div className="flex items-center justify-between px-4 py-2">
-                                <span className="text-xs text-cream-500 pl-4">(-) Giá vốn hàng bán (COGS - FIFO)</span>
+                                <span className="text-xs text-cream-500 pl-4">(-) Giá vốn hàng bán (COGS)</span>
                                 <span className="font-mono text-xs text-red-600">-₫{fmt(financeSummary.totalCOGS)}</span>
                             </div>
                             <div className="flex items-center justify-between rounded-lg bg-cream-50 border border-cream-200 px-4 py-2.5">
@@ -184,19 +197,23 @@ export function FinanceClient() {
                         <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">
                             <PieChart className="h-4 w-4 text-wine-600" /> Cơ cấu chi phí
                         </h3>
-                        <div className="space-y-2.5 mb-4">
-                            {expenses.map((exp) => (
-                                <div key={exp.category}>
-                                    <div className="flex items-center justify-between mb-0.5">
-                                        <span className="text-[10px] text-cream-500 truncate max-w-[160px]">{exp.category}</span>
-                                        <span className="font-mono text-[10px] font-bold text-cream-600">₫{fmtK(exp.amount)} ({exp.percentage}%)</span>
+                        {expenses.length > 0 ? (
+                            <div className="space-y-2.5 mb-4">
+                                {expenses.map((exp) => (
+                                    <div key={exp.category}>
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <span className="text-[10px] text-cream-500 truncate max-w-[160px]">{exp.category}</span>
+                                            <span className="font-mono text-[10px] font-bold text-cream-600">₫{fmtK(exp.amount)} ({exp.percentage}%)</span>
+                                        </div>
+                                        <div className="h-2 rounded-full bg-cream-200 overflow-hidden">
+                                            <div className="h-full rounded-full transition-all" style={{ width: `${exp.percentage}%`, backgroundColor: exp.color }} />
+                                        </div>
                                     </div>
-                                    <div className="h-2 rounded-full bg-cream-200 overflow-hidden">
-                                        <div className="h-full rounded-full transition-all" style={{ width: `${exp.percentage}%`, backgroundColor: exp.color }} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-cream-400 italic py-4 text-center">Chưa có dữ liệu chi phí. Thanh toán đơn để thấy COGS.</p>
+                        )}
 
                         {cogsSummary && (
                             <div className="border-t border-cream-200 pt-3 space-y-2">
@@ -209,6 +226,16 @@ export function FinanceClient() {
                                     <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                                     <div><p className="text-[9px] text-cream-400">Biên thấp nhất</p><p className="text-[11px] font-bold text-amber-700">{cogsSummary.lowestMarginProduct}</p></div>
                                 </div>
+                                <div className="rounded-lg bg-cream-50 border border-cream-200 px-3 py-2 mt-2">
+                                    <div className="flex justify-between text-[10px]">
+                                        <span className="text-cream-500">Tổng đơn có COGS</span>
+                                        <span className="font-bold text-green-900">{cogsSummary.totalOrders}</span>
+                                    </div>
+                                    <div className="flex justify-between text-[10px] mt-1">
+                                        <span className="text-cream-500">Biên LN trung bình</span>
+                                        <span className="font-bold text-wine-700">{cogsSummary.avgMargin}%</span>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -218,84 +245,110 @@ export function FinanceClient() {
             {/* ═══════════ COGS DETAIL ═══════════ */}
             {tab === "cogs" && (
                 <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
-                    <table className="w-full">
-                        <thead>
-                            <tr>
-                                <th className={TH}>Sản phẩm</th>
-                                <th className={THR} style={{ width: 110 }}>Giá bán</th>
-                                <th className={THR} style={{ width: 110 }}>Giá vốn FIFO</th>
-                                <th className={THR} style={{ width: 110 }}>Lợi nhuận gộp</th>
-                                <th className={THC} style={{ width: 80 }}>Biên LN</th>
-                                <th className={THC} style={{ width: 60 }}>SL bán</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {cogsRecords.map((record) => {
-                                const cls = record.grossMargin >= 70 ? "bg-green-100 text-green-700"
-                                    : record.grossMargin >= 50 ? "bg-blue-100 text-blue-700"
-                                        : record.grossMargin >= 30 ? "bg-amber-100 text-amber-700"
-                                            : "bg-red-100 text-red-700"
-                                return (
-                                    <tr key={record.id} className="hover:bg-green-50/50 transition-colors">
-                                        <td className={TD}>
-                                            <p className="font-medium leading-tight">{record.productName}</p>
-                                            <p className="text-[10px] text-cream-400 leading-tight">{Array.isArray(record.batchesUsed) ? record.batchesUsed.map((b: any) => b.poNumber).join(", ") : `${record.batchesUsed} batches`} · {record.soldDate ? (typeof record.soldDate === 'string' ? record.soldDate : new Date(record.soldDate).toLocaleDateString('vi-VN')) : ''}</p>
-                                        </td>
-                                        <td className={TDR}>₫{fmt(record.sellingPrice)}</td>
-                                        <td className={cn(TDR, "text-wine-600")}>₫{fmt(record.fifoCost)}</td>
-                                        <td className={cn(TDR, "font-bold text-green-600")}>₫{fmt(record.grossProfit)}</td>
-                                        <td className={TDC}>
-                                            <span className={cn("inline-block rounded-full px-2 py-0.5 text-[9px] font-bold leading-tight", cls)}>{record.grossMargin}%</span>
-                                        </td>
-                                        <td className={cn(TDC, "text-cream-600")}>{record.soldQty}</td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
+                    {cogsRecords.length > 0 ? (
+                        <table className="w-full">
+                            <thead>
+                                <tr>
+                                    <th className={TH}>Đơn hàng</th>
+                                    <th className={TH}>Sản phẩm</th>
+                                    <th className={THR} style={{ width: 110 }}>Doanh thu</th>
+                                    <th className={THR} style={{ width: 110 }}>Giá vốn COGS</th>
+                                    <th className={THR} style={{ width: 110 }}>Lợi nhuận gộp</th>
+                                    <th className={THC} style={{ width: 80 }}>Biên LN</th>
+                                    <th className={THC} style={{ width: 60 }}>SL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {cogsRecords.map((record) => {
+                                    const margin = record.marginPct
+                                    const cls = margin >= 70 ? "bg-green-100 text-green-700"
+                                        : margin >= 50 ? "bg-blue-100 text-blue-700"
+                                            : margin >= 30 ? "bg-amber-100 text-amber-700"
+                                                : "bg-red-100 text-red-700"
+                                    return (
+                                        <tr key={record.id} className="hover:bg-green-50/50 transition-colors">
+                                            <td className={TD}>
+                                                <p className="font-mono text-[11px] font-bold text-blue-700">{record.orderNo}</p>
+                                                <p className="text-[10px] text-cream-400 leading-tight">
+                                                    {record.soldDate ? new Date(record.soldDate).toLocaleDateString('vi-VN') : ''}
+                                                </p>
+                                            </td>
+                                            <td className={TD}>
+                                                <p className="font-medium leading-tight">{record.productName}</p>
+                                                <p className="text-[10px] text-cream-400 leading-tight">
+                                                    {record.items.map(i => `${i.productName} x${i.qty}`).join(", ")}
+                                                </p>
+                                            </td>
+                                            <td className={TDR}>₫{fmt(record.totalRevenue)}</td>
+                                            <td className={cn(TDR, "text-wine-600")}>₫{fmt(record.totalCOGS)}</td>
+                                            <td className={cn(TDR, "font-bold text-green-600")}>₫{fmt(record.grossProfit)}</td>
+                                            <td className={TDC}>
+                                                <span className={cn("inline-block rounded-full px-2 py-0.5 text-[9px] font-bold leading-tight", cls)}>{margin}%</span>
+                                            </td>
+                                            <td className={cn(TDC, "text-cream-600")}>{record.soldQty}</td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="py-12 text-center">
+                            <Package className="h-8 w-8 text-cream-300 mx-auto mb-2" />
+                            <p className="text-sm text-cream-400">Chưa có dữ liệu COGS</p>
+                            <p className="text-xs text-cream-300 mt-1">Tạo công thức cho sản phẩm, sau đó thanh toán đơn hàng để thấy giá vốn thực</p>
+                        </div>
+                    )}
                 </div>
             )}
 
             {/* ═══════════ PRODUCT MARGIN ═══════════ */}
             {tab === "products" && (
                 <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
-                    <table className="w-full">
-                        <thead>
-                            <tr>
-                                <th className={TH} style={{ width: 24 }}>#</th>
-                                <th className={TH}>Sản phẩm</th>
-                                <th className={THR} style={{ width: 100 }}>Doanh thu</th>
-                                <th className={THR} style={{ width: 100 }}>COGS</th>
-                                <th className={THR} style={{ width: 100 }}>Lợi nhuận</th>
-                                <th className={TH} style={{ width: 130 }}>Mức biên</th>
-                                <th className={THC} style={{ width: 60 }}>SL bán</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {productCOGS.map((product, idx) => {
-                                const mc = product.grossMargin >= 70 ? "text-green-700" : product.grossMargin >= 50 ? "text-blue-700" : product.grossMargin >= 30 ? "text-amber-700" : "text-red-700"
-                                const bc = product.grossMargin >= 70 ? "bg-green-500" : product.grossMargin >= 50 ? "bg-blue-500" : product.grossMargin >= 30 ? "bg-amber-500" : "bg-red-500"
-                                return (
-                                    <tr key={product.productName} className="hover:bg-green-50/50 transition-colors">
-                                        <td className={cn(TD, "text-cream-400 text-center font-mono")}>{idx + 1}</td>
-                                        <td className={cn(TD, "font-medium")}>{product.productName}</td>
-                                        <td className={TDR}>₫{fmtK(product.totalRevenue)}</td>
-                                        <td className={cn(TDR, "text-wine-600")}>₫{fmtK(product.totalCOGS)}</td>
-                                        <td className={cn(TDR, "font-bold text-green-600")}>₫{fmtK(product.grossProfit)}</td>
-                                        <td className={TD}>
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="flex-1 h-1.5 rounded-full bg-cream-200 overflow-hidden">
-                                                    <div className={cn("h-full rounded-full", bc)} style={{ width: `${product.grossMargin}%` }} />
+                    {productCOGS.length > 0 ? (
+                        <table className="w-full">
+                            <thead>
+                                <tr>
+                                    <th className={TH} style={{ width: 24 }}>#</th>
+                                    <th className={TH}>Sản phẩm</th>
+                                    <th className={THR} style={{ width: 100 }}>Doanh thu</th>
+                                    <th className={THR} style={{ width: 100 }}>COGS</th>
+                                    <th className={THR} style={{ width: 100 }}>Lợi nhuận</th>
+                                    <th className={TH} style={{ width: 130 }}>Mức biên</th>
+                                    <th className={THC} style={{ width: 60 }}>SL bán</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {productCOGS.map((product, idx) => {
+                                    const mc = product.grossMargin >= 70 ? "text-green-700" : product.grossMargin >= 50 ? "text-blue-700" : product.grossMargin >= 30 ? "text-amber-700" : "text-red-700"
+                                    const bc = product.grossMargin >= 70 ? "bg-green-500" : product.grossMargin >= 50 ? "bg-blue-500" : product.grossMargin >= 30 ? "bg-amber-500" : "bg-red-500"
+                                    return (
+                                        <tr key={product.productName} className="hover:bg-green-50/50 transition-colors">
+                                            <td className={cn(TD, "text-cream-400 text-center font-mono")}>{idx + 1}</td>
+                                            <td className={cn(TD, "font-medium")}>{product.productName}</td>
+                                            <td className={TDR}>₫{fmtK(product.totalRevenue)}</td>
+                                            <td className={cn(TDR, "text-wine-600")}>₫{fmtK(product.totalCOGS)}</td>
+                                            <td className={cn(TDR, "font-bold text-green-600")}>₫{fmtK(product.grossProfit)}</td>
+                                            <td className={TD}>
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="flex-1 h-1.5 rounded-full bg-cream-200 overflow-hidden">
+                                                        <div className={cn("h-full rounded-full", bc)} style={{ width: `${product.grossMargin}%` }} />
+                                                    </div>
+                                                    <span className={cn("text-[10px] font-bold min-w-[32px] text-right", mc)}>{product.grossMargin}%</span>
                                                 </div>
-                                                <span className={cn("text-[10px] font-bold min-w-[32px] text-right", mc)}>{product.grossMargin}%</span>
-                                            </div>
-                                        </td>
-                                        <td className={cn(TDC, "text-cream-600")}>{product.totalQty}</td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
+                                            </td>
+                                            <td className={cn(TDC, "text-cream-600")}>{product.totalQty}</td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="py-12 text-center">
+                            <Package className="h-8 w-8 text-cream-300 mx-auto mb-2" />
+                            <p className="text-sm text-cream-400">Chưa có dữ liệu biên lợi nhuận sản phẩm</p>
+                            <p className="text-xs text-cream-300 mt-1">Tạo công thức → bán hàng → thanh toán để thấy biên LN từng sản phẩm</p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
