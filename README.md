@@ -149,6 +149,8 @@ pos-noonnoir/
 │   ├── lib/
 │   │   ├── mock-data.ts       # Legacy (no longer imported by actions)
 │   │   ├── staff-constants.ts # Role/status label maps
+│   │   ├── customer-tiers.ts  # 🆕 v9: CustomerTier type + calculateTier
+│   │   ├── shift-types.ts     # 🆕 v9: Shared SHIFT_TYPES constant
 │   │   └── utils.ts           # cn() utility
 │   └── stores/
 │       ├── auth-store.ts      # Auth + PIN (Zustand persist)
@@ -262,12 +264,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 8.0 |
+| **Version** | 9.0 |
 | **Created** | March 10, 2026 |
-| **Last Updated** | March 11, 2026 |
+| **Last Updated** | March 12, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **🚀 Full HR Management** — 28 routes, 37 modules, 34 Prisma models, payroll, schedule, HR config |
+| **Status** | **⚡ SSR Performance + Build Compliance** — 7 SSR pages, 3 server action fixes, 28 routes, 37 modules |
 
 ---
 
@@ -301,7 +303,8 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-11 | **v6.0** | **🗄️ Full Prisma Migration** — Toàn bộ 17 server action files chuyển từ mock data → Prisma ORM. (1) **P0**: wine.ts, operational.ts, reservations.ts — WineBottle FIFO, AuditLog, Reservation model. (2) **P1**: feedback.ts, notifications.ts, reports.ts, daily-pnl.ts, qr-payment.ts — Live aggregation từ Order/Payment. (3) **P2**: forecast.ts, push-sale.ts, shift-targets.ts, inventory-alerts.ts, serving-notes.ts — Dynamic queries. (4) **P3**: promotions.ts, assets.ts — 3 new models (Promotion, Equipment, DepreciationEntry) + 4 new enums. **Schema: 33 models. 0 mock data. 0 delay() calls. Build: 0 TS errors.** |
 | 2026-03-11 | **v7.0** | **🍷 Wine By-Glass Sales System** — (1) Wine Guide tích hợp POS cards + setup dashboard. (2) Tax/CTKM hiển thị đầy đủ. (3) Wine Advisor: gợi ý theo ABV/acidity/body + alternatives. (4) Bottle Selector modal: chọn chai rót ly, oxidation tracking. (5) Bottle Tracking Dashboard: KPIs, opened bottles monitoring, P&L history. (6) By-Glass Product Setup: toggle, glasses/bottle, oxidation hours, margin calc. **27 routes, 34 modules.** |
 | 2026-03-11 | **v8.0** | **👥 Full HR Management** — (1) **Staff Audit & Fix**: sửa bug ₫undefined, thêm lương vào card + modal. (2) **Attendance**: check-in/out, nghỉ phép, summary KPIs (8 server actions). (3) **Staff Detail Page**: profile + 4 sub-tabs (Overview, Attendance, Shifts, Performance). (4) **Payroll**: tính lương tháng = Base ÷ days × worked + OT(1.5x) + bonus(1% DT nếu >5M), CSV export. (5) **Schedule**: weekly grid 7 ngày × N staff, 4 loại ca (Sáng/Chiều/Tối/Cả ngày), assign/remove/copy week. (6) **HR Settings**: 5 sub-tabs (Ca làm, Chấm công, Lương, Nghỉ phép, Vai trò & Thang lương). Schema: +2 models (StaffSchedule, SystemSetting). **28 routes, 37 modules, 34 Prisma models. 0 TS errors.** |
+| 2026-03-12 | **v9.0** | **⚡ SSR Performance + Build Compliance** — (1) **SSR Conversion**: 7 pages chuyển sang Server Components (Dashboard, Analytics, Reports, Tables, Customers, Reservations, Staff) — data hiển thị lập tức, không loading spinner. (2) **"use server" Compliance Fix**: sửa 3 action files vi phạm quy tắc Next.js (chỉ cho export async functions từ `"use server"` files): `customers.ts` (xóa re-export `calculateTier`/`TIER_THRESHOLDS`), `schedule.ts` (extract `SHIFT_TYPES` → `@/lib/shift-types.ts`), `tax.ts` (convert `export const` alias → async function wrapper). (3) **Shared Lib Extraction**: tạo `@/lib/shift-types.ts`, `@/lib/customer-tiers.ts` cho runtime constants dùng chung. **Build: 0 TS errors, next build exit 0. Deploy-ready.** |
 
 ---
 
-*Last updated: March 11, 2026 — Full HR Management v8.0*
+*Last updated: March 12, 2026 — SSR Performance + Build Compliance v9.0*
