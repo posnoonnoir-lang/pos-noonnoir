@@ -362,7 +362,7 @@ export async function getActiveOrderByTable(tableId: string) {
     const order = await prisma.order.findFirst({
         where: {
             tableId,
-            status: { in: ["OPEN", "PREPARING", "SERVED"] },
+            status: { in: ["OPEN", "PENDING", "PREPARING", "READY", "SERVED"] },
         },
         include: {
             items: { include: { product: { select: { name: true } } } },
