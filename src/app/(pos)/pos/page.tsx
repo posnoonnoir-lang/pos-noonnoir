@@ -166,7 +166,11 @@ function TableSelector({
             const order = await getActiveOrderByTable(table.id)
             setLoadingOrder(false)
             if (order) {
-                setViewingOrder({ table, order })
+                // Direct load into cart — no popup
+                if (onSelectOccupied) {
+                    onSelectOccupied(table, order)
+                }
+                onClose()
             } else {
                 // No active order found — allow creating new
                 onSelect(table)
