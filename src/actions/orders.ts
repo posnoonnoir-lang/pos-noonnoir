@@ -429,9 +429,7 @@ export async function getActiveOrders() {
     const orders = await prisma.order.findMany({
         where: { status: { in: ["OPEN", "PREPARING", "SERVED"] } },
         include: {
-            items: { include: { product: true } },
-            table: true,
-            staff: true,
+            items: { include: { product: { select: { name: true } } } },
         },
         orderBy: { createdAt: "desc" },
     })
@@ -541,7 +539,7 @@ export async function sendToKitchen(orderId: string, itemIds?: string[]) {
         })
 
         // revalidatePath("/pos")
-        revalidatePath("/dashboard/kitchen")
+        // revalidatePath("/dashboard/kitchen") — removed for perf (kitchen is client-side with polling)
         return { success: true, itemsSent: result.count }
     } catch {
         return { success: false, itemsSent: 0, error: "Lỗi gửi bếp" }
@@ -579,7 +577,7 @@ export async function updateItemStatus(
         }
 
         // revalidatePath("/pos")
-        revalidatePath("/dashboard/kitchen")
+        // revalidatePath("/dashboard/kitchen") — removed for perf (kitchen is client-side with polling)
         return { success: true }
     } catch {
         return { success: false, error: "Lỗi cập nhật trạng thái" }

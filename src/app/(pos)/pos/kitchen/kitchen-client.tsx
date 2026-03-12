@@ -94,10 +94,13 @@ export default function KitchenClient({ initialOrders }: KitchenClientProps) {
     const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
         const result = await updateOrderStatus(orderId, newStatus)
         if (result.success) {
+            // Optimistic update — no full refetch
+            setOrders(prev => prev.map(o =>
+                o.id === orderId ? { ...o, status: newStatus } : o
+            ).filter(o => !["COMPLETED", "PAID", "CANCELLED", "VOID"].includes(o.status)))
             if (newStatus === "READY" && soundEnabled) {
                 toast.success("🔔 Đơn đã sẵn sàng!", { duration: 3000 })
             }
-            loadOrders()
         }
     }
 
