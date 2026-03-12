@@ -58,9 +58,6 @@ import {
     type ConsignmentSettlement,
 } from "@/actions/consignment"
 import { useAuthStore } from "@/stores/auth-store"
-import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
-import { useMultiCachedData } from "@/hooks/use-cached-data"
-import { usePrefetchStore } from "@/stores/prefetch-store"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -100,9 +97,19 @@ function StatCard({ label, value, color, icon: Icon }: { label: string; value: s
 
 type TabType = "orders" | "suppliers" | "receipts" | "fifo" | "consignment" | "settlement"
 
-export function ProcurementClient() {
+export interface ProcurementInitialData {
+    orders: PurchaseOrder[]
+    suppliers: Supplier[]
+    receipts: GoodsReceipt[]
+    fifoBatches: FIFOBatch[]
+    stats: Awaited<ReturnType<typeof getProcurementStats>>
+    consignments: Consignment[]
+    settlements: ConsignmentSettlement[]
+    csmStats: Awaited<ReturnType<typeof getConsignmentStats>>
+}
+
+export function ProcurementClient({ initial }: { initial: ProcurementInitialData }) {
     const { staff } = useAuthStore()
-    const invalidate = usePrefetchStore(s => s.invalidatePrefix)
     const [tab, setTab] = useState<TabType>("orders")
     const [searchTerm, setSearchTerm] = useState("")
     const [statusFilter, setStatusFilter] = useState<POStatus | "ALL">("ALL")
@@ -111,32 +118,23 @@ export function ProcurementClient() {
     const [showCreateSupplier, setShowCreateSupplier] = useState(false)
     const [expandedCSM, setExpandedCSM] = useState<string | null>(null)
 
-    const { data, loading, refresh } = useMultiCachedData<[
-        PurchaseOrder[], Supplier[], GoodsReceipt[], FIFOBatch[],
-        Awaited<ReturnType<typeof getProcurementStats>>,
-        Consignment[], ConsignmentSettlement[],
-        Awaited<ReturnType<typeof getConsignmentStats>>
-    ]>([
-        { key: "proc:orders", fetcher: getPurchaseOrders },
-        { key: "proc:suppliers", fetcher: getSuppliers },
-        { key: "proc:receipts", fetcher: getGoodsReceipts },
-        { key: "proc:fifo", fetcher: getFIFOBatches },
-        { key: "proc:stats", fetcher: getProcurementStats },
-        { key: "proc:consign", fetcher: getConsignments },
-        { key: "proc:settle", fetcher: getSettlements },
-        { key: "proc:csmStats", fetcher: getConsignmentStats },
-    ])
+    const [orders, setOrders] = useState(initial.orders)
+    const [suppliers, setSuppliers] = useState(initial.suppliers)
+    const [receipts, setReceipts] = useState(initial.receipts)
+    const [fifoBatches, setFifoBatches] = useState(initial.fifoBatches)
+    const [stats, setStats] = useState(initial.stats)
+    const [consignments, setConsignments] = useState(initial.consignments)
+    const [settlements, setSettlements] = useState(initial.settlements)
+    const [csmStats, setCsmStats] = useState(initial.csmStats)
 
-    const orders = data[0] ?? []
-    const suppliers = data[1] ?? []
-    const receipts = data[2] ?? []
-    const fifoBatches = data[3] ?? []
-    const stats = data[4]
-    const consignments = data[5] ?? []
-    const settlements = data[6] ?? []
-    const csmStats = data[7]
-
-    const loadData = async () => { invalidate("proc:"); refresh() }
+    const loadData = async () => {
+        const [o, s, r, f, st, c, se, cs] = await Promise.all([
+            getPurchaseOrders(), getSuppliers(), getGoodsReceipts(), getFIFOBatches(),
+            getProcurementStats(), getConsignments(), getSettlements(), getConsignmentStats(),
+        ])
+        setOrders(o); setSuppliers(s); setReceipts(r); setFifoBatches(f)
+        setStats(st); setConsignments(c); setSettlements(se); setCsmStats(cs)
+    }
 
     const filteredOrders = orders.filter((po) => {
         const matchSearch = !searchTerm
@@ -164,10 +162,6 @@ export function ProcurementClient() {
             setExpandedPO(null)
             loadData()
         }
-    }
-
-    if (loading && orders.length === 0 && !stats) {
-        return <DashboardInlineSkeleton />
     }
 
     return (
