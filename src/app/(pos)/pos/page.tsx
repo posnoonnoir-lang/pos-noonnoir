@@ -94,6 +94,7 @@ import { getPosConfig, type PaymentMode } from "@/actions/pos-config"
 import { checkPromotions, type AppliedPromo } from "@/actions/promotions"
 import { getProductStock, getAllowNegativeStock, getWineRecommendations, getAlternativesForOutOfStock, type WineRecommendation } from "@/actions/wine-advisor"
 import { POSInlineSkeleton } from "@/components/inline-skeletons"
+import { ReceiptPrintFrame } from "@/components/pos/receipt"
 import { usePrefetchStore } from "@/stores/prefetch-store"
 import type { Product, Category, Customer, CustomerTab } from "@/types"
 type FloorTable = Awaited<ReturnType<typeof getTables>>[number]
@@ -344,6 +345,7 @@ export default function POSPage() {
     const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
     const [payingOrder, setPayingOrder] = useState<Order | null>(null)
     const [existingOrderData, setExistingOrderData] = useState<Order | null>(null)
+    const [receiptOrder, setReceiptOrder] = useState<Order | null>(null)
 
     // Tab state
     const [openTabModal, setOpenTabModal] = useState(false)
@@ -884,11 +886,16 @@ export default function POSPage() {
                 const deductionInfo = cogsResult.deductions.length > 0
                     ? ` · Trừ NPL: ${cogsResult.deductions.length} SP`
                     : ""
+                const paidOrder = result.order
                 toast.success(
                     `✅ ${result.order.orderNumber}`,
                     {
                         description: `${cart.selectedTable?.tableNumber ?? "Takeaway"} · ₫${formatPrice(result.order.total)} · ${paymentMethod}${deductionInfo}`,
-                        duration: 4000,
+                        duration: 8000,
+                        action: {
+                            label: "🖨️ In bill",
+                            onClick: () => setReceiptOrder(paidOrder),
+                        },
                     }
                 )
 
@@ -1460,13 +1467,19 @@ export default function POSPage() {
                                 ))}
                             </div>
                             {/* Quick Pay button for existing order */}
-                            <div className="px-4 py-2 border-t border-wine-100">
+                            <div className="px-4 py-2 border-t border-wine-100 flex gap-1.5">
+                                <button
+                                    onClick={() => setReceiptOrder(existingOrderData)}
+                                    className="rounded-lg border border-wine-200 bg-wine-50 py-1.5 px-3 text-[10px] font-bold text-wine-700 hover:bg-wine-100 transition-all flex items-center gap-1"
+                                >
+                                    🖨️
+                                </button>
                                 <button
                                     onClick={() => setPayingOrder(existingOrderData)}
-                                    className="w-full rounded-lg bg-green-700 py-1.5 text-[10px] font-bold text-white hover:bg-green-600 transition-all flex items-center justify-center gap-1"
+                                    className="flex-1 rounded-lg bg-green-700 py-1.5 text-[10px] font-bold text-white hover:bg-green-600 transition-all flex items-center justify-center gap-1"
                                 >
                                     <Banknote className="h-3 w-3" />
-                                    Thanh toán đơn này · ₫{formatPrice(existingOrderData.total)}
+                                    Thanh toán · ₫{formatPrice(existingOrderData.total)}
                                 </button>
                             </div>
                         </div>
@@ -1994,11 +2007,28 @@ export default function POSPage() {
                     order={payingOrder}
                     onClose={() => setPayingOrder(null)}
                     onPaid={() => {
+                        const paidOrd = payingOrder
                         setPayingOrder(null)
+                        setExistingOrderData(null)
+                        setActiveOrderId(null)
                         refreshFloorData()
-                        toast.success(`✅ Đã thanh toán đơn ${payingOrder.orderNumber}`)
+                        toast.success(`✅ Đã thanh toán đơn ${paidOrd.orderNumber}`, {
+                            duration: 8000,
+                            action: {
+                                label: "🖨️ In bill",
+                                onClick: () => setReceiptOrder(paidOrd),
+                            },
+                        })
                     }}
                     staffName={staff?.fullName ?? "Staff"}
+                />
+            )}
+
+            {/* Receipt Print Modal */}
+            {receiptOrder && (
+                <ReceiptPrintFrame
+                    order={receiptOrder}
+                    onClose={() => setReceiptOrder(null)}
                 />
             )}
 
