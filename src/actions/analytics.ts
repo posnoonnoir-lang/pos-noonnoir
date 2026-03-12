@@ -71,31 +71,34 @@ export type AnalyticsSummary = {
 // 1. Monthly Revenue (last 6 months)
 // ============================================================
 export async function getMonthlyRevenue(): Promise<MonthlyRevenue[]> {
-    const result: MonthlyRevenue[] = []
     const now = new Date()
 
-    for (let i = 5; i >= 0; i--) {
+    // Build all 6 months in PARALLEL
+    const months = Array.from({ length: 6 }, (_, idx) => {
+        const i = 5 - idx
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const start = new Date(d.getFullYear(), d.getMonth(), 1)
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 1)
         const monthLabel = start.toLocaleDateString("vi-VN", { month: "short", year: "numeric" })
+        return { start, end, monthLabel }
+    })
 
-        const orders = await prisma.order.findMany({
-            where: { createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
-            include: { items: { include: { product: true } } },
+    const results = await Promise.all(
+        months.map(async ({ start, end, monthLabel }) => {
+            const orders = await prisma.order.findMany({
+                where: { createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
+                include: { items: { include: { product: true } } },
+            })
+            const revenue = orders.reduce((s, o) => s + Number(o.totalAmount), 0)
+            const cogs = orders.reduce(
+                (s, o) => s + o.items.reduce((is, it) => is + Number(it.product.costPrice) * it.quantity, 0), 0
+            )
+            const profit = revenue - cogs
+            const avgTicket = orders.length > 0 ? Math.round(revenue / orders.length) : 0
+            return { month: monthLabel, revenue, profit, orders: orders.length, avgTicket }
         })
-
-        const revenue = orders.reduce((s, o) => s + Number(o.totalAmount), 0)
-        const cogs = orders.reduce(
-            (s, o) => s + o.items.reduce((is, it) => is + Number(it.product.costPrice) * it.quantity, 0),
-            0
-        )
-        const profit = revenue - cogs
-        const avgTicket = orders.length > 0 ? Math.round(revenue / orders.length) : 0
-
-        result.push({ month: monthLabel, revenue, profit, orders: orders.length, avgTicket })
-    }
-    return result
+    )
+    return results
 }
 
 // ============================================================
@@ -198,35 +201,41 @@ export async function getZoneHeatmap(): Promise<ZoneHeatmap[]> {
 export async function getHourlyHeatmap(): Promise<HourlyHeatmap[]> {
     const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"]
     const now = new Date()
-    const result: HourlyHeatmap[] = []
 
-    for (let i = 6; i >= 0; i--) {
+    // Build all 7 days in PARALLEL
+    const dayConfigs = Array.from({ length: 7 }, (_, idx) => {
+        const i = 6 - idx
         const d = new Date(now.getTime() - i * 86400000)
         const start = new Date(d.toISOString().split("T")[0])
         const end = new Date(start.getTime() + 86400000)
         const dayLabel = days[start.getDay()]
+        return { start, end, dayLabel, dayIndex: start.getDay() }
+    })
 
-        const orders = await prisma.order.findMany({
-            where: { createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
+    const result = await Promise.all(
+        dayConfigs.map(async ({ start, end, dayLabel, dayIndex }) => {
+            const orders = await prisma.order.findMany({
+                where: { createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
+            })
+
+            const hourMap = new Map<number, { orders: number; revenue: number }>()
+            for (const o of orders) {
+                const h = o.createdAt.getHours()
+                const existing = hourMap.get(h) ?? { orders: 0, revenue: 0 }
+                existing.orders++
+                existing.revenue += Number(o.totalAmount)
+                hourMap.set(h, existing)
+            }
+
+            const hours = []
+            for (let h = 10; h <= 23; h++) {
+                const data = hourMap.get(h) ?? { orders: 0, revenue: 0 }
+                hours.push({ hour: h, ...data, intensity: 0 })
+            }
+
+            return { day: dayLabel, dayIndex, hours } as HourlyHeatmap
         })
-
-        const hourMap = new Map<number, { orders: number; revenue: number }>()
-        for (const o of orders) {
-            const h = o.createdAt.getHours()
-            const existing = hourMap.get(h) ?? { orders: 0, revenue: 0 }
-            existing.orders++
-            existing.revenue += Number(o.totalAmount)
-            hourMap.set(h, existing)
-        }
-
-        const hours = []
-        for (let h = 10; h <= 23; h++) {
-            const data = hourMap.get(h) ?? { orders: 0, revenue: 0 }
-            hours.push({ hour: h, ...data, intensity: 0 })
-        }
-
-        result.push({ day: dayLabel, dayIndex: start.getDay(), hours })
-    }
+    )
 
     // Normalize intensity
     const maxOrders = Math.max(...result.flatMap((d) => d.hours.map((h) => h.orders)), 1)

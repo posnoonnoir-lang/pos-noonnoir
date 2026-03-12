@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma"
 
 // ============================================================
-// DAILY P&L REPORT — Prisma version
+// DAILY P&L REPORT — Prisma version (OPTIMIZED)
 // ============================================================
 
 export type PnLExpenseGroup = { category: string; amount: number; items: { description: string; amount: number }[] }
@@ -26,19 +26,26 @@ async function buildPnL(dateStr: string): Promise<DailyPnL> {
     const start = new Date(dateStr)
     const end = new Date(start.getTime() + 86400000)
 
-    const orders = await prisma.order.findMany({
-        where: { createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
-        include: { items: { include: { product: true } }, payments: true },
-    })
+    // Run orders + expenses + waste in parallel instead of sequential
+    const [orders, expenses, waste] = await Promise.all([
+        prisma.order.findMany({
+            where: { createdAt: { gte: start, lt: end }, status: { not: "CANCELLED" } },
+            include: { items: { include: { product: true } }, payments: true },
+        }),
+        prisma.fundTransaction.findMany({
+            where: { date: { gte: start, lt: end }, transactionType: "EXPENSE" },
+        }),
+        prisma.stockMovement.aggregate({
+            where: { type: { in: ["WASTE", "SPOILAGE", "BREAKAGE"] }, createdAt: { gte: start, lt: end } },
+            _sum: { unitCost: true },
+        }),
+    ])
 
     const revenue = orders.reduce((s, o) => s + Number(o.totalAmount), 0)
     const costOfGoods = orders.reduce((s, o) => s + o.items.reduce((is, i) => is + Number(i.product.costPrice) * i.quantity, 0), 0)
     const grossProfit = revenue - costOfGoods
     const grossMargin = revenue > 0 ? Math.round(grossProfit / revenue * 1000) / 10 : 0
 
-    const expenses = await prisma.fundTransaction.findMany({
-        where: { date: { gte: start, lt: end }, transactionType: "EXPENSE" },
-    })
     const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0)
     const expenseGroups: PnLExpenseGroup[] = []
     const catMap = new Map<string, { amount: number; items: { description: string; amount: number }[] }>()
@@ -74,8 +81,6 @@ async function buildPnL(dateStr: string): Promise<DailyPnL> {
         }
     }
 
-    const waste = await prisma.stockMovement.aggregate({ where: { type: { in: ["WASTE", "SPOILAGE", "BREAKAGE"] }, createdAt: { gte: start, lt: end } }, _sum: { unitCost: true } })
-
     return {
         date: dateStr, revenue, costOfGoods, grossProfit, grossMargin,
         expenses: expenseGroups, totalExpenses, netProfit, netMargin,
@@ -94,16 +99,21 @@ export async function getPnLByDate(date: string): Promise<DailyPnL | null> {
 }
 
 export async function getPnLSummary(): Promise<PnLSummary> {
-    const today = new Date().toISOString().split("T")[0]
-    const todayPnL = await buildPnL(today)
-
-    const weeklyTrend: PnLTrend[] = []
-    let weekRevenue = 0, weekProfit = 0, weekOrders = 0
-
+    // Build all 7 days + today in PARALLEL instead of sequential loop
+    const dates: string[] = []
     for (let i = 6; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 86400000).toISOString().split("T")[0]
-        const pnl = await buildPnL(d)
-        weeklyTrend.push({ date: d, revenue: pnl.revenue, profit: pnl.netProfit, orders: pnl.orderCount })
+        dates.push(new Date(Date.now() - i * 86400000).toISOString().split("T")[0])
+    }
+
+    const allPnL = await Promise.all(dates.map(d => buildPnL(d)))
+
+    const todayPnL = allPnL[allPnL.length - 1]
+    const weeklyTrend: PnLTrend[] = allPnL.map(pnl => ({
+        date: pnl.date, revenue: pnl.revenue, profit: pnl.netProfit, orders: pnl.orderCount,
+    }))
+
+    let weekRevenue = 0, weekProfit = 0, weekOrders = 0
+    for (const pnl of allPnL) {
         weekRevenue += pnl.revenue; weekProfit += pnl.netProfit; weekOrders += pnl.orderCount
     }
 
@@ -122,10 +132,10 @@ export async function getPnLSummary(): Promise<PnLSummary> {
 }
 
 export async function getWeeklyPnL(): Promise<DailyPnL[]> {
-    const result: DailyPnL[] = []
+    // Build all 7 days in PARALLEL
+    const dates: string[] = []
     for (let i = 6; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 86400000).toISOString().split("T")[0]
-        result.push(await buildPnL(d))
+        dates.push(new Date(Date.now() - i * 86400000).toISOString().split("T")[0])
     }
-    return result
+    return Promise.all(dates.map(d => buildPnL(d)))
 }
