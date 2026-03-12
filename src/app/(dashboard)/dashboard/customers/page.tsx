@@ -1,6 +1,8 @@
 import { getAllCustomers, getCustomerStats } from "@/actions/customers"
 import { CustomersClient } from "./customers-client"
 
+export const dynamic = "force-dynamic"
+
 export default async function CustomersPage() {
     let list: Awaited<ReturnType<typeof getAllCustomers>> = []
     let stats: Awaited<ReturnType<typeof getCustomerStats>> = {
