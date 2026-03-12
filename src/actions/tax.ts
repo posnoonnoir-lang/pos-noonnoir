@@ -50,8 +50,8 @@ export async function calculateTax(subtotal: number, taxRateId?: string) {
     }
 }
 
-// Alias for settings page
-export const getAllTaxRates = getTaxRates
+// Wrapper for settings page (can't use const alias in "use server" files)
+export async function getAllTaxRates() { return getTaxRates() }
 
 // Get default/first active tax rate for POS
 export async function getDefaultTaxRate(): Promise<{ id: string; name: string; rate: number } | null> {

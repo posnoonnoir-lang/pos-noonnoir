@@ -72,9 +72,9 @@ import {
     assignShift,
     removeShift,
     copyWeekSchedule,
-    SHIFT_TYPES,
     type ScheduleEntry,
 } from "@/actions/schedule"
+import { SHIFT_TYPES } from "@/lib/shift-types"
 
 function formatCompact(amount: number): string {
     if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`
