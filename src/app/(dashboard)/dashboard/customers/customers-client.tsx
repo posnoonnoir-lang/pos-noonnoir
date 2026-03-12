@@ -15,6 +15,9 @@ import {
     ChevronUp,
     Heart,
     ShoppingBag,
+    Activity,
+    AlertCircle,
+    UserX,
     TrendingUp,
     Award,
     X,
@@ -31,7 +34,9 @@ import {
     searchCRMCustomers,
     createCustomer,
     getCustomerStats,
+    getCustomerProfile,
     type CustomerProfile,
+    type CustomerDetailProfile,
     type CustomerStats,
 } from "@/actions/customers"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
@@ -66,7 +71,18 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
     const [searchTerm, setSearchTerm] = useState("")
     const [tierFilter, setTierFilter] = useState<TierKey | "ALL">("ALL")
     const [expandedId, setExpandedId] = useState<string | null>(null)
+    const [expandedDetail, setExpandedDetail] = useState<CustomerDetailProfile | null>(null)
+    const [loadingDetail, setLoadingDetail] = useState(false)
     const [showAddModal, setShowAddModal] = useState(false)
+
+    const handleExpand = useCallback(async (id: string) => {
+        if (expandedId === id) { setExpandedId(null); setExpandedDetail(null); return }
+        setExpandedId(id)
+        setLoadingDetail(true)
+        const detail = await getCustomerProfile(id)
+        setExpandedDetail(detail)
+        setLoadingDetail(false)
+    }, [expandedId])
 
     const loadData = useCallback(async () => {
         setLoading(true)
@@ -120,23 +136,40 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
 
             {/* Stats */}
             {stats && (
-                <div className="grid grid-cols-6 gap-3">
-                    <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
-                        <div className="flex items-center gap-1.5 mb-1"><Users className="h-3.5 w-3.5 text-cream-400" /><span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">Tổng KH</span></div>
-                        <p className="font-mono text-xl font-bold text-green-900">{stats.totalCustomers}</p>
+                <div className="space-y-3">
+                    <div className="grid grid-cols-6 gap-3">
+                        <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-1"><Users className="h-3.5 w-3.5 text-cream-400" /><span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">Tổng KH</span></div>
+                            <p className="font-mono text-xl font-bold text-green-900">{stats.totalCustomers}</p>
+                        </div>
+                        {(["PLATINUM", "GOLD", "SILVER", "REGULAR"] as TierKey[]).map((tier) => {
+                            const cfg = TIER_DISPLAY[tier]
+                            return (
+                                <div key={tier} className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setTierFilter(tierFilter === tier ? "ALL" : tier)}>
+                                    <div className="flex items-center gap-1.5 mb-1"><span className="text-sm">{cfg.icon}</span><span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">{cfg.label}</span></div>
+                                    <p className={cn("font-mono text-xl font-bold", cfg.cls)}>{stats.byTier[tier] ?? 0}</p>
+                                </div>
+                            )
+                        })}
+                        <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-1"><TrendingUp className="h-3.5 w-3.5 text-cream-400" /><span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">TB/đơn</span></div>
+                            <p className="font-mono text-xl font-bold text-wine-700">₫{fmtK(stats.avgSpendPerVisit)}</p>
+                        </div>
                     </div>
-                    {(["PLATINUM", "GOLD", "SILVER", "REGULAR"] as TierKey[]).map((tier) => {
-                        const cfg = TIER_DISPLAY[tier]
-                        return (
-                            <div key={tier} className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
-                                <div className="flex items-center gap-1.5 mb-1"><span className="text-sm">{cfg.icon}</span><span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">{cfg.label}</span></div>
-                                <p className={cn("font-mono text-xl font-bold", cfg.cls)}>{stats.byTier[tier]}</p>
-                            </div>
-                        )
-                    })}
-                    <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
-                        <div className="flex items-center gap-1.5 mb-1"><TrendingUp className="h-3.5 w-3.5 text-cream-400" /><span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">TB/lần</span></div>
-                        <p className="font-mono text-xl font-bold text-wine-700">₫{fmtK(stats.avgSpendPerVisit)}</p>
+                    {/* RFM Segments */}
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-xl border border-green-200 bg-green-50 p-3.5 shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-1"><Activity className="h-3.5 w-3.5 text-green-600" /><span className="text-[10px] font-medium uppercase tracking-wider text-green-600">Active (≤30 ngày)</span></div>
+                            <p className="font-mono text-xl font-bold text-green-700">{stats.segments?.active ?? 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-1"><AlertCircle className="h-3.5 w-3.5 text-amber-600" /><span className="text-[10px] font-medium uppercase tracking-wider text-amber-600">At Risk (31-90 ngày)</span></div>
+                            <p className="font-mono text-xl font-bold text-amber-700">{stats.segments?.atRisk ?? 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-1"><UserX className="h-3.5 w-3.5 text-red-500" /><span className="text-[10px] font-medium uppercase tracking-wider text-red-500">Lost (90+ ngày)</span></div>
+                            <p className="font-mono text-xl font-bold text-red-600">{stats.segments?.lost ?? 0}</p>
+                        </div>
                     </div>
                 </div>
             )}
@@ -182,11 +215,11 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
                             {/* Main Row */}
                             <div
                                 className={cn("flex items-center cursor-pointer transition-colors px-4 py-3.5", isExpanded && "bg-green-50")}
-                                onClick={() => setExpandedId(isExpanded ? null : cust.id)}
+                                onClick={() => handleExpand(cust.id)}
                             >
                                 {/* Avatar */}
                                 <div className={cn("flex h-10 w-10 items-center justify-center rounded-full border-2 mr-3 text-sm font-bold", tierCfg.bg)}>
-                                    {cust.fullName.split(" ").slice(-1)[0][0]}
+                                    {(cust.fullName ?? cust.name ?? "?").split(" ").slice(-1)[0]?.[0] ?? "?"}
                                 </div>
 
                                 {/* Name + Contact */}
@@ -204,18 +237,24 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
                                     </div>
                                 </div>
 
-                                {/* Wine Preferences tags */}
-                                <div className="hidden xl:flex items-center gap-1 mr-4">
-                                    {cust.winePreferences.slice(0, 3).map((wp) => (
-                                        <span key={wp} className="rounded-full bg-wine-50 border border-wine-200 px-2 py-0.5 text-[8px] font-medium text-wine-700">{wp}</span>
-                                    ))}
-                                    {cust.winePreferences.length > 3 && <span className="text-[9px] text-cream-400">+{cust.winePreferences.length - 3}</span>}
+                                {/* Last Visit */}
+                                <div className="hidden xl:flex items-center gap-4 mr-4 text-[11px]">
+                                    {cust.lastVisit && (
+                                        <span className="text-cream-500">
+                                            <Clock className="inline h-3 w-3 mr-0.5" />
+                                            {new Date(cust.lastVisit).toLocaleDateString("vi-VN")}
+                                        </span>
+                                    )}
+                                    <span className="text-cream-500">
+                                        <ShoppingBag className="inline h-3 w-3 mr-0.5" />
+                                        {cust.orderCount ?? cust.visitCount ?? 0} đơn
+                                    </span>
                                 </div>
 
                                 {/* Spend + Points */}
                                 <div className="text-right mr-3">
                                     <p className="font-mono text-sm font-bold text-wine-700">₫{fmtK(cust.totalSpent)}</p>
-                                    <p className="text-[10px] text-cream-400">{cust.visitCount} lần · {fmt(cust.loyaltyPoints)} pts</p>
+                                    <p className="text-[10px] text-cream-400">{cust.orderCount ?? cust.visitCount ?? 0} đơn · {fmt(cust.loyaltyPoints ?? cust.loyaltyPts ?? 0)} pts</p>
                                 </div>
 
                                 {/* Expand arrow */}
@@ -227,130 +266,121 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
                             {/* Expanded Detail */}
                             {isExpanded && (
                                 <div className="border-t border-cream-200 bg-cream-50 px-5 py-4">
-                                    <div className="grid grid-cols-3 gap-5">
-                                        {/* Left: Info */}
-                                        <div className="space-y-3">
-                                            <div>
-                                                <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-1.5">Thông tin</h4>
-                                                <div className="rounded-lg bg-white border border-cream-200 p-3 space-y-2 text-xs">
-                                                    <div className="flex justify-between"><span className="text-cream-500">SĐT</span><span className="font-mono">{cust.phone}</span></div>
-                                                    <div className="flex justify-between"><span className="text-cream-500">Email</span><span>{cust.email ?? "—"}</span></div>
-                                                    <div className="flex justify-between"><span className="text-cream-500">Sinh nhật</span><span>{cust.birthday ? (typeof cust.birthday === 'string' ? cust.birthday : new Date(cust.birthday).toLocaleDateString('vi-VN')) : "—"}</span></div>
-                                                    <div className="flex justify-between"><span className="text-cream-500">Khách từ</span><span>{new Date(cust.createdAt).toLocaleDateString("vi-VN")}</span></div>
-                                                </div>
-                                            </div>
-
-                                            {/* Wine Preferences */}
-                                            <div>
-                                                <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-1.5 flex items-center gap-1"><Wine className="h-3 w-3" /> Sở thích rượu</h4>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {cust.winePreferences.length > 0 ? cust.winePreferences.map((wp) => (
-                                                        <span key={wp} className="rounded-full bg-wine-50 border border-wine-200 px-2.5 py-0.5 text-[10px] font-medium text-wine-700">{wp}</span>
-                                                    )) : <span className="text-[10px] text-cream-400 italic">Chưa có sở thích</span>}
-                                                </div>
-                                            </div>
-
-                                            {/* Allergies */}
-                                            {cust.allergies.length > 0 && (
+                                    {loadingDetail ? (
+                                        <div className="py-6 text-center text-sm text-cream-400">Đang tải chi tiết...</div>
+                                    ) : expandedDetail ? (
+                                        <div className="grid grid-cols-3 gap-5">
+                                            {/* Left: Info + RFM */}
+                                            <div className="space-y-3">
                                                 <div>
-                                                    <h4 className="text-[10px] font-bold uppercase text-red-400 mb-1.5 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Dị ứng</h4>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {cust.allergies.map((a) => (
-                                                            <span key={a} className="rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[10px] font-bold text-red-700">{a}</span>
-                                                        ))}
+                                                    <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-1.5">Thông tin</h4>
+                                                    <div className="rounded-lg bg-white border border-cream-200 p-3 space-y-2 text-xs">
+                                                        <div className="flex justify-between"><span className="text-cream-500">SĐT</span><span className="font-mono">{cust.phone}</span></div>
+                                                        <div className="flex justify-between"><span className="text-cream-500">Email</span><span>{cust.email ?? "—"}</span></div>
+                                                        <div className="flex justify-between"><span className="text-cream-500">Sinh nhật</span><span>{cust.birthday ? (typeof cust.birthday === 'string' ? cust.birthday : new Date(cust.birthday).toLocaleDateString('vi-VN')) : "—"}</span></div>
+                                                        <div className="flex justify-between"><span className="text-cream-500">Khách từ</span><span>{new Date(cust.createdAt).toLocaleDateString("vi-VN")}</span></div>
+                                                        <div className="flex justify-between"><span className="text-cream-500">Lần ghé cuối</span><span className="font-medium">{expandedDetail.daysSinceLastVisit === 0 ? "Hôm nay" : `${expandedDetail.daysSinceLastVisit} ngày trước`}</span></div>
                                                     </div>
                                                 </div>
-                                            )}
 
-                                            {/* Notes */}
-                                            {cust.notes && (
-                                                <p className="text-[11px] text-cream-500 italic bg-white rounded-lg border border-cream-200 p-2.5">📝 {cust.notes}</p>
-                                            )}
-                                        </div>
+                                                {/* RFM Score */}
+                                                <div>
+                                                    <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-1.5 flex items-center gap-1"><Activity className="h-3 w-3" /> Phân tích RFM</h4>
+                                                    <div className="rounded-lg bg-white border border-cream-200 p-3 space-y-1.5">
+                                                        {(["recency", "frequency", "monetary"] as const).map((dim) => {
+                                                            const val = expandedDetail.rfm[dim]
+                                                            const labels = { recency: "Gần đây", frequency: "Tần suất", monetary: "Chi tiêu" }
+                                                            const colors = { HIGH: "bg-green-100 text-green-700", MEDIUM: "bg-amber-100 text-amber-700", LOW: "bg-red-100 text-red-700" }
+                                                            return (
+                                                                <div key={dim} className="flex justify-between items-center text-xs">
+                                                                    <span className="text-cream-500">{labels[dim]}</span>
+                                                                    <span className={cn("rounded-full px-2 py-0.5 text-[9px] font-bold", colors[val])}>{val}</span>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
 
-                                        {/* Middle: Loyalty & Stats */}
-                                        <div className="space-y-3">
-                                            <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-1.5">Loyalty & Thống kê</h4>
-                                            <div className="rounded-lg bg-white border border-cream-200 p-3 space-y-2">
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-cream-500 flex items-center gap-1"><Crown className="h-3 w-3" /> Hạng</span>
-                                                    <Badge className={cn("text-[9px] font-bold border", tierCfg.bg)}>{tierCfg.icon} {tierCfg.label}</Badge>
-                                                </div>
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-cream-500 flex items-center gap-1"><Star className="h-3 w-3" /> Điểm tích lũy</span>
-                                                    <span className="font-mono font-bold text-amber-600">{fmt(cust.loyaltyPoints)} pts</span>
-                                                </div>
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-cream-500 flex items-center gap-1"><ShoppingBag className="h-3 w-3" /> Tổng chi tiêu</span>
-                                                    <span className="font-mono font-bold text-wine-700">₫{fmt(cust.totalSpent)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-cream-500 flex items-center gap-1"><Heart className="h-3 w-3" /> Số lần ghé</span>
-                                                    <span className="font-bold text-green-700">{cust.visitCount}</span>
-                                                </div>
-                                                <div className="border-t border-cream-200 pt-2 flex justify-between text-xs">
-                                                    <span className="text-cream-500">TB/lần ghé</span>
-                                                    <span className="font-mono font-bold text-green-900">₫{fmt(cust.visitCount > 0 ? Math.round(cust.totalSpent / cust.visitCount) : 0)}</span>
-                                                </div>
+                                                {cust.notes && <p className="text-[11px] text-cream-500 italic bg-white rounded-lg border border-cream-200 p-2.5">📝 {cust.notes}</p>}
                                             </div>
 
-                                            {/* Tier progress */}
-                                            <div className="rounded-lg bg-white border border-cream-200 p-3">
-                                                <p className="text-[9px] font-bold uppercase text-cream-400 mb-1.5">Tiến trình hạng</p>
-                                                {(() => {
-                                                    const tiers: TierKey[] = ["REGULAR", "SILVER", "GOLD", "PLATINUM"]
-                                                    const currentIdx = tiers.indexOf(cust.tier as TierKey)
-                                                    const nextTier = currentIdx < tiers.length - 1 ? tiers[currentIdx + 1] : null
-                                                    const thresholds: Record<TierKey, number> = { REGULAR: 0, SILVER: 10000000, GOLD: 30000000, PLATINUM: 80000000, VIP: 100000000 }
-                                                    if (!nextTier) return <p className="text-[10px] text-indigo-600 font-bold">💎 Đã đạt hạng cao nhất!</p>
-                                                    const needed = thresholds[nextTier] - cust.totalSpent
-                                                    const progress = Math.min(100, (cust.totalSpent / thresholds[nextTier]) * 100)
-                                                    return (
-                                                        <>
+                                            {/* Middle: Loyalty & Favorites */}
+                                            <div className="space-y-3">
+                                                <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-1.5">Loyalty & Thống kê</h4>
+                                                <div className="rounded-lg bg-white border border-cream-200 p-3 space-y-2">
+                                                    <div className="flex justify-between text-xs"><span className="text-cream-500 flex items-center gap-1"><Crown className="h-3 w-3" /> Hạng</span><Badge className={cn("text-[9px] font-bold border", tierCfg.bg)}>{tierCfg.icon} {tierCfg.label}</Badge></div>
+                                                    <div className="flex justify-between text-xs"><span className="text-cream-500 flex items-center gap-1"><ShoppingBag className="h-3 w-3" /> Tổng chi</span><span className="font-mono font-bold text-wine-700">₫{fmt(cust.totalSpent)}</span></div>
+                                                    <div className="flex justify-between text-xs"><span className="text-cream-500 flex items-center gap-1"><Heart className="h-3 w-3" /> Số đơn</span><span className="font-bold text-green-700">{expandedDetail.orderCount}</span></div>
+                                                    <div className="border-t border-cream-200 pt-2 flex justify-between text-xs"><span className="text-cream-500">TB/đơn</span><span className="font-mono font-bold text-green-900">₫{fmt(expandedDetail.avgOrderValue)}</span></div>
+                                                    <div className="flex justify-between text-xs"><span className="text-cream-500 flex items-center gap-1"><Star className="h-3 w-3" /> Điểm</span><span className="font-mono font-bold text-amber-600">{fmt(cust.loyaltyPts)} pts</span></div>
+                                                </div>
+
+                                                {/* Favorite Products */}
+                                                {expandedDetail.favoriteProducts.length > 0 && (
+                                                    <div>
+                                                        <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-1.5 flex items-center gap-1"><Wine className="h-3 w-3" /> Hay gọi nhất</h4>
+                                                        <div className="rounded-lg bg-white border border-cream-200 p-3 space-y-1.5">
+                                                            {expandedDetail.favoriteProducts.map((fp, i) => (
+                                                                <div key={i} className="flex justify-between text-xs">
+                                                                    <span className="text-cream-600 truncate max-w-[160px]">{fp.name}</span>
+                                                                    <span className="font-mono text-cream-500">{fp.count}× · ₫{fmtK(fp.total)}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Tier progress */}
+                                                <div className="rounded-lg bg-white border border-cream-200 p-3">
+                                                    <p className="text-[9px] font-bold uppercase text-cream-400 mb-1.5">Tiến trình hạng</p>
+                                                    {(() => {
+                                                        const tiers: TierKey[] = ["REGULAR", "SILVER", "GOLD", "PLATINUM"]
+                                                        const currentIdx = tiers.indexOf(cust.tier as TierKey)
+                                                        const nextTier = currentIdx < tiers.length - 1 ? tiers[currentIdx + 1] : null
+                                                        const thresholds: Record<TierKey, number> = { REGULAR: 0, SILVER: 10000000, GOLD: 30000000, PLATINUM: 80000000, VIP: 100000000 }
+                                                        if (!nextTier) return <p className="text-[10px] text-indigo-600 font-bold">💎 Đã đạt hạng cao nhất!</p>
+                                                        const needed = thresholds[nextTier] - cust.totalSpent
+                                                        const progress = Math.min(100, (cust.totalSpent / thresholds[nextTier]) * 100)
+                                                        return (<>
                                                             <div className="flex justify-between text-[10px] mb-1">
-                                                                <span className="text-cream-500">{TIER_DISPLAY[(cust.tier as TierKey) in TIER_DISPLAY ? cust.tier as TierKey : "REGULAR"].icon} {TIER_DISPLAY[(cust.tier as TierKey) in TIER_DISPLAY ? cust.tier as TierKey : "REGULAR"].label}</span>
+                                                                <span className="text-cream-500">{tierCfg.icon} {tierCfg.label}</span>
                                                                 <span className={cn("font-bold", TIER_DISPLAY[nextTier].cls)}>{TIER_DISPLAY[nextTier].icon} {TIER_DISPLAY[nextTier].label}</span>
                                                             </div>
-                                                            <div className="h-2 rounded-full bg-cream-200 overflow-hidden">
-                                                                <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${progress}%` }} />
-                                                            </div>
+                                                            <div className="h-2 rounded-full bg-cream-200 overflow-hidden"><div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${progress}%` }} /></div>
                                                             <p className="text-[9px] text-cream-400 mt-1">Còn ₫{fmt(needed)} để lên hạng</p>
-                                                        </>
-                                                    )
-                                                })()}
+                                                        </>)
+                                                    })()}
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* Right: Order History */}
-                                        <div>
-                                            <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-1.5 flex items-center gap-1"><Clock className="h-3 w-3" /> Lịch sử mua hàng</h4>
-                                            <div className="space-y-2 max-h-60 overflow-y-auto">
-                                                {cust.orderHistory.length > 0 ? cust.orderHistory.map((order) => (
-                                                    <div key={order.id} className="rounded-lg bg-white border border-cream-200 p-2.5">
-                                                        <div className="flex justify-between items-start mb-1">
-                                                            <div>
-                                                                <span className="font-mono text-[11px] font-bold text-blue-700">{order.orderNumber}</span>
-                                                                <span className="text-[9px] text-cream-400 ml-1.5">{new Date(order.date).toLocaleDateString("vi-VN")}</span>
+                                            {/* Right: Order History */}
+                                            <div>
+                                                <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-1.5 flex items-center gap-1"><Clock className="h-3 w-3" /> Lịch sử ({expandedDetail.orderHistory?.length ?? 0} đơn gần nhất)</h4>
+                                                <div className="space-y-2 max-h-72 overflow-y-auto">
+                                                    {(expandedDetail.orderHistory ?? []).length > 0 ? (expandedDetail.orderHistory ?? []).map((order) => (
+                                                        <div key={order.id} className="rounded-lg bg-white border border-cream-200 p-2.5">
+                                                            <div className="flex justify-between items-start mb-1">
+                                                                <div>
+                                                                    <span className="font-mono text-[11px] font-bold text-blue-700">{order.orderNumber}</span>
+                                                                    <span className="text-[9px] text-cream-400 ml-1.5">{new Date(order.date).toLocaleDateString("vi-VN")}</span>
+                                                                </div>
+                                                                <span className="font-mono text-[11px] font-bold text-wine-700">₫{fmt(order.total)}</span>
                                                             </div>
-                                                            <span className="font-mono text-[11px] font-bold text-wine-700">₫{fmt(order.total)}</span>
-                                                        </div>
-                                                        <p className="text-[10px] text-cream-500 leading-tight">{order.items.join(", ")}</p>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <span className={cn(
-                                                                "rounded-full px-1.5 py-0.5 text-[7px] font-bold",
+                                                            <p className="text-[10px] text-cream-500 leading-tight">{order.items.join(", ")}</p>
+                                                            <span className={cn("rounded-full px-1.5 py-0.5 text-[7px] font-bold mt-1 inline-block",
                                                                 order.paymentMethod === "CASH" ? "bg-green-100 text-green-700" :
-                                                                    order.paymentMethod === "CARD" ? "bg-blue-100 text-blue-700" :
-                                                                        "bg-wine-100 text-wine-700"
+                                                                    order.paymentMethod === "CARD" ? "bg-blue-100 text-blue-700" : "bg-wine-100 text-wine-700"
                                                             )}>{order.paymentMethod}</span>
-                                                            <span className="text-[9px] text-cream-400">{order.staffName}</span>
                                                         </div>
-                                                    </div>
-                                                )) : (
-                                                    <p className="text-[10px] text-cream-400 italic py-4 text-center">Chưa có lịch sử mua hàng</p>
-                                                )}
+                                                    )) : (
+                                                        <p className="text-[10px] text-cream-400 italic py-4 text-center">Chưa có lịch sử mua hàng</p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="py-6 text-center text-sm text-cream-400">Không tìm thấy thông tin chi tiết</div>
+                                    )}
                                 </div>
                             )}
                         </div>
