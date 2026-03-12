@@ -38,6 +38,7 @@ import {
 } from "@/actions/reservations"
 import { getTables, getZones } from "@/actions/tables"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 
 const STATUS_CONFIG: Record<ReservationStatus, { label: string; color: string; icon: string }> = {
     PENDING: { label: "Chờ xác nhận", color: "bg-amber-100 border-amber-300 text-amber-700", icon: "⏳" },
@@ -58,9 +59,13 @@ const SOURCE_LABELS: Record<string, { label: string; icon: string }> = {
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 
 export default function ReservationsPage() {
-    const [reservations, setReservations] = useState<Reservation[]>([])
-    const [stats, setStats] = useState<{ todayTotal: number; pending: number; confirmed: number; seated: number; noShow: number; totalGuests: number } | null>(null)
-    const [loading, setLoading] = useState(true)
+    const store = usePrefetchStore()
+    const cachedList = store.get("resv:list", 60_000) as Reservation[] | null
+    const cachedStats = store.get("resv:stats", 60_000)
+
+    const [reservations, setReservations] = useState<Reservation[]>(cachedList ?? [])
+    const [stats, setStats] = useState<{ todayTotal: number; pending: number; confirmed: number; seated: number; noShow: number; totalGuests: number } | null>(cachedStats)
+    const [loading, setLoading] = useState(!cachedList)
     const [statusFilter, setStatusFilter] = useState<ReservationStatus | "ALL">("ALL")
     const [dateFilter, setDateFilter] = useState(new Date().toISOString().split("T")[0])
     const [showAddModal, setShowAddModal] = useState(false)
@@ -73,7 +78,7 @@ export default function ReservationsPage() {
     const [dbTables, setDbTables] = useState<DbTable[]>([])
 
     const loadData = useCallback(async () => {
-        setLoading(true)
+        if (cachedList && !loading) { /* skip loading state for cached */ } else { setLoading(true) }
         try {
             const params: { date?: string; status?: ReservationStatus } = {}
             if (dateFilter) params.date = dateFilter
@@ -85,12 +90,14 @@ export default function ReservationsPage() {
             ])
             setReservations(list)
             setStats(s)
+            store.set("resv:list", list)
+            store.set("resv:stats", s)
         } catch (err) {
             console.error("[Reservations] loadData failed:", err)
             toast.error("Không thể tải dữ liệu đặt bàn")
         }
         setLoading(false)
-    }, [dateFilter, statusFilter])
+    }, [dateFilter, statusFilter, store])
 
     useEffect(() => { loadData() }, [loadData])
 

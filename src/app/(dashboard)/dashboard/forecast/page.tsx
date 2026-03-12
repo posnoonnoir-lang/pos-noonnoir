@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import {
     TrendingUp,
     RefreshCw,
@@ -24,39 +24,25 @@ import {
     type ForecastSummary,
 } from "@/actions/forecast"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
+import { useMultiCachedData } from "@/hooks/use-cached-data"
 
 function formatPrice(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
 }
 
 export default function ForecastPage() {
-    const [items, setItems] = useState<ForecastItem[]>([])
-    const [summary, setSummary] = useState<ForecastSummary | null>(null)
-    const [loading, setLoading] = useState(true)
+    const { data, loading, refresh } = useMultiCachedData<[ForecastItem[], ForecastSummary]>([
+        { key: "forecast:items", fetcher: calculateForecast },
+        { key: "forecast:summary", fetcher: getForecastSummary },
+    ])
 
-    const loadData = useCallback(async () => {
-        setLoading(true)
-        try {
-            const [forecastItems, forecastSummary] = await Promise.all([
-                calculateForecast(),
-                getForecastSummary(),
-            ])
-            setItems(forecastItems)
-            setSummary(forecastSummary)
-        } catch (err) {
-            console.error("[Forecast] loadData failed:", err)
-            toast.error("Không thể tải dữ liệu dự báo")
-        }
-        setLoading(false)
-    }, [])
-
-    useEffect(() => {
-        loadData()
-    }, [loadData])
+    const [localItems, setLocalItems] = useState<ForecastItem[] | null>(null)
+    const items = localItems ?? data[0] ?? []
+    const summary = data[1]
 
     const handleAction = async (id: string, status: "ACCEPTED" | "DISMISSED") => {
         await updateForecastStatus(id, status)
-        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)))
+        setLocalItems((prev) => (prev ?? items).map((i) => (i.id === id ? { ...i, status } : i)))
         toast.success(status === "ACCEPTED" ? "✅ Đã duyệt gợi ý" : "❌ Đã bỏ qua")
     }
 
@@ -81,7 +67,7 @@ export default function ForecastPage() {
                     </p>
                 </div>
                 <Button
-                    onClick={loadData}
+                    onClick={refresh}
                     variant="outline"
                     size="sm"
                     disabled={loading}

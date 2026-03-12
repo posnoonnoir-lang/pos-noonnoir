@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuthStore } from "@/stores/auth-store"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 
 const navItems = [
     { label: "POS", href: "/pos", icon: LayoutGrid },
@@ -47,6 +48,19 @@ const bottomItems = [
 export function Sidebar() {
     const pathname = usePathname()
     const { staff, logout } = useAuthStore()
+    const prefetch = usePrefetchStore(s => s.prefetchMultiple)
+
+    const handleHover = (href: string) => {
+        const keyMap: Record<string, string[]> = {
+            "/dashboard/promotions": ["promotions:list", "promotions:stats"],
+            "/dashboard/inventory": ["inv:items", "inv:stats", "inv:movements"],
+            "/dashboard/procurement": ["proc:orders", "proc:suppliers", "proc:stats"],
+            "/dashboard/customers": ["customers:list", "customers:stats"],
+            "/dashboard/finance": ["finance:summary", "finance:expenses"],
+        }
+        const keys = keyMap[href]
+        if (keys) prefetch(keys)
+    }
 
     return (
         <aside className="fixed left-0 top-0 z-40 flex h-screen w-[60px] flex-col bg-green-900 py-3">
@@ -75,7 +89,8 @@ export function Sidebar() {
                                         ? "bg-green-700 text-cream-50 shadow-sm"
                                         : "text-green-300 hover:bg-green-800 hover:text-cream-50"
                                 )}
-                                render={<Link href={item.href} />}
+                                render={<Link href={item.href} prefetch={true} />}
+                                onMouseEnter={() => handleHover(item.href)}
                             >
                                 <Icon className="h-5 w-5" />
                             </TooltipTrigger>

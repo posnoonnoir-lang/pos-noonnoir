@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import {
     Truck,
     Search,
@@ -59,6 +59,8 @@ import {
 } from "@/actions/consignment"
 import { useAuthStore } from "@/stores/auth-store"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
+import { useMultiCachedData } from "@/hooks/use-cached-data"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -100,42 +102,41 @@ type TabType = "orders" | "suppliers" | "receipts" | "fifo" | "consignment" | "s
 
 export default function ProcurementPage() {
     const { staff } = useAuthStore()
+    const invalidate = usePrefetchStore(s => s.invalidatePrefix)
     const [tab, setTab] = useState<TabType>("orders")
-    const [orders, setOrders] = useState<PurchaseOrder[]>([])
-    const [suppliers, setSuppliers] = useState<Supplier[]>([])
-    const [receipts, setReceipts] = useState<GoodsReceipt[]>([])
-    const [fifoBatches, setFifoBatches] = useState<FIFOBatch[]>([])
-    const [stats, setStats] = useState<Awaited<ReturnType<typeof getProcurementStats>> | null>(null)
-    const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
     const [statusFilter, setStatusFilter] = useState<POStatus | "ALL">("ALL")
     const [expandedPO, setExpandedPO] = useState<string | null>(null)
     const [showCreatePO, setShowCreatePO] = useState(false)
     const [showCreateSupplier, setShowCreateSupplier] = useState(false)
-
-    // Consignment state
-    const [consignments, setConsignments] = useState<Consignment[]>([])
-    const [settlements, setSettlements] = useState<ConsignmentSettlement[]>([])
-    const [csmStats, setCsmStats] = useState<Awaited<ReturnType<typeof getConsignmentStats>> | null>(null)
     const [expandedCSM, setExpandedCSM] = useState<string | null>(null)
 
-    const loadData = useCallback(async () => {
-        setLoading(true)
-        try {
-            const [po, sup, gr, fb, st, csm, stl, cs] = await Promise.all([
-                getPurchaseOrders(), getSuppliers(), getGoodsReceipts(), getFIFOBatches(), getProcurementStats(),
-                getConsignments(), getSettlements(), getConsignmentStats(),
-            ])
-            setOrders(po); setSuppliers(sup); setReceipts(gr); setFifoBatches(fb); setStats(st)
-            setConsignments(csm); setSettlements(stl); setCsmStats(cs)
-        } catch (err) {
-            console.error("[Procurement] loadData failed:", err)
-            toast.error("Không thể tải dữ liệu mua hàng")
-        }
-        setLoading(false)
-    }, [])
+    const { data, loading, refresh } = useMultiCachedData<[
+        PurchaseOrder[], Supplier[], GoodsReceipt[], FIFOBatch[],
+        Awaited<ReturnType<typeof getProcurementStats>>,
+        Consignment[], ConsignmentSettlement[],
+        Awaited<ReturnType<typeof getConsignmentStats>>
+    ]>([
+        { key: "proc:orders", fetcher: getPurchaseOrders },
+        { key: "proc:suppliers", fetcher: getSuppliers },
+        { key: "proc:receipts", fetcher: getGoodsReceipts },
+        { key: "proc:fifo", fetcher: getFIFOBatches },
+        { key: "proc:stats", fetcher: getProcurementStats },
+        { key: "proc:consign", fetcher: getConsignments },
+        { key: "proc:settle", fetcher: getSettlements },
+        { key: "proc:csmStats", fetcher: getConsignmentStats },
+    ])
 
-    useEffect(() => { loadData() }, [loadData])
+    const orders = data[0] ?? []
+    const suppliers = data[1] ?? []
+    const receipts = data[2] ?? []
+    const fifoBatches = data[3] ?? []
+    const stats = data[4]
+    const consignments = data[5] ?? []
+    const settlements = data[6] ?? []
+    const csmStats = data[7]
+
+    const loadData = async () => { invalidate("proc:"); refresh() }
 
     const filteredOrders = orders.filter((po) => {
         const matchSearch = !searchTerm

@@ -35,6 +35,7 @@ import {
     type CustomerStats,
 } from "@/actions/customers"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -55,16 +56,20 @@ const TIER_DISPLAY: Record<TierKey, { label: string; cls: string; icon: string; 
 }
 
 export default function CustomersPage() {
-    const [customers, setCustomers] = useState<CustomerProfile[]>([])
-    const [stats, setStats] = useState<CustomerStats | null>(null)
-    const [loading, setLoading] = useState(true)
+    const store = usePrefetchStore()
+    const cachedList = store.get("customers:list", 60_000) as CustomerProfile[] | null
+    const cachedStats = store.get("customers:stats", 60_000) as CustomerStats | null
+
+    const [customers, setCustomers] = useState<CustomerProfile[]>(cachedList ?? [])
+    const [stats, setStats] = useState<CustomerStats | null>(cachedStats)
+    const [loading, setLoading] = useState(!cachedList)
     const [searchTerm, setSearchTerm] = useState("")
     const [tierFilter, setTierFilter] = useState<TierKey | "ALL">("ALL")
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [showAddModal, setShowAddModal] = useState(false)
 
     const loadData = useCallback(async () => {
-        setLoading(true)
+        if (!loading && customers.length > 0 && !searchTerm) { setLoading(false) } else { setLoading(true) }
         try {
             const [cList, cStats] = await Promise.all([
                 searchTerm ? searchCRMCustomers(searchTerm) : getAllCustomers(),
@@ -72,12 +77,16 @@ export default function CustomersPage() {
             ])
             setCustomers(cList)
             setStats(cStats)
+            if (!searchTerm) {
+                store.set("customers:list", cList)
+                store.set("customers:stats", cStats)
+            }
         } catch (err) {
             console.error("[Customers] loadData failed:", err)
             toast.error("Không thể tải dữ liệu khách hàng")
         }
         setLoading(false)
-    }, [searchTerm])
+    }, [searchTerm, store])
 
     useEffect(() => { loadData() }, [loadData])
 

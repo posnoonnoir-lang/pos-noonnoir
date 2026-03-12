@@ -9,12 +9,16 @@ type PrefetchStore = {
     cache: Map<string, CacheEntry>
     get: (key: string, maxAgeMs?: number) => any | null
     set: (key: string, data: any) => void
+    invalidate: (key: string) => void
+    invalidatePrefix: (prefix: string) => void
+    invalidateAll: () => void
     prefetchFn: Map<string, () => Promise<any>>
     registerPrefetch: (key: string, fn: () => Promise<any>) => void
     prefetch: (key: string) => void
+    prefetchMultiple: (keys: string[]) => void
 }
 
-const CACHE_TTL = 30_000 // 30 seconds
+const CACHE_TTL = 60_000 // 60 seconds default
 
 export const usePrefetchStore = create<PrefetchStore>((set, get) => ({
     cache: new Map(),
@@ -33,6 +37,24 @@ export const usePrefetchStore = create<PrefetchStore>((set, get) => ({
         set({ cache })
     },
 
+    invalidate: (key: string) => {
+        const cache = new Map(get().cache)
+        cache.delete(key)
+        set({ cache })
+    },
+
+    invalidatePrefix: (prefix: string) => {
+        const cache = new Map(get().cache)
+        for (const k of cache.keys()) {
+            if (k.startsWith(prefix)) cache.delete(k)
+        }
+        set({ cache })
+    },
+
+    invalidateAll: () => {
+        set({ cache: new Map() })
+    },
+
     registerPrefetch: (key: string, fn: () => Promise<any>) => {
         const prefetchFn = new Map(get().prefetchFn)
         prefetchFn.set(key, fn)
@@ -41,19 +63,20 @@ export const usePrefetchStore = create<PrefetchStore>((set, get) => ({
 
     prefetch: (key: string) => {
         const store = get()
-        // Already cached and fresh? Skip
         const existing = store.cache.get(key)
         if (existing && Date.now() - existing.timestamp < CACHE_TTL) return
 
-        // Find registered fetcher
         const fn = store.prefetchFn.get(key)
         if (!fn) return
 
-        // Fire and forget
         fn().then((data) => {
             const cache = new Map(get().cache)
             cache.set(key, { data, timestamp: Date.now() })
             set({ cache })
         }).catch(() => { })
+    },
+
+    prefetchMultiple: (keys: string[]) => {
+        keys.forEach((key) => get().prefetch(key))
     },
 }))

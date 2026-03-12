@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import {
     DollarSign,
     TrendingUp,
@@ -29,6 +29,7 @@ import {
 } from "@/actions/finance"
 import { toast } from "sonner"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
+import { useMultiCachedData } from "@/hooks/use-cached-data"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -62,28 +63,20 @@ type TabType = "overview" | "cogs" | "products"
 
 export default function FinancePage() {
     const [tab, setTab] = useState<TabType>("overview")
-    const [cogsRecords, setCogsRecords] = useState<COGSRecord[]>([])
-    const [cogsSummary, setCogsSummary] = useState<Awaited<ReturnType<typeof getCOGSSummary>> | null>(null)
-    const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null)
-    const [expenses, setExpenses] = useState<ExpenseCategory[]>([])
-    const [productCOGS, setProductCOGS] = useState<Awaited<ReturnType<typeof getCOGSByProduct>>>([])
-    const [loading, setLoading] = useState(true)
 
-    const loadData = useCallback(async () => {
-        setLoading(true)
-        try {
-            const [records, summary, finance, exp, products] = await Promise.all([
-                getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
-            ])
-            setCogsRecords(records); setCogsSummary(summary); setFinanceSummary(finance); setExpenses(exp); setProductCOGS(products)
-        } catch (err) {
-            console.error("[Finance] loadData failed:", err)
-            toast.error("Không thể tải dữ liệu tài chính")
-        }
-        setLoading(false)
-    }, [])
+    const { data, loading, refresh } = useMultiCachedData<[COGSRecord[], Awaited<ReturnType<typeof getCOGSSummary>>, FinanceSummary, ExpenseCategory[], Awaited<ReturnType<typeof getCOGSByProduct>>]>([
+        { key: "finance:cogs", fetcher: getCOGSRecords },
+        { key: "finance:cogsSummary", fetcher: getCOGSSummary },
+        { key: "finance:summary", fetcher: getFinanceSummary },
+        { key: "finance:expenses", fetcher: getExpenseBreakdown },
+        { key: "finance:products", fetcher: getCOGSByProduct },
+    ])
 
-    useEffect(() => { loadData() }, [loadData])
+    const cogsRecords = data[0] ?? []
+    const cogsSummary = data[1]
+    const financeSummary = data[2]
+    const expenses = data[3] ?? []
+    const productCOGS = data[4] ?? []
 
     if (loading && !financeSummary) {
         return <DashboardInlineSkeleton />
@@ -102,7 +95,7 @@ export default function FinancePage() {
                         <p className="text-sm text-cream-500">Giá vốn FIFO, P&L & phân tích biên lợi nhuận</p>
                     </div>
                 </div>
-                <Button onClick={loadData} variant="outline" size="sm" className="border-cream-300 text-cream-500">
+                <Button onClick={refresh} variant="outline" size="sm" className="border-cream-300 text-cream-500">
                     <RefreshCcw className="mr-1.5 h-3.5 w-3.5" /> Refresh
                 </Button>
             </div>

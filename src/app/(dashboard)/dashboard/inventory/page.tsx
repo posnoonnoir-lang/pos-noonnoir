@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import {
     Package,
     Search,
@@ -52,6 +52,8 @@ import {
 import { useAuthStore } from "@/stores/auth-store"
 import { AddIngredientModal, RecipeManagerModal } from "@/components/recipe-ingredient-modals"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
+import { useMultiCachedData } from "@/hooks/use-cached-data"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 
 function fmt(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -110,52 +112,48 @@ const TDC = cn(TD, "text-center")
 
 export default function InventoryPage() {
     const { staff } = useAuthStore()
+    const invalidate = usePrefetchStore(s => s.invalidatePrefix)
 
-    const [items, setItems] = useState<InventoryItem[]>([])
-    const [movements, setMovements] = useState<StockMovement[]>([])
-    const [stats, setStats] = useState<Awaited<ReturnType<typeof getInventoryStats>> | null>(null)
     const [searchTerm, setSearchTerm] = useState("")
     const [statusFilter, setStatusFilter] = useState<InventoryStatus | "ALL">("ALL")
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
     const [showAdjust, setShowAdjust] = useState(false)
     const [subTab, setSubTab] = useState<"list" | "movements">("list")
-
-    const [materials, setMaterials] = useState<RawMaterial[]>([])
-    const [nplStats, setNplStats] = useState<Awaited<ReturnType<typeof getRawMaterialStats>> | null>(null)
-    const [recipes, setRecipes] = useState<Recipe[]>([])
     const [nplSubTab, setNplSubTab] = useState<"materials" | "recipes">("materials")
     const [selectedMat, setSelectedMat] = useState<RawMaterial | null>(null)
     const [showAddIngredient, setShowAddIngredient] = useState(false)
     const [editRecipe, setEditRecipe] = useState<{ productId: string; productName: string; recipe: Recipe | null } | null>(null)
-
-    const [equipment, setEquipment] = useState<Equipment[]>([])
-    const [eqStats, setEqStats] = useState<Awaited<ReturnType<typeof getEquipmentStats>> | null>(null)
-    const [depHistory, setDepHistory] = useState<DepreciationEntry[]>([])
     const [ccdcSubTab, setCcdcSubTab] = useState<"list" | "depreciation">("list")
     const [isRunningDep, setIsRunningDep] = useState(false)
-
     const [mainTab, setMainTab] = useState<MainTab>("inventory")
-    const [loading, setLoading] = useState(true)
 
-    const loadData = useCallback(async () => {
-        setLoading(true)
-        try {
-            const [inv, st, mv, mats, nst, rec, eq, est, dh] = await Promise.all([
-                getInventory(), getInventoryStats(), getStockMovements(),
-                getRawMaterials(), getRawMaterialStats(), getRecipes(),
-                getEquipment(), getEquipmentStats(), getDepreciationHistory(),
-            ])
-            setItems(inv); setStats(st); setMovements(mv)
-            setMaterials(mats); setNplStats(nst); setRecipes(rec)
-            setEquipment(eq); setEqStats(est); setDepHistory(dh)
-        } catch (err) {
-            console.error("[Inventory] loadData failed:", err)
-            toast.error("Không thể tải dữ liệu kho hàng")
-        }
-        setLoading(false)
-    }, [])
+    const { data, loading, refresh } = useMultiCachedData<[
+        InventoryItem[], Awaited<ReturnType<typeof getInventoryStats>>, StockMovement[],
+        RawMaterial[], Awaited<ReturnType<typeof getRawMaterialStats>>, Recipe[],
+        Equipment[], Awaited<ReturnType<typeof getEquipmentStats>>, DepreciationEntry[]
+    ]>([
+        { key: "inv:items", fetcher: getInventory },
+        { key: "inv:stats", fetcher: getInventoryStats },
+        { key: "inv:movements", fetcher: getStockMovements },
+        { key: "inv:materials", fetcher: getRawMaterials },
+        { key: "inv:nplStats", fetcher: getRawMaterialStats },
+        { key: "inv:recipes", fetcher: getRecipes },
+        { key: "inv:equipment", fetcher: getEquipment },
+        { key: "inv:eqStats", fetcher: getEquipmentStats },
+        { key: "inv:depHistory", fetcher: getDepreciationHistory },
+    ])
 
-    useEffect(() => { loadData() }, [loadData])
+    const items = data[0] ?? []
+    const stats = data[1]
+    const movements = data[2] ?? []
+    const materials = data[3] ?? []
+    const nplStats = data[4]
+    const recipes = data[5] ?? []
+    const equipment = data[6] ?? []
+    const eqStats = data[7]
+    const depHistory = data[8] ?? []
+
+    const loadData = async () => { invalidate("inv:"); refresh() }
 
     const filtered = items.filter((item) => {
         const matchSearch = !searchTerm
@@ -169,7 +167,6 @@ export default function InventoryPage() {
         !searchTerm || m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.sku.toLowerCase().includes(searchTerm.toLowerCase())
     )
 
-    // Show loading skeleton for first load
     if (loading && items.length === 0 && materials.length === 0) {
         return <DashboardInlineSkeleton />
     }

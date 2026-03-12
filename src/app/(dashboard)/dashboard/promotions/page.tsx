@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import {
     Sparkles,
     Clock,
@@ -33,6 +33,8 @@ import {
     type PromoStats,
 } from "@/actions/promotions"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
+import { useMultiCachedData } from "@/hooks/use-cached-data"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 
@@ -53,37 +55,30 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
 const DAY_LABELS: Record<string, string> = { MON: "T2", TUE: "T3", WED: "T4", THU: "T5", FRI: "T6", SAT: "T7", SUN: "CN" }
 
 export default function PromotionsPage() {
-    const [promos, setPromos] = useState<Promotion[]>([])
-    const [stats, setStats] = useState<PromoStats | null>(null)
-    const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "EXPIRED" | "DISABLED">("ALL")
     const [showCreate, setShowCreate] = useState(false)
+    const invalidate = usePrefetchStore(s => s.invalidatePrefix)
 
-    const loadData = useCallback(async () => {
-        setLoading(true)
-        try {
-            const [pList, pStats] = await Promise.all([getAllPromotions(), getPromoStats()])
-            setPromos(pList)
-            setStats(pStats)
-        } catch (err) {
-            console.error("[Promotions] loadData failed:", err)
-            toast.error("Không thể tải dữ liệu khuyến mãi")
-        }
-        setLoading(false)
-    }, [])
+    const { data, loading, refresh } = useMultiCachedData<[Promotion[], PromoStats]>([
+        { key: "promotions:list", fetcher: getAllPromotions },
+        { key: "promotions:stats", fetcher: getPromoStats },
+    ])
 
-    useEffect(() => { loadData() }, [loadData])
+    const promos = data[0] ?? []
+    const stats = data[1]
 
     const handleToggle = async (id: string) => {
         await togglePromoStatus(id)
         toast.success("Cập nhật trạng thái!")
-        loadData()
+        invalidate("promotions:")
+        refresh()
     }
 
     const handleDelete = async (id: string) => {
         await deletePromotion(id)
         toast.success("Đã xóa chương trình khuyến mãi!")
-        loadData()
+        invalidate("promotions:")
+        refresh()
     }
 
     const filtered = filter === "ALL" ? promos : promos.filter((p) => p.status === filter)
@@ -290,7 +285,7 @@ export default function PromotionsPage() {
                 <div className="py-12 text-center text-sm text-cream-400">Không có khuyến mãi nào</div>
             )}
 
-            {showCreate && <CreatePromoModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); loadData() }} />}
+            {showCreate && <CreatePromoModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); invalidate("promotions:"); refresh() }} />}
         </div>
     )
 }
