@@ -4,6 +4,11 @@ import KitchenClient from "./kitchen-client"
 export const dynamic = "force-dynamic"
 
 export default async function KitchenPage() {
-    const orders = await getActiveOrders()
+    let orders: Awaited<ReturnType<typeof getActiveOrders>> = []
+    try {
+        orders = await getActiveOrders()
+    } catch (e) {
+        console.error("[KitchenPage SSR] Failed to fetch orders:", e)
+    }
     return <KitchenClient initialOrders={orders} />
 }
