@@ -31,6 +31,7 @@ import {
     updateWineGuideInfo,
     type WineServingNote,
 } from "@/actions/serving-notes"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 export default function WineGuidePage() {
     const [notes, setNotes] = useState<WineServingNote[]>([])
@@ -55,8 +56,13 @@ export default function WineGuidePage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const list = search ? await searchServingNotes(search) : await getAllServingNotes()
-        setNotes(list)
+        try {
+            const list = search ? await searchServingNotes(search) : await getAllServingNotes()
+            setNotes(list)
+        } catch (err) {
+            console.error("[WineGuide] load failed:", err)
+            toast.error("Không thể tải dữ liệu Wine Guide")
+        }
         setLoading(false)
     }, [search])
 
@@ -114,6 +120,10 @@ export default function WineGuidePage() {
 
     const removeTag = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number) => {
         setter(prev => prev.filter((_, i) => i !== index))
+    }
+
+    if (loading && notes.length === 0) {
+        return <DashboardInlineSkeleton />
     }
 
     return (

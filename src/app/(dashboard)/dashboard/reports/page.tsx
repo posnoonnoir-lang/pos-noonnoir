@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import {
     TrendingUp,
     TrendingDown,
@@ -111,9 +112,14 @@ function DailyPnLView() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [s, w] = await Promise.all([getPnLSummary(), getWeeklyPnL()])
-        setSummary(s)
-        setWeekData(w)
+        try {
+            const [s, w] = await Promise.all([getPnLSummary(), getWeeklyPnL()])
+            setSummary(s)
+            setWeekData(w)
+        } catch (err) {
+            console.error("[P&L] load failed:", err)
+            toast.error("Không thể tải dữ liệu P&L")
+        }
         setLoading(false)
     }, [])
 
@@ -313,10 +319,15 @@ function FinanceView() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [records, summary, finance, exp, products] = await Promise.all([
-            getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
-        ])
-        setCogsRecords(records); setCogsSummary(summary); setFinanceSummary(finance); setExpenses(exp); setProductCOGS(products)
+        try {
+            const [records, summary, finance, exp, products] = await Promise.all([
+                getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
+            ])
+            setCogsRecords(records); setCogsSummary(summary); setFinanceSummary(finance); setExpenses(exp); setProductCOGS(products)
+        } catch (err) {
+            console.error("[Finance] load failed:", err)
+            toast.error("Không thể tải dữ liệu tài chính")
+        }
         setLoading(false)
     }, [])
 

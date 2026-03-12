@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getAllFeedback } from "@/actions/feedback"
+import { toast } from "sonner"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 export default function FeedbackDashboardPage() {
     const [data, setData] = useState<Awaited<ReturnType<typeof getAllFeedback>> | null>(null)
@@ -20,8 +22,13 @@ export default function FeedbackDashboardPage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const result = await getAllFeedback()
-        setData(result)
+        try {
+            const result = await getAllFeedback()
+            setData(result)
+        } catch (err) {
+            console.error("[Feedback] load failed:", err)
+            toast.error("Không thể tải dữ liệu feedback")
+        }
         setLoading(false)
     }, [])
 
@@ -29,7 +36,7 @@ export default function FeedbackDashboardPage() {
         loadData()
     }, [loadData])
 
-    if (!data) return null
+    if (loading || !data) return <DashboardInlineSkeleton />
 
     const { sessions, stats } = data
 

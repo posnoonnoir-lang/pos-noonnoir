@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getInventoryAlerts, type InventoryAlert, type AlertSeverity } from "@/actions/inventory-alerts"
+import { toast } from "sonner"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 const SEVERITY_CONFIG: Record<AlertSeverity, { label: string; color: string; bgColor: string; borderColor: string; icon: React.ComponentType<{ className?: string }> }> = {
     CRITICAL: {
@@ -53,9 +55,14 @@ export default function AlertsPage() {
 
     const loadAlerts = useCallback(async () => {
         setLoading(true)
-        const data = await getInventoryAlerts()
-        setAlerts(data)
-        setLastRefresh(new Date())
+        try {
+            const data = await getInventoryAlerts()
+            setAlerts(data)
+            setLastRefresh(new Date())
+        } catch (err) {
+            console.error("[Alerts] loadAlerts failed:", err)
+            toast.error("Không thể tải cảnh báo tồn kho")
+        }
         setLoading(false)
     }, [])
 
@@ -74,6 +81,10 @@ export default function AlertsPage() {
         { severity: "WARNING", items: warningAlerts },
         { severity: "INFO", items: infoAlerts },
     ]
+
+    if (loading && alerts.length === 0) {
+        return <DashboardInlineSkeleton />
+    }
 
     return (
         <div className="p-6 max-w-6xl">
