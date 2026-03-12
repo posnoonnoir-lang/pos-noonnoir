@@ -37,6 +37,7 @@ import {
     type ReservationStatus,
 } from "@/actions/reservations"
 import { getTables, getZones } from "@/actions/tables"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 const STATUS_CONFIG: Record<ReservationStatus, { label: string; color: string; icon: string }> = {
     PENDING: { label: "Chờ xác nhận", color: "bg-amber-100 border-amber-300 text-amber-700", icon: "⏳" },
@@ -73,24 +74,28 @@ export default function ReservationsPage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const params: { date?: string; status?: ReservationStatus } = {}
-        if (dateFilter) params.date = dateFilter
-        if (statusFilter !== "ALL") params.status = statusFilter
+        try {
+            const params: { date?: string; status?: ReservationStatus } = {}
+            if (dateFilter) params.date = dateFilter
+            if (statusFilter !== "ALL") params.status = statusFilter
 
-        const [list, s] = await Promise.all([
-            getReservations(params),
-            getReservationStats(),
-        ])
-        setReservations(list)
-        setStats(s)
+            const [list, s] = await Promise.all([
+                getReservations(params),
+                getReservationStats(),
+            ])
+            setReservations(list)
+            setStats(s)
+        } catch (err) {
+            console.error("[Reservations] loadData failed:", err)
+            toast.error("Không thể tải dữ liệu đặt bàn")
+        }
         setLoading(false)
     }, [dateFilter, statusFilter])
 
     useEffect(() => { loadData() }, [loadData])
 
-    // Load floor data
     useEffect(() => {
-        Promise.all([getZones(), getTables()]).then(([z, t]) => { setDbZones(z); setDbTables(t) })
+        Promise.all([getZones(), getTables()]).then(([z, t]) => { setDbZones(z); setDbTables(t) }).catch(() => { })
     }, [])
 
     const handleStatusChange = async (id: string, status: ReservationStatus) => {
@@ -111,10 +116,14 @@ export default function ReservationsPage() {
 
     const isToday = dateFilter === new Date().toISOString().split("T")[0]
 
+    if (loading && reservations.length === 0) {
+        return <DashboardInlineSkeleton />
+    }
+
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
                         <CalendarDays className="h-5 w-5 text-blue-700" />

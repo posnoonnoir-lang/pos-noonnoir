@@ -204,10 +204,15 @@ function TaxSettings() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [config, rates] = await Promise.all([getTaxConfig(), getAllTaxRates()])
-        setTaxEnabled(config.enabled)
-        setTaxInclusive(config.inclusive)
-        setTaxRates(rates)
+        try {
+            const [config, rates] = await Promise.all([getTaxConfig(), getAllTaxRates()])
+            setTaxEnabled(config.enabled)
+            setTaxInclusive(config.inclusive)
+            setTaxRates(rates)
+        } catch (err) {
+            console.error("[TaxSettings] loadData failed:", err)
+            toast.error("Không thể tải cấu hình thuế")
+        }
         setLoading(false)
     }, [])
 
@@ -216,12 +221,16 @@ function TaxSettings() {
     }, [loadData])
 
     const loadReport = useCallback(async () => {
-        const [report, breakdown] = await Promise.all([
-            getTaxReport("2026"),
-            getTaxBreakdownByRate(),
-        ])
-        setTaxReport(report)
-        setTaxBreakdown(breakdown)
+        try {
+            const [report, breakdown] = await Promise.all([
+                getTaxReport("2026"),
+                getTaxBreakdownByRate(),
+            ])
+            setTaxReport(report)
+            setTaxBreakdown(breakdown)
+        } catch (err) {
+            console.error("[TaxSettings] loadReport failed:", err)
+        }
     }, [])
 
     useEffect(() => {

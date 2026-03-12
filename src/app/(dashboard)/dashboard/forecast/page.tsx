@@ -23,6 +23,7 @@ import {
     type ForecastItem,
     type ForecastSummary,
 } from "@/actions/forecast"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function formatPrice(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -35,12 +36,17 @@ export default function ForecastPage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [forecastItems, forecastSummary] = await Promise.all([
-            calculateForecast(),
-            getForecastSummary(),
-        ])
-        setItems(forecastItems)
-        setSummary(forecastSummary)
+        try {
+            const [forecastItems, forecastSummary] = await Promise.all([
+                calculateForecast(),
+                getForecastSummary(),
+            ])
+            setItems(forecastItems)
+            setSummary(forecastSummary)
+        } catch (err) {
+            console.error("[Forecast] loadData failed:", err)
+            toast.error("Không thể tải dữ liệu dự báo")
+        }
         setLoading(false)
     }, [])
 
@@ -56,6 +62,10 @@ export default function ForecastPage() {
 
     const pendingItems = items.filter((i) => i.status === "PENDING")
     const decidedItems = items.filter((i) => i.status !== "PENDING")
+
+    if (loading && items.length === 0) {
+        return <DashboardInlineSkeleton />
+    }
 
     return (
         <div className="p-6 max-w-6xl">

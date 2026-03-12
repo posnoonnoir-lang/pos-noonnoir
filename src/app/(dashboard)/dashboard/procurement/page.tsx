@@ -58,6 +58,7 @@ import {
     type ConsignmentSettlement,
 } from "@/actions/consignment"
 import { useAuthStore } from "@/stores/auth-store"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -120,12 +121,17 @@ export default function ProcurementPage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [po, sup, gr, fb, st, csm, stl, cs] = await Promise.all([
-            getPurchaseOrders(), getSuppliers(), getGoodsReceipts(), getFIFOBatches(), getProcurementStats(),
-            getConsignments(), getSettlements(), getConsignmentStats(),
-        ])
-        setOrders(po); setSuppliers(sup); setReceipts(gr); setFifoBatches(fb); setStats(st)
-        setConsignments(csm); setSettlements(stl); setCsmStats(cs)
+        try {
+            const [po, sup, gr, fb, st, csm, stl, cs] = await Promise.all([
+                getPurchaseOrders(), getSuppliers(), getGoodsReceipts(), getFIFOBatches(), getProcurementStats(),
+                getConsignments(), getSettlements(), getConsignmentStats(),
+            ])
+            setOrders(po); setSuppliers(sup); setReceipts(gr); setFifoBatches(fb); setStats(st)
+            setConsignments(csm); setSettlements(stl); setCsmStats(cs)
+        } catch (err) {
+            console.error("[Procurement] loadData failed:", err)
+            toast.error("Không thể tải dữ liệu mua hàng")
+        }
         setLoading(false)
     }, [])
 
@@ -159,10 +165,14 @@ export default function ProcurementPage() {
         }
     }
 
+    if (loading && orders.length === 0 && !stats) {
+        return <DashboardInlineSkeleton />
+    }
+
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
                         <Truck className="h-5 w-5 text-blue-700" />

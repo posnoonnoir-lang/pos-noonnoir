@@ -33,6 +33,7 @@ import {
     type Consignment,
     type ConsignmentSettlement,
 } from "@/actions/consignment"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -64,12 +65,17 @@ export default function ConsignmentPage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [cList, sList] = await Promise.all([
-            getConsignments(),
-            getSettlements(),
-        ])
-        setConsignments(cList)
-        setSettlements(sList)
+        try {
+            const [cList, sList] = await Promise.all([
+                getConsignments(),
+                getSettlements(),
+            ])
+            setConsignments(cList)
+            setSettlements(sList)
+        } catch (err) {
+            console.error("[Consignment] loadData failed:", err)
+            toast.error("Không thể tải dữ liệu ký gửi")
+        }
         setLoading(false)
     }, [])
 
@@ -111,16 +117,19 @@ export default function ConsignmentPage() {
         }
     }
 
-    // Summary stats
     const totalActive = consignments.filter((c) => c.status === "ACTIVE").length
     const totalItems = consignments.reduce((s, c) => s + c.totalItems, 0)
     const totalSold = consignments.reduce((s, c) => s + c.soldItems, 0)
     const totalRevenue = consignments.reduce((s, c) => s + c.totalRevenue, 0)
 
+    if (loading && consignments.length === 0) {
+        return <DashboardInlineSkeleton />
+    }
+
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100">
                         <Handshake className="h-5 w-5 text-teal-700" />

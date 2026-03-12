@@ -32,6 +32,7 @@ import {
     type Promotion,
     type PromoStats,
 } from "@/actions/promotions"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 
@@ -60,9 +61,14 @@ export default function PromotionsPage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [pList, pStats] = await Promise.all([getAllPromotions(), getPromoStats()])
-        setPromos(pList)
-        setStats(pStats)
+        try {
+            const [pList, pStats] = await Promise.all([getAllPromotions(), getPromoStats()])
+            setPromos(pList)
+            setStats(pStats)
+        } catch (err) {
+            console.error("[Promotions] loadData failed:", err)
+            toast.error("Không thể tải dữ liệu khuyến mãi")
+        }
         setLoading(false)
     }, [])
 
@@ -82,7 +88,6 @@ export default function PromotionsPage() {
 
     const filtered = filter === "ALL" ? promos : promos.filter((p) => p.status === filter)
 
-    // Detect if any promo is currently active (time-based check)
     const now = new Date()
     const currentHour = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
     const dayMap: Record<number, string> = { 0: "SUN", 1: "MON", 2: "TUE", 3: "WED", 4: "THU", 5: "FRI", 6: "SAT" }
@@ -96,10 +101,14 @@ export default function PromotionsPage() {
         return true
     }
 
+    if (loading && promos.length === 0) {
+        return <DashboardInlineSkeleton />
+    }
+
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
                         <Sparkles className="h-5 w-5 text-amber-700" />

@@ -14,6 +14,8 @@ import {
     getByGlassDashboardStats,
     type OpenedBottleSummary,
 } from "@/actions/wine"
+import { toast } from "sonner"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function formatPrice(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
@@ -29,24 +31,32 @@ export default function BottleTrackingPage() {
 
     const refresh = useCallback(async () => {
         setLoading(true)
-        const [o, h, s] = await Promise.all([
-            getAllOpenedBottles(),
-            getBottleHistory({ days: historyDays }),
-            getByGlassDashboardStats(),
-        ])
-        setOpenedBottles(o)
-        setHistory(h)
-        setStats(s)
+        try {
+            const [o, h, s] = await Promise.all([
+                getAllOpenedBottles(),
+                getBottleHistory({ days: historyDays }),
+                getByGlassDashboardStats(),
+            ])
+            setOpenedBottles(o)
+            setHistory(h)
+            setStats(s)
+        } catch (err) {
+            console.error("[BottleTracking] refresh failed:", err)
+            toast.error("Không thể tải dữ liệu chai")
+        }
         setLoading(false)
     }, [historyDays])
 
     useEffect(() => { refresh() }, [refresh])
 
-    // Auto-refresh every 30s
     useEffect(() => {
         const interval = setInterval(refresh, 30000)
         return () => clearInterval(interval)
     }, [refresh])
+
+    if (loading && openedBottles.length === 0 && !stats) {
+        return <DashboardInlineSkeleton />
+    }
 
     return (
         <div className="min-h-screen bg-cream-50 p-6">

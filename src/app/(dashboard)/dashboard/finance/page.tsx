@@ -27,6 +27,8 @@ import {
     type FinanceSummary,
     type ExpenseCategory,
 } from "@/actions/finance"
+import { toast } from "sonner"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -69,19 +71,28 @@ export default function FinancePage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [records, summary, finance, exp, products] = await Promise.all([
-            getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
-        ])
-        setCogsRecords(records); setCogsSummary(summary); setFinanceSummary(finance); setExpenses(exp); setProductCOGS(products)
+        try {
+            const [records, summary, finance, exp, products] = await Promise.all([
+                getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
+            ])
+            setCogsRecords(records); setCogsSummary(summary); setFinanceSummary(finance); setExpenses(exp); setProductCOGS(products)
+        } catch (err) {
+            console.error("[Finance] loadData failed:", err)
+            toast.error("Không thể tải dữ liệu tài chính")
+        }
         setLoading(false)
     }, [])
 
     useEffect(() => { loadData() }, [loadData])
 
+    if (loading && !financeSummary) {
+        return <DashboardInlineSkeleton />
+    }
+
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-wine-100">
                         <DollarSign className="h-5 w-5 text-wine-700" />

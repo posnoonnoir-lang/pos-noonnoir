@@ -34,6 +34,7 @@ import {
     type CustomerProfile,
     type CustomerStats,
 } from "@/actions/customers"
+import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -64,12 +65,17 @@ export default function CustomersPage() {
 
     const loadData = useCallback(async () => {
         setLoading(true)
-        const [cList, cStats] = await Promise.all([
-            searchTerm ? searchCRMCustomers(searchTerm) : getAllCustomers(),
-            getCustomerStats(),
-        ])
-        setCustomers(cList)
-        setStats(cStats)
+        try {
+            const [cList, cStats] = await Promise.all([
+                searchTerm ? searchCRMCustomers(searchTerm) : getAllCustomers(),
+                getCustomerStats(),
+            ])
+            setCustomers(cList)
+            setStats(cStats)
+        } catch (err) {
+            console.error("[Customers] loadData failed:", err)
+            toast.error("Không thể tải dữ liệu khách hàng")
+        }
         setLoading(false)
     }, [searchTerm])
 
@@ -79,10 +85,14 @@ export default function CustomersPage() {
         ? customers
         : customers.filter((c) => c.tier === tierFilter)
 
+    if (loading && customers.length === 0) {
+        return <DashboardInlineSkeleton />
+    }
+
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
                         <Users className="h-5 w-5 text-amber-700" />
