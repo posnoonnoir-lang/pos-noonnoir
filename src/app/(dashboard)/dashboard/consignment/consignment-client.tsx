@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import {
     Handshake,
     Package,
@@ -33,7 +33,6 @@ import {
     type Consignment,
     type ConsignmentSettlement,
 } from "@/actions/consignment"
-import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function fmt(n: number) { return new Intl.NumberFormat("vi-VN").format(n) }
 function fmtK(n: number) {
@@ -55,16 +54,19 @@ const ITEM_STATUS: Record<string, { label: string; cls: string }> = {
     DAMAGED: { label: "Hỏng", cls: "bg-red-100 text-red-600" },
 }
 
-export function ConsignmentClient() {
-    const [consignments, setConsignments] = useState<Consignment[]>([])
-    const [settlements, setSettlements] = useState<ConsignmentSettlement[]>([])
-    const [loading, setLoading] = useState(true)
+export interface ConsignmentInitialData {
+    consignments: Consignment[]
+    settlements: ConsignmentSettlement[]
+}
+
+export function ConsignmentClient({ initial }: { initial: ConsignmentInitialData }) {
+    const [consignments, setConsignments] = useState<Consignment[]>(initial.consignments)
+    const [settlements, setSettlements] = useState<ConsignmentSettlement[]>(initial.settlements)
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<"list" | "settlements">("list")
     const [showCreate, setShowCreate] = useState(false)
 
     const loadData = useCallback(async () => {
-        setLoading(true)
         try {
             const [cList, sList] = await Promise.all([
                 getConsignments(),
@@ -76,10 +78,7 @@ export function ConsignmentClient() {
             console.error("[Consignment] loadData failed:", err)
             toast.error("Không thể tải dữ liệu ký gửi")
         }
-        setLoading(false)
     }, [])
-
-    useEffect(() => { loadData() }, [loadData])
 
     const handleReturn = async (consignmentId: string, itemId: string) => {
         const result = await returnConsignmentItem(consignmentId, itemId)
@@ -122,9 +121,7 @@ export function ConsignmentClient() {
     const totalSold = consignments.reduce((s, c) => s + c.soldItems, 0)
     const totalRevenue = consignments.reduce((s, c) => s + c.totalRevenue, 0)
 
-    if (loading && consignments.length === 0) {
-        return <DashboardInlineSkeleton />
-    }
+
 
     return (
         <div className="min-h-screen bg-cream-50 p-6 space-y-5">
