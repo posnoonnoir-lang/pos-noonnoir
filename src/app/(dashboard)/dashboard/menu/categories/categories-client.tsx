@@ -16,6 +16,7 @@ import {
     FolderOpen,
     UtensilsCrossed,
     LayoutGrid,
+    ChefHat,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -43,32 +44,32 @@ const CATEGORY_ICONS = ["🍸", "🍷", "🥂", "🍺", "🍽️", "🍰", "☕"
 
 function MenuTabNav() {
     const pathname = usePathname()
+    const tabs = [
+        { href: "/dashboard/menu/categories", label: "Danh mục", icon: FolderOpen },
+        { href: "/dashboard/menu/products", label: "Sản phẩm", icon: LayoutGrid },
+        { href: "/dashboard/menu/recipes", label: "Công thức", icon: ChefHat },
+    ]
     return (
         <div className="flex gap-1 border-b border-cream-300 bg-cream-50">
-            <Link
-                href="/dashboard/menu/categories"
-                className={cn(
-                    "flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-all",
-                    pathname.includes("/categories")
-                        ? "border-green-700 text-green-900"
-                        : "border-transparent text-cream-500 hover:text-green-900 hover:border-cream-400"
-                )}
-            >
-                <FolderOpen className="h-4 w-4" />
-                Danh mục
-            </Link>
-            <Link
-                href="/dashboard/menu/products"
-                className={cn(
-                    "flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-all",
-                    pathname.includes("/products")
-                        ? "border-green-700 text-green-900"
-                        : "border-transparent text-cream-500 hover:text-green-900 hover:border-cream-400"
-                )}
-            >
-                <LayoutGrid className="h-4 w-4" />
-                Sản phẩm
-            </Link>
+            {tabs.map((tab) => {
+                const Icon = tab.icon
+                const isActive = pathname.includes(tab.href.split("/").pop()!)
+                return (
+                    <Link
+                        key={tab.href}
+                        href={tab.href}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-all",
+                            isActive
+                                ? "border-green-700 text-green-900"
+                                : "border-transparent text-cream-500 hover:text-green-900 hover:border-cream-400"
+                        )}
+                    >
+                        <Icon className="h-4 w-4" />
+                        {tab.label}
+                    </Link>
+                )
+            })}
         </div>
     )
 }

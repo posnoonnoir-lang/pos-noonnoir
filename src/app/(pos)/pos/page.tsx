@@ -55,7 +55,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useCartStore } from "@/stores/cart-store"
 import { useAuthStore } from "@/stores/auth-store"
-import { createOrder, processOrderWithCOGS, getActiveOrderByTable, addItemsToOrder, sendToKitchen as sendToKitchenAction, type PaymentMethod, type Order } from "@/actions/orders"
+import { createOrder, processOrderWithCOGS, getActiveOrderByTable, getActiveOrders, addItemsToOrder, sendToKitchen as sendToKitchenAction, type PaymentMethod, type Order } from "@/actions/orders"
 import {
     searchCustomers,
     createQuickCustomer,
@@ -106,6 +106,7 @@ function formatPrice(amount: number): string {
 
 // ============================================================
 // TABLE SELECTOR MODAL — supports viewing occupied tables & adding items
+// Pre-fetches ALL active orders in 1 query for instant table selection
 // ============================================================
 function TableSelector({
     open,
@@ -127,6 +128,8 @@ function TableSelector({
     const [selectedZone, setSelectedZone] = useState(zones[0]?.id ?? "")
     const [viewingOrder, setViewingOrder] = useState<{ table: FloorTable; order: Order } | null>(null)
     const [loadingOrder, setLoadingOrder] = useState(false)
+    // Pre-fetched map: tableId → Order (loaded once when modal opens)
+    const [orderMap, setOrderMap] = useState<Map<string, Order>>(new Map())
 
     // Sync selectedZone when zones load (fixes empty table list on first open)
     useEffect(() => {
@@ -134,6 +137,20 @@ function TableSelector({
             setSelectedZone(zones[0].id)
         }
     }, [zones, selectedZone])
+
+    // ★ Pre-fetch ALL active orders when modal opens — 1 query instead of N
+    useEffect(() => {
+        if (!open) return
+        setLoadingOrder(true)
+        getActiveOrders().then((orders) => {
+            const map = new Map<string, Order>()
+            for (const order of orders) {
+                if (order.tableId) map.set(order.tableId, order as Order)
+            }
+            setOrderMap(map)
+            setLoadingOrder(false)
+        }).catch(() => setLoadingOrder(false))
+    }, [open])
 
     if (!open) return null
 
@@ -157,16 +174,14 @@ function TableSelector({
         MERGED: "Ghép",
     }
 
-    const handleTableClick = async (table: FloorTable) => {
+    const handleTableClick = (table: FloorTable) => {
         if (table.status === "AVAILABLE") {
             onSelect(table)
             onClose()
         } else if (table.status === "OCCUPIED") {
-            setLoadingOrder(true)
-            const order = await getActiveOrderByTable(table.id)
-            setLoadingOrder(false)
+            // ★ Instant lookup from pre-fetched map — no DB call
+            const order = orderMap.get(table.id)
             if (order) {
-                // Direct load into cart — no popup
                 if (onSelectOccupied) {
                     onSelectOccupied(table, order)
                 }

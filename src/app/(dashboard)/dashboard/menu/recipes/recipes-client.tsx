@@ -1,0 +1,855 @@
+"use client"
+
+import { useState, useCallback } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import {
+    ChefHat,
+    Plus,
+    Search,
+    Trash2,
+    Pencil,
+    Save,
+    Loader2,
+    X,
+    FolderOpen,
+    LayoutGrid,
+    CookingPot,
+    AlertCircle,
+    CheckCircle2,
+    DollarSign,
+    Package,
+} from "lucide-react"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+    getRecipes,
+    getRawMaterials,
+    createRecipe,
+    deleteRecipe,
+    deleteRecipeIngredient,
+    type Recipe,
+    type RawMaterial,
+} from "@/actions/assets"
+import type { Product } from "@/types"
+
+function fmt(amount: number): string {
+    return new Intl.NumberFormat("vi-VN").format(amount)
+}
+
+// ─── Shared Menu Tab Nav ───
+function MenuTabNav() {
+    const pathname = usePathname()
+    const tabs = [
+        { href: "/dashboard/menu/categories", label: "Danh mục", icon: FolderOpen },
+        { href: "/dashboard/menu/products", label: "Sản phẩm", icon: LayoutGrid },
+        { href: "/dashboard/menu/recipes", label: "Công thức", icon: ChefHat },
+    ]
+    return (
+        <div className="flex gap-1 border-b border-cream-300 bg-cream-50">
+            {tabs.map((tab) => {
+                const Icon = tab.icon
+                const isActive = pathname.includes(tab.href.split("/").pop()!)
+                return (
+                    <Link
+                        key={tab.href}
+                        href={tab.href}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-all",
+                            isActive
+                                ? "border-green-700 text-green-900"
+                                : "border-transparent text-cream-500 hover:text-green-900 hover:border-cream-400"
+                        )}
+                    >
+                        <Icon className="h-4 w-4" />
+                        {tab.label}
+                    </Link>
+                )
+            })}
+        </div>
+    )
+}
+
+// ─── Table styles ───
+const TH = "px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-cream-400 bg-cream-50 border-b border-cream-200 whitespace-nowrap"
+const THR = cn(TH, "text-right")
+const TD = "px-3 py-3 text-xs text-green-900 border-b border-cream-100 whitespace-nowrap"
+const TDR = cn(TD, "text-right font-mono")
+
+interface RecipesClientProps {
+    initialRecipes: Recipe[]
+    initialProducts: Product[]
+    initialMaterials: RawMaterial[]
+}
+
+export default function RecipesClient({ initialRecipes, initialProducts, initialMaterials }: RecipesClientProps) {
+    const [recipes, setRecipes] = useState(initialRecipes)
+    const [products] = useState(initialProducts)
+    const [materials, setMaterials] = useState(initialMaterials)
+    const [searchTerm, setSearchTerm] = useState("")
+    const [showCreateFlow, setShowCreateFlow] = useState(false)
+    const [editRecipe, setEditRecipe] = useState<{ productId: string; productName: string; recipe: Recipe } | null>(null)
+
+    const loadRecipes = useCallback(async () => {
+        const [recs, mats] = await Promise.all([getRecipes(), getRawMaterials()])
+        setRecipes(recs)
+        setMaterials(mats)
+    }, [])
+
+    // Products that don't have a recipe yet
+    const productsWithoutRecipe = products.filter(
+        (p) => !recipes.some((r) => r.productId === p.id)
+    )
+
+    const filtered = recipes.filter(
+        (r) => !searchTerm || r.productName.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+    const totalRecipes = recipes.length
+    const totalIngredients = recipes.reduce((s, r) => s + r.ingredients.length, 0)
+    const avgCost = totalRecipes > 0 ? Math.round(recipes.reduce((s, r) => s + r.totalCost, 0) / totalRecipes) : 0
+    const noRecipeCount = productsWithoutRecipe.length
+
+    return (
+        <div className="min-h-screen">
+            {/* Page Header */}
+            <div className="border-b border-cream-300 bg-cream-50 px-6 py-5">
+                <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
+                        <CookingPot className="h-5 w-5 text-green-700" />
+                    </div>
+                    <div>
+                        <h1 className="font-display text-2xl font-bold text-green-900">
+                            Menu & Sản phẩm
+                        </h1>
+                        <p className="text-sm text-cream-500">
+                            Quản lý danh mục, sản phẩm và công thức cho POS
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Tab Nav */}
+            <MenuTabNav />
+
+            {/* Content */}
+            <div className="p-6 space-y-5">
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-3">
+                    <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                            <ChefHat className="h-3.5 w-3.5 text-cream-400" />
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">Công thức</span>
+                        </div>
+                        <p className="font-mono text-xl font-bold leading-none text-green-900">{totalRecipes}</p>
+                    </div>
+                    <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                            <Package className="h-3.5 w-3.5 text-cream-400" />
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">Nguyên liệu dùng</span>
+                        </div>
+                        <p className="font-mono text-xl font-bold leading-none text-blue-700">{totalIngredients}</p>
+                    </div>
+                    <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                            <DollarSign className="h-3.5 w-3.5 text-cream-400" />
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">Giá vốn TB</span>
+                        </div>
+                        <p className="font-mono text-xl font-bold leading-none text-wine-700">₫{fmt(avgCost)}</p>
+                    </div>
+                    <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                            <AlertCircle className="h-3.5 w-3.5 text-cream-400" />
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">Chưa có CT</span>
+                        </div>
+                        <p className={cn("font-mono text-xl font-bold leading-none", noRecipeCount > 0 ? "text-amber-600" : "text-green-600")}>
+                            {noRecipeCount}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Toolbar */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="relative max-w-[260px]">
+                            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-400" />
+                            <Input
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Tìm công thức..."
+                                className="h-8 pl-8 text-xs border-cream-300 bg-white"
+                            />
+                        </div>
+                        <span className="text-xs text-cream-400">{filtered.length} công thức</span>
+                    </div>
+                    <Button
+                        onClick={() => setShowCreateFlow(true)}
+                        className="bg-green-900 text-cream-50 hover:bg-green-800"
+                    >
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        Tạo công thức
+                    </Button>
+                </div>
+
+                {/* Recipe Cards */}
+                {filtered.length === 0 && !showCreateFlow ? (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-cream-300 bg-cream-100 py-20">
+                        <ChefHat className="h-12 w-12 text-cream-400 mb-3" />
+                        <p className="text-cream-500">
+                            {searchTerm ? "Không tìm thấy công thức" : "Chưa có công thức nào"}
+                        </p>
+                        {!searchTerm && (
+                            <Button
+                                onClick={() => setShowCreateFlow(true)}
+                                variant="outline"
+                                className="mt-4"
+                            >
+                                <Plus className="mr-1 h-4 w-4" />
+                                Tạo công thức đầu tiên
+                            </Button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {filtered.map((recipe) => (
+                            <RecipeCard
+                                key={recipe.id}
+                                recipe={recipe}
+                                onEdit={() => setEditRecipe({ productId: recipe.productId, productName: recipe.productName, recipe })}
+                                onDeleted={loadRecipes}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Create Flow Modal */}
+            {showCreateFlow && (
+                <CreateRecipeFlow
+                    products={productsWithoutRecipe}
+                    materials={materials}
+                    onClose={() => setShowCreateFlow(false)}
+                    onCreated={loadRecipes}
+                />
+            )}
+
+            {/* Edit Recipe Modal */}
+            {editRecipe && (
+                <EditRecipeModal
+                    productId={editRecipe.productId}
+                    productName={editRecipe.productName}
+                    recipe={editRecipe.recipe}
+                    materials={materials}
+                    onClose={() => setEditRecipe(null)}
+                    onSaved={loadRecipes}
+                />
+            )}
+        </div>
+    )
+}
+
+// ─── Recipe Card ───
+function RecipeCard({ recipe, onEdit, onDeleted }: { recipe: Recipe; onEdit: () => void; onDeleted: () => void }) {
+    const [deleting, setDeleting] = useState(false)
+
+    const handleDelete = async () => {
+        if (!confirm(`Xóa công thức "${recipe.productName}"?`)) return
+        setDeleting(true)
+        const res = await deleteRecipe(recipe.productId)
+        if (res.success) {
+            toast.success(`Đã xóa công thức "${recipe.productName}"`)
+            onDeleted()
+        } else {
+            toast.error("Lỗi xóa công thức")
+        }
+        setDeleting(false)
+    }
+
+    return (
+        <div className="group rounded-xl border border-cream-200 bg-white shadow-sm hover:border-green-300 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-cream-100">
+                <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100">
+                        <CookingPot className="h-4.5 w-4.5 text-green-700" />
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-bold text-green-900">{recipe.productName}</h3>
+                        <p className="text-[10px] text-cream-400">{recipe.ingredients.length} nguyên liệu</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="text-right">
+                        <p className="text-[10px] text-cream-400 uppercase tracking-wider">Giá vốn</p>
+                        <p className="font-mono text-sm font-bold text-wine-700">₫{fmt(recipe.totalCost)}</p>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                            onClick={onEdit}
+                            className="rounded-lg p-2 text-cream-500 hover:bg-cream-200 hover:text-green-700 transition-all"
+                        >
+                            <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            className="rounded-lg p-2 text-cream-500 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50"
+                        >
+                            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <table className="w-full">
+                <thead>
+                    <tr>
+                        <th className={TH}>Nguyên liệu</th>
+                        <th className={cn(THR)} style={{ width: 90 }}>Số lượng</th>
+                        <th className={cn(THR)} style={{ width: 110 }}>Đơn giá</th>
+                        <th className={cn(THR)} style={{ width: 110 }}>Thành tiền</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {recipe.ingredients.map((ing, i) => (
+                        <tr key={i} className="hover:bg-green-50/30 transition-colors">
+                            <td className={TD}>
+                                <span className="font-medium">{ing.materialName}</span>
+                            </td>
+                            <td className={TDR}>{ing.quantity} {ing.unit}</td>
+                            <td className={TDR}>₫{fmt(Math.round(ing.costPerBaseUnit || ing.costPerUnit))}/{ing.baseUnit || ing.unit}</td>
+                            <td className={cn(TDR, "font-bold text-wine-700")}>₫{fmt(Math.round(ing.quantity * (ing.costPerBaseUnit || ing.costPerUnit)))}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            {recipe.notes && <p className="px-4 py-2 text-[10px] text-cream-400 italic border-t border-cream-100">📝 {recipe.notes}</p>}
+        </div>
+    )
+}
+
+// ─── Create Recipe Flow (Step 1: Pick Product → Step 2: Add Ingredients) ───
+function CreateRecipeFlow({
+    products,
+    materials,
+    onClose,
+    onCreated,
+}: {
+    products: Product[]
+    materials: RawMaterial[]
+    onClose: () => void
+    onCreated: () => void
+}) {
+    const [step, setStep] = useState<1 | 2>(1)
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+    const [searchProduct, setSearchProduct] = useState("")
+    const [ingredients, setIngredients] = useState<{ materialId: string; materialName: string; quantity: number; unit: string; costPerUnit: number; costPerBaseUnit: number; baseUnit: string }[]>([])
+    const [selectedMaterialId, setSelectedMaterialId] = useState("")
+    const [qty, setQty] = useState(0)
+    const [qtyUnit, setQtyUnit] = useState("")
+    const [saving, setSaving] = useState(false)
+    const [notes, setNotes] = useState("")
+
+    const filteredProducts = products.filter(
+        (p) => !searchProduct || p.name.toLowerCase().includes(searchProduct.toLowerCase())
+    )
+
+    const handleSelectProduct = (product: Product) => {
+        setSelectedProduct(product)
+        setStep(2)
+    }
+
+    const handleAddIngredient = () => {
+        if (!selectedMaterialId || qty <= 0) return
+        const mat = materials.find((m) => m.id === selectedMaterialId)
+        if (!mat) return
+
+        // Prevent duplicate
+        if (ingredients.some((i) => i.materialId === mat.id)) {
+            toast.error(`"${mat.name}" đã có trong công thức`)
+            return
+        }
+
+        setIngredients((prev) => [
+            ...prev,
+            {
+                materialId: mat.id,
+                materialName: mat.name,
+                quantity: qty,
+                unit: qtyUnit || mat.baseUnit || mat.unit,
+                costPerUnit: mat.costPrice,
+                costPerBaseUnit: mat.costPerBaseUnit,
+                baseUnit: mat.baseUnit || mat.unit,
+            },
+        ])
+        setSelectedMaterialId("")
+        setQty(0)
+        setQtyUnit("")
+    }
+
+    const handleRemoveIngredient = (materialId: string) => {
+        setIngredients((prev) => prev.filter((i) => i.materialId !== materialId))
+    }
+
+    const handleSave = async () => {
+        if (!selectedProduct || ingredients.length === 0) return
+        setSaving(true)
+        const res = await createRecipe({
+            productId: selectedProduct.id,
+            productName: selectedProduct.name,
+            ingredients,
+            notes,
+        })
+        setSaving(false)
+
+        if (res.id) {
+            toast.success(`Đã tạo công thức cho "${selectedProduct.name}"`)
+            onCreated()
+            onClose()
+        } else {
+            toast.error("Lỗi tạo công thức")
+        }
+    }
+
+    const totalCost = ingredients.reduce((s, i) => s + i.quantity * (i.costPerBaseUnit || i.costPerUnit), 0)
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl max-h-[85vh] flex flex-col animate-fade-in-up">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200">
+                    <div>
+                        <h3 className="font-display text-lg font-bold text-green-900">
+                            <ChefHat className="inline h-5 w-5 mr-2" />
+                            {step === 1 ? "Chọn sản phẩm" : `Công thức: ${selectedProduct?.name}`}
+                        </h3>
+                        <p className="text-xs text-cream-400 mt-0.5">
+                            {step === 1 ? "Bước 1/2 — Chọn món cần setup công thức" : "Bước 2/2 — Thêm nguyên liệu"}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 hover:bg-cream-100 rounded-lg transition-colors">
+                        <X className="h-5 w-5 text-cream-400" />
+                    </button>
+                </div>
+
+                {/* Step Indicator */}
+                <div className="px-5 py-3 flex items-center gap-2 bg-cream-50 border-b border-cream-200">
+                    <div className={cn("flex items-center gap-1.5 text-xs font-semibold", step >= 1 ? "text-green-700" : "text-cream-400")}>
+                        <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold", step >= 1 ? "bg-green-700 text-white" : "bg-cream-300 text-cream-500")}>1</div>
+                        Chọn món
+                    </div>
+                    <div className="flex-1 h-px bg-cream-300" />
+                    <div className={cn("flex items-center gap-1.5 text-xs font-semibold", step >= 2 ? "text-green-700" : "text-cream-400")}>
+                        <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold", step >= 2 ? "bg-green-700 text-white" : "bg-cream-300 text-cream-500")}>2</div>
+                        Nguyên liệu
+                    </div>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-5">
+                    {step === 1 ? (
+                        <div className="space-y-3">
+                            {/* Search */}
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-400" />
+                                <input
+                                    value={searchProduct}
+                                    onChange={(e) => setSearchProduct(e.target.value)}
+                                    placeholder="Tìm sản phẩm..."
+                                    className="w-full rounded-lg border border-cream-300 pl-8 pr-4 py-2.5 text-sm focus:border-green-500 focus:outline-none"
+                                    autoFocus
+                                />
+                            </div>
+
+                            {filteredProducts.length === 0 ? (
+                                <div className="text-center py-8 text-cream-400">
+                                    <CheckCircle2 className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                    <p className="text-sm">{searchProduct ? "Không tìm thấy" : "Tất cả sản phẩm đã có công thức 🎉"}</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+                                    {filteredProducts.map((product) => (
+                                        <button
+                                            key={product.id}
+                                            onClick={() => handleSelectProduct(product)}
+                                            className="w-full flex items-center gap-3 rounded-lg border border-cream-200 bg-white px-4 py-3 text-left hover:border-green-400 hover:bg-green-50/50 transition-all group"
+                                        >
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cream-200 group-hover:bg-green-100 transition-colors">
+                                                <CookingPot className="h-4 w-4 text-cream-500 group-hover:text-green-700 transition-colors" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-green-900 truncate">{product.name}</p>
+                                                <p className="text-[10px] text-cream-400">{product.category?.name ?? ""} · {product.type}</p>
+                                            </div>
+                                            <span className="font-mono text-xs text-cream-500">₫{fmt(product.sellPrice)}</span>
+                                            <Plus className="h-4 w-4 text-cream-400 group-hover:text-green-700 transition-colors" />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {/* Selected product info */}
+                            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-200">
+                                    <CookingPot className="h-4 w-4 text-green-700" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold text-green-900">{selectedProduct?.name}</p>
+                                    <p className="text-[10px] text-green-600">Giá bán: ₫{fmt(selectedProduct?.sellPrice ?? 0)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] text-cream-400">Giá vốn CT</p>
+                                    <p className="font-mono text-sm font-bold text-wine-700">₫{fmt(Math.round(totalCost))}</p>
+                                </div>
+                            </div>
+
+                            {/* Ingredient list */}
+                            {ingredients.length > 0 && (
+                                <div className="space-y-1.5">
+                                    {ingredients.map((ing) => (
+                                        <div key={ing.materialId} className="flex items-center justify-between p-3 bg-cream-50 rounded-lg border border-cream-200">
+                                            <div>
+                                                <p className="text-sm font-medium text-green-900">{ing.materialName}</p>
+                                                <p className="text-xs text-cream-400">
+                                                    {ing.quantity} {ing.unit} × ₫{fmt(Math.round(ing.costPerBaseUnit || ing.costPerUnit))}
+                                                    {" = "}
+                                                    <span className="font-mono font-bold text-wine-700">
+                                                        ₫{fmt(Math.round(ing.quantity * (ing.costPerBaseUnit || ing.costPerUnit)))}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleRemoveIngredient(ing.materialId)}
+                                                className="p-1.5 text-red-400 hover:bg-red-50 rounded transition-colors"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Add ingredient form */}
+                            <div className="p-4 bg-cream-50 rounded-lg border border-cream-200 space-y-3">
+                                <p className="text-xs font-semibold text-green-900 uppercase tracking-wider">Thêm nguyên liệu</p>
+                                <select
+                                    value={selectedMaterialId}
+                                    onChange={(e) => {
+                                        setSelectedMaterialId(e.target.value)
+                                        const m = materials.find((m) => m.id === e.target.value)
+                                        if (m) setQtyUnit(m.baseUnit || m.unit)
+                                    }}
+                                    className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm bg-white focus:border-green-500 focus:outline-none"
+                                >
+                                    <option value="">-- Chọn nguyên liệu --</option>
+                                    {materials.map((m) => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.name} ({m.unit}{m.baseUnit && m.baseUnit !== m.unit ? ` → ${m.baseUnit}` : ""}) — ₫{fmt(Math.round(m.costPerBaseUnit))}/{m.baseUnit || m.unit}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="col-span-1">
+                                        <label className="text-[10px] font-medium text-cream-400 mb-1 block">Số lượng</label>
+                                        <input
+                                            type="number"
+                                            value={qty || ""}
+                                            onChange={(e) => setQty(Number(e.target.value))}
+                                            placeholder="200"
+                                            className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <div className="col-span-1">
+                                        <label className="text-[10px] font-medium text-cream-400 mb-1 block">Đơn vị</label>
+                                        <input
+                                            value={qtyUnit}
+                                            onChange={(e) => setQtyUnit(e.target.value)}
+                                            placeholder="ml"
+                                            className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <div className="col-span-1 flex items-end">
+                                        <button
+                                            onClick={handleAddIngredient}
+                                            disabled={!selectedMaterialId || qty <= 0}
+                                            className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-700 px-3 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                            Thêm
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Notes */}
+                            <div>
+                                <label className="text-[10px] font-medium text-cream-400 mb-1 block">Ghi chú (tuỳ chọn)</label>
+                                <input
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="VD: Khuấy đều, đun sôi nhỏ lửa..."
+                                    className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
+                                />
+                            </div>
+
+                            {/* Margin info */}
+                            {ingredients.length > 0 && selectedProduct && (
+                                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                                    <div className="text-xs text-green-700">
+                                        <span className="font-medium">Biên lợi nhuận:</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="font-mono text-sm font-bold text-green-900">
+                                            {selectedProduct.sellPrice > 0
+                                                ? `${Math.round(((selectedProduct.sellPrice - totalCost) / selectedProduct.sellPrice) * 100)}%`
+                                                : "—"}
+                                        </span>
+                                        <span className="text-xs text-cream-400 ml-2">
+                                            (₫{fmt(selectedProduct.sellPrice)} − ₫{fmt(Math.round(totalCost))} = ₫{fmt(Math.round(selectedProduct.sellPrice - totalCost))})
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between px-5 py-4 border-t border-cream-200">
+                    {step === 2 && (
+                        <button
+                            onClick={() => { setStep(1); setSelectedProduct(null); setIngredients([]) }}
+                            className="text-xs text-cream-500 hover:text-green-700 transition-colors"
+                        >
+                            ← Chọn món khác
+                        </button>
+                    )}
+                    {step === 1 && <div />}
+                    <div className="flex gap-2">
+                        <button onClick={onClose} className="px-4 py-2 text-sm text-cream-500 hover:bg-cream-100 rounded-lg transition-colors">
+                            Hủy
+                        </button>
+                        {step === 2 && (
+                            <button
+                                onClick={handleSave}
+                                disabled={saving || ingredients.length === 0}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-800 disabled:opacity-50 transition-all"
+                            >
+                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                {saving ? "Đang lưu..." : "Lưu công thức"}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Edit Recipe Modal ───
+function EditRecipeModal({
+    productId,
+    productName,
+    recipe,
+    materials,
+    onClose,
+    onSaved,
+}: {
+    productId: string
+    productName: string
+    recipe: Recipe
+    materials: RawMaterial[]
+    onClose: () => void
+    onSaved: () => void
+}) {
+    const [ingredients, setIngredients] = useState(recipe.ingredients)
+    const [addMode, setAddMode] = useState(false)
+    const [selectedMaterialId, setSelectedMaterialId] = useState("")
+    const [qty, setQty] = useState(0)
+    const [qtyUnit, setQtyUnit] = useState("")
+    const [saving, setSaving] = useState(false)
+
+    const handleAddIngredient = async () => {
+        if (!selectedMaterialId || qty <= 0) return
+        const mat = materials.find((m) => m.id === selectedMaterialId)
+        if (!mat) return
+
+        setSaving(true)
+        const res = await createRecipe({
+            productId,
+            productName,
+            ingredients: [{
+                materialId: mat.id,
+                materialName: mat.name,
+                quantity: qty,
+                unit: qtyUnit || mat.baseUnit || mat.unit,
+                costPerUnit: mat.costPrice,
+                costPerBaseUnit: mat.costPerBaseUnit,
+                baseUnit: mat.baseUnit || mat.unit,
+            }],
+            notes: "",
+        })
+        setSaving(false)
+
+        if (res.id) {
+            toast.success(`Đã thêm "${mat.name}"`)
+            const recipes = await getRecipes()
+            const updated = recipes.find((r) => r.productId === productId)
+            if (updated) setIngredients(updated.ingredients)
+            setAddMode(false)
+            setSelectedMaterialId("")
+            setQty(0)
+            onSaved()
+        }
+    }
+
+    const handleRemoveIngredient = async (materialId: string) => {
+        setSaving(true)
+        const res = await deleteRecipeIngredient(productId, materialId)
+        if (res.success) {
+            setIngredients((prev) => prev.filter((i) => i.materialId !== materialId))
+            toast.success("Đã xóa nguyên liệu")
+            onSaved()
+        }
+        setSaving(false)
+    }
+
+    const handleDeleteAll = async () => {
+        if (!confirm("Xóa toàn bộ công thức?")) return
+        setSaving(true)
+        const res = await deleteRecipe(productId)
+        if (res.success) {
+            toast.success("Đã xóa công thức")
+            onSaved()
+            onClose()
+        }
+        setSaving(false)
+    }
+
+    const totalCost = ingredients.reduce((s, i) => s + (i.costPerBaseUnit || i.costPerUnit) * i.quantity, 0)
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl max-h-[80vh] flex flex-col animate-fade-in-up">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200">
+                    <div>
+                        <h3 className="font-display text-lg font-bold text-green-900">
+                            <ChefHat className="inline h-5 w-5 mr-2" />
+                            Sửa: {productName}
+                        </h3>
+                        <p className="text-xs text-cream-400 mt-0.5">
+                            Giá vốn: <span className="font-mono font-bold text-wine-700">₫{fmt(Math.round(totalCost))}</span>
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 hover:bg-cream-100 rounded-lg transition-colors">
+                        <X className="h-5 w-5 text-cream-400" />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                    {ingredients.length === 0 && !addMode && (
+                        <div className="text-center py-8 text-cream-400">
+                            <ChefHat className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                            <p>Chưa có nguyên liệu nào</p>
+                        </div>
+                    )}
+
+                    {ingredients.map((ing) => (
+                        <div key={ing.materialId} className="flex items-center justify-between p-3 bg-cream-50 rounded-lg border border-cream-200">
+                            <div>
+                                <p className="text-sm font-medium text-green-900">{ing.materialName}</p>
+                                <p className="text-xs text-cream-400">
+                                    {ing.quantity} {ing.unit} × ₫{fmt(Math.round(ing.costPerBaseUnit || ing.costPerUnit))}
+                                    {" = "}
+                                    <span className="font-mono font-bold">
+                                        ₫{fmt(Math.round((ing.costPerBaseUnit || ing.costPerUnit) * ing.quantity))}
+                                    </span>
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => handleRemoveIngredient(ing.materialId)}
+                                className="p-1.5 text-red-400 hover:bg-red-50 rounded"
+                                disabled={saving}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        </div>
+                    ))}
+
+                    {addMode && (
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-3">
+                            <select
+                                value={selectedMaterialId}
+                                onChange={(e) => {
+                                    setSelectedMaterialId(e.target.value)
+                                    const m = materials.find((m) => m.id === e.target.value)
+                                    if (m) setQtyUnit(m.baseUnit || m.unit)
+                                }}
+                                className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm bg-white"
+                            >
+                                <option value="">-- Chọn nguyên liệu --</option>
+                                {materials.map((m) => (
+                                    <option key={m.id} value={m.id}>
+                                        {m.name} ({m.unit}{m.baseUnit && m.baseUnit !== m.unit ? ` → ${m.baseUnit}` : ""}) — ₫{fmt(Math.round(m.costPerBaseUnit))}/{m.baseUnit || m.unit}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-medium text-cream-500 mb-1 block">Số lượng</label>
+                                    <input type="number" value={qty || ""} onChange={(e) => setQty(Number(e.target.value))}
+                                        className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm" placeholder="200" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-cream-500 mb-1 block">Đơn vị</label>
+                                    <input value={qtyUnit} onChange={(e) => setQtyUnit(e.target.value)}
+                                        className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm" placeholder="ml" />
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleAddIngredient}
+                                    disabled={saving || !selectedMaterialId || qty <= 0}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-green-700 text-white text-xs rounded-lg disabled:opacity-50"
+                                >
+                                    {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                    Thêm
+                                </button>
+                                <button onClick={() => setAddMode(false)} className="px-3 py-1.5 text-xs text-cream-500 hover:bg-cream-100 rounded-lg">
+                                    Hủy
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-between px-5 py-4 border-t border-cream-200">
+                    <div className="flex gap-2">
+                        {!addMode && (
+                            <button
+                                onClick={() => setAddMode(true)}
+                                className="flex items-center gap-1 px-3 py-2 bg-green-700 text-white text-sm rounded-lg hover:bg-green-800"
+                            >
+                                <Plus className="h-4 w-4" /> Thêm NL
+                            </button>
+                        )}
+                        {ingredients.length > 0 && (
+                            <button
+                                onClick={handleDeleteAll}
+                                disabled={saving}
+                                className="flex items-center gap-1 px-3 py-2 text-red-500 text-sm rounded-lg hover:bg-red-50"
+                            >
+                                <Trash2 className="h-4 w-4" /> Xóa tất cả
+                            </button>
+                        )}
+                    </div>
+                    <button onClick={onClose} className="px-4 py-2 text-sm text-cream-500 hover:bg-cream-100 rounded-lg">
+                        Đóng
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
