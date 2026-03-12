@@ -140,12 +140,12 @@ export async function getCustomerStats() {
     }
 }
 
-export { calculateTier, TIER_THRESHOLDS }
-export type { CustomerTier }
+// NOTE: calculateTier, TIER_THRESHOLDS, CustomerTier are exported from @/lib/customer-tiers directly
+// "use server" files can only export async functions — do not re-export constants here
 
 export type CustomerProfile = {
     id: string; name: string; fullName?: string; phone: string | null; email: string | null
-    tier: CustomerTier; totalSpent: number; loyaltyPts: number; loyaltyPoints?: number
+    tier: "REGULAR" | "SILVER" | "GOLD" | "PLATINUM" | "VIP"; totalSpent: number; loyaltyPts: number; loyaltyPoints?: number
     visitCount?: number; notes: string | null; birthday?: Date | null
     winePreferences?: string[]; allergies?: string[]
     orderHistory?: Array<{ id: string; orderNumber: string; date: Date; items: string[]; total: number; paymentMethod: string; staffName: string }>
