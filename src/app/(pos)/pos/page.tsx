@@ -476,7 +476,11 @@ export default function POSPage() {
         const prefetchStore = usePrefetchStore.getState()
         prefetchStore.registerPrefetch('pos', getPOSInitialData)
 
-        const applyData = (data: any) => {
+        const applyData = (data: any, skipIfEmpty = false) => {
+            // Guard: never overwrite good data with empty response
+            if (skipIfEmpty && (!data.products || data.products.length === 0)) {
+                return
+            }
             setDbProducts(data.products as Product[])
             setDbCategories(data.categories as Category[])
             setDbZones(data.zones as TableZone[])
@@ -498,19 +502,25 @@ export default function POSPage() {
             getUpcomingReservations().then((list) => setUpcomingReservations(list)).catch(() => { })
         }
 
-        const cached = prefetchStore.get('pos')
+        // Try cache first (even expired — use 10min window for stale-while-revalidate)
+        const cached = prefetchStore.get('pos', 600_000)
         if (cached) {
+            // Apply cached data IMMEDIATELY — no skeleton flash
             applyData(cached)
             loadSecondary()
-            // Background refresh
+            // Background refresh — but NEVER overwrite with empty data
             getPOSInitialData().then((data) => {
-                prefetchStore.set('pos', data)
-                applyData(data)
+                if (data.products && data.products.length > 0) {
+                    prefetchStore.set('pos', data)
+                    applyData(data, true)
+                }
             }).catch(() => { })
         } else {
             getPOSInitialData()
                 .then((data) => {
-                    prefetchStore.set('pos', data)
+                    if (data.products && data.products.length > 0) {
+                        prefetchStore.set('pos', data)
+                    }
                     applyData(data)
                     // Load secondary only AFTER main data
                     loadSecondary()
@@ -1210,16 +1220,15 @@ export default function POSPage() {
                                         key={product.id}
                                         onClick={() => handleAddToCart(product)}
                                         onContextMenu={(e) => handleProductContextMenu(e, product)}
-                                        disabled={is86}
                                         className={cn(
                                             "group relative flex flex-col rounded-xl border bg-cream-100 p-3 text-left transition-all hover:shadow-md hover:border-green-600 active:scale-[0.97]",
-                                            is86 ? "opacity-40 border-red-300 cursor-not-allowed" :
+                                            is86 ? "border-red-300" :
                                                 inCart ? "border-green-600 ring-1 ring-green-600/30" : "border-cream-300"
                                         )}
                                     >
-                                        {/* 86 overlay */}
+                                        {/* 86 overlay — only cover product info area, not action buttons */}
                                         {is86 && (
-                                            <span className="absolute inset-0 flex items-center justify-center z-10">
+                                            <span className="absolute left-0 right-0 top-0 bottom-12 flex items-center justify-center z-10 bg-cream-100/60 rounded-t-xl">
                                                 <span className="rounded-lg bg-red-600 px-3 py-1 text-xs font-bold text-white rotate-[-12deg] shadow-lg">86 — HếT</span>
                                             </span>
                                         )}
@@ -1298,7 +1307,7 @@ export default function POSPage() {
                                         )}
 
                                         {/* Price + Wine Guide button */}
-                                        <div className="mt-auto pt-2 flex items-center justify-between">
+                                        <div className="mt-auto pt-2 flex items-center justify-between relative z-20">
                                             <div>
                                                 <span className="font-mono text-sm font-bold text-green-900">
                                                     ₫{formatPrice(displayPrice)}

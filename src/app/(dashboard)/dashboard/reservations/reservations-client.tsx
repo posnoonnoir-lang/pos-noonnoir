@@ -39,6 +39,7 @@ import {
 import { getTables, getZones } from "@/actions/tables"
 import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 import { usePrefetchStore } from "@/stores/prefetch-store"
+import { useAuthStore } from "@/stores/auth-store"
 
 const STATUS_CONFIG: Record<ReservationStatus, { label: string; color: string; icon: string }> = {
     PENDING: { label: "Chờ xác nhận", color: "bg-amber-100 border-amber-300 text-amber-700", icon: "⏳" },
@@ -368,6 +369,7 @@ export function ReservationsClient({ initialData }: { initialData: ReservationsI
 // ADD RESERVATION MODAL
 // ============================================================
 function AddReservationModal({ onClose, onCreated, zones }: { onClose: () => void; onCreated: () => void; zones: Awaited<ReturnType<typeof getZones>> }) {
+    const { staff } = useAuthStore()
     const [name, setName] = useState("")
     const [phone, setPhone] = useState("")
     const [email, setEmail] = useState("")
@@ -396,8 +398,8 @@ function AddReservationModal({ onClose, onCreated, zones }: { onClose: () => voi
             notes: notes.trim() || undefined,
             specialRequests: specialRequests.trim() || undefined,
             source,
-            staffId: "staff-1",
-            staffName: "Staff",
+            staffId: staff?.id ?? "",
+            staffName: staff?.fullName ?? "Staff",
         })
         setSubmitting(false)
 
