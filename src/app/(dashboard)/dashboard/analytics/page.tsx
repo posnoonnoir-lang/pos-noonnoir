@@ -13,6 +13,7 @@ import {
 } from "recharts"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 import {
     getMonthlyRevenue, getCategoryRevenue, getZoneHeatmap,
     getHourlyHeatmap, getStaffLeaderboard, getAnalyticsSummary,
@@ -68,35 +69,54 @@ export default function AnalyticsPage() {
     const [hourlyData, setHourlyData] = useState<HourlyData[]>([])
     const [payments, setPayments] = useState<PaymentBreakdown[]>([])
 
+    const applyData = useCallback((d: any) => {
+        setSummary(d.sum); setMonthly(d.mon); setCategories(d.cat)
+        setZones(d.zone); setHourly(d.hour); setStaff(d.stf)
+        setWeeklyRev(d.wRev); setTopProducts(d.topP)
+        setHourlyData(d.hData); setPayments(d.pay)
+    }, [])
+
+    const fetchFromServer = useCallback(async () => {
+        const [sum, mon, cat, zone, hour, stf, wRev, topP, hData, pay] = await Promise.all([
+            getAnalyticsSummary(), getMonthlyRevenue(), getCategoryRevenue(),
+            getZoneHeatmap(), getHourlyHeatmap(), getStaffLeaderboard(),
+            getWeeklyRevenue(), getTopProducts(), getHourlyData(), getPaymentBreakdown(),
+        ])
+        return { sum, mon, cat, zone, hour, stf, wRev, topP, hData, pay }
+    }, [])
+
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
-            const [
-                sum, mon, cat, zone, hour, stf,
-                wRev, topP, hData, pay,
-            ] = await Promise.all([
-                getAnalyticsSummary(),
-                getMonthlyRevenue(),
-                getCategoryRevenue(),
-                getZoneHeatmap(),
-                getHourlyHeatmap(),
-                getStaffLeaderboard(),
-                getWeeklyRevenue(),
-                getTopProducts(),
-                getHourlyData(),
-                getPaymentBreakdown(),
-            ])
-            setSummary(sum); setMonthly(mon); setCategories(cat)
-            setZones(zone); setHourly(hour); setStaff(stf)
-            setWeeklyRev(wRev); setTopProducts(topP)
-            setHourlyData(hData); setPayments(pay)
+            const data = await fetchFromServer()
+            applyData(data)
+            // Cache for instant revisit
+            usePrefetchStore.getState().set("analytics:all", data)
         } catch (e) {
             console.error("Analytics load error:", e)
         }
         setLoading(false)
-    }, [])
+    }, [fetchFromServer, applyData])
 
-    useEffect(() => { loadData() }, [loadData])
+    useEffect(() => {
+        const store = usePrefetchStore.getState()
+        store.registerPrefetch("analytics:all", fetchFromServer)
+
+        // Try cache first for instant display
+        const cached = store.get("analytics:all")
+        if (cached) {
+            applyData(cached)
+            setLoading(false)
+            // Background refresh
+            fetchFromServer().then(data => {
+                applyData(data)
+                store.set("analytics:all", data)
+            }).catch(() => { })
+        } else {
+            loadData()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     const handleExport = async (type: "revenue" | "products" | "staff" | "orders") => {
         const data = await getExportData(type)

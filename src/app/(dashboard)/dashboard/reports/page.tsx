@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
+import { usePrefetchStore } from "@/stores/prefetch-store"
 import {
     TrendingUp,
     TrendingDown,
@@ -110,20 +111,42 @@ function DailyPnLView() {
     const [selectedDay, setSelectedDay] = useState(0)
     const [loading, setLoading] = useState(true)
 
+    const fetchFromServer = useCallback(async () => {
+        const [s, w] = await Promise.all([getPnLSummary(), getWeeklyPnL()])
+        return { s, w }
+    }, [])
+
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
-            const [s, w] = await Promise.all([getPnLSummary(), getWeeklyPnL()])
-            setSummary(s)
-            setWeekData(w)
+            const result = await fetchFromServer()
+            setSummary(result.s)
+            setWeekData(result.w)
+            usePrefetchStore.getState().set("reports:pnl", result)
         } catch (err) {
             console.error("[P&L] load failed:", err)
             toast.error("Không thể tải dữ liệu P&L")
         }
         setLoading(false)
-    }, [])
+    }, [fetchFromServer])
 
-    useEffect(() => { loadData() }, [loadData])
+    useEffect(() => {
+        const store = usePrefetchStore.getState()
+        store.registerPrefetch("reports:pnl", fetchFromServer)
+        const cached = store.get("reports:pnl")
+        if (cached) {
+            setSummary(cached.s)
+            setWeekData(cached.w)
+            setLoading(false)
+            fetchFromServer().then(r => {
+                setSummary(r.s); setWeekData(r.w)
+                store.set("reports:pnl", r)
+            }).catch(() => { })
+        } else {
+            loadData()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     const day = weekData[selectedDay] ?? null
 
@@ -317,21 +340,47 @@ function FinanceView() {
     const [productCOGS, setProductCOGS] = useState<Awaited<ReturnType<typeof getCOGSByProduct>>>([])
     const [loading, setLoading] = useState(true)
 
+    const fetchFromServer = useCallback(async () => {
+        const [records, summary, finance, exp, products] = await Promise.all([
+            getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
+        ])
+        return { records, summary, finance, exp, products }
+    }, [])
+
+    const applyData = useCallback((d: any) => {
+        setCogsRecords(d.records); setCogsSummary(d.summary); setFinanceSummary(d.finance)
+        setExpenses(d.exp); setProductCOGS(d.products)
+    }, [])
+
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
-            const [records, summary, finance, exp, products] = await Promise.all([
-                getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
-            ])
-            setCogsRecords(records); setCogsSummary(summary); setFinanceSummary(finance); setExpenses(exp); setProductCOGS(products)
+            const data = await fetchFromServer()
+            applyData(data)
+            usePrefetchStore.getState().set("reports:finance", data)
         } catch (err) {
             console.error("[Finance] load failed:", err)
             toast.error("Không thể tải dữ liệu tài chính")
         }
         setLoading(false)
-    }, [])
+    }, [fetchFromServer, applyData])
 
-    useEffect(() => { loadData() }, [loadData])
+    useEffect(() => {
+        const store = usePrefetchStore.getState()
+        store.registerPrefetch("reports:finance", fetchFromServer)
+        const cached = store.get("reports:finance")
+        if (cached) {
+            applyData(cached)
+            setLoading(false)
+            fetchFromServer().then(d => {
+                applyData(d)
+                store.set("reports:finance", d)
+            }).catch(() => { })
+        } else {
+            loadData()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     if (loading) return <ReportsInlineSkeleton />
 

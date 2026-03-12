@@ -18,7 +18,7 @@ type PrefetchStore = {
     prefetchMultiple: (keys: string[]) => void
 }
 
-const CACHE_TTL = 60_000 // 60 seconds default
+const CACHE_TTL = 300_000 // 5 minutes — stale-while-revalidate keeps data fresh
 
 export const usePrefetchStore = create<PrefetchStore>((set, get) => ({
     cache: new Map(),

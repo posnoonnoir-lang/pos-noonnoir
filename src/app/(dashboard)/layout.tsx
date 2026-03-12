@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
 import { usePrefetchStore } from "@/stores/prefetch-store"
 import { PageTransition } from "@/components/page-transition"
+import { GlobalPrefetcher } from "@/components/global-prefetcher"
 
 // Map routes to prefetch cache keys
 const PREFETCH_KEYS: Record<string, string> = {
@@ -211,6 +212,7 @@ export default function DashboardLayout({
 
             {/* Main Content — with page transition animation */}
             <main className="ml-[220px] flex-1 min-h-screen bg-cream-50">
+                <GlobalPrefetcher />
                 <PageTransition>
                     {children}
                 </PageTransition>
