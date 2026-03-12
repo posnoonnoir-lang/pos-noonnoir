@@ -111,6 +111,7 @@ function TableSelector({
     onClose,
     onSelect,
     onSelectOccupied,
+    onPayOrder,
     zones,
     tables,
 }: {
@@ -118,6 +119,7 @@ function TableSelector({
     onClose: () => void
     onSelect: (table: FloorTable) => void
     onSelectOccupied?: (table: FloorTable, order: Order) => void
+    onPayOrder?: (order: Order) => void
     zones: TableZone[]
     tables: FloorTable[]
 }) {
@@ -310,6 +312,16 @@ function TableSelector({
                                 <Plus className="h-3.5 w-3.5" />
                                 Thêm món cho bàn này
                             </button>
+                            <button
+                                onClick={() => {
+                                    onPayOrder?.(viewingOrder.order)
+                                    onClose()
+                                }}
+                                className="w-full rounded-lg bg-green-700 py-2 text-xs font-bold text-white hover:bg-green-600 transition-all flex items-center justify-center gap-1.5"
+                            >
+                                <Banknote className="h-3.5 w-3.5" />
+                                Thanh toán đơn · ₫{formatPrice(viewingOrder.order.total)}
+                            </button>
                         </div>
                     </div>
                 )}
@@ -330,6 +342,7 @@ export default function POSPage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [lastOrder, setLastOrder] = useState<{ orderNumber: string; total: number } | null>(null)
     const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
+    const [payingOrder, setPayingOrder] = useState<Order | null>(null)
 
     // Tab state
     const [openTabModal, setOpenTabModal] = useState(false)
@@ -1920,7 +1933,22 @@ export default function POSPage() {
                     setActiveOrderId(order.id)
                     toast.info(`🍽 Bàn ${table.tableNumber} — thêm món vào đơn ${order.orderNumber}`)
                 }}
+                onPayOrder={(order) => setPayingOrder(order)}
             />
+
+            {/* Pay Existing Order Modal */}
+            {payingOrder && (
+                <PayExistingOrderModal
+                    order={payingOrder}
+                    onClose={() => setPayingOrder(null)}
+                    onPaid={() => {
+                        setPayingOrder(null)
+                        refreshFloorData()
+                        toast.success(`✅ Đã thanh toán đơn ${payingOrder.orderNumber}`)
+                    }}
+                    staffName={staff?.fullName ?? "Staff"}
+                />
+            )}
 
             {/* Open Tab Modal */}
             {openTabModal && (
@@ -3981,6 +4009,121 @@ function FoodPairingPopup({
                         Đóng
                     </Button>
                 </div>
+            </div>
+        </div>
+    )
+}
+
+// ============================================================
+// PAY EXISTING ORDER MODAL — For PAY_AFTER mode checkout
+// ============================================================
+function PayExistingOrderModal({
+    order,
+    onClose,
+    onPaid,
+    staffName,
+}: {
+    order: Order
+    onClose: () => void
+    onPaid: () => void
+    staffName: string
+}) {
+    const [paying, setPaying] = useState(false)
+
+    const handlePay = async (method: PaymentMethod) => {
+        setPaying(true)
+        try {
+            const result = await processOrderWithCOGS(order.id, method)
+            if (result.success) {
+                if (result.stockWarnings.length > 0) {
+                    for (const w of result.stockWarnings) {
+                        toast.warning(`⚠️ ${w}`, { duration: 5000 })
+                    }
+                }
+                onPaid()
+            } else {
+                toast.error(result.errors?.[0] ?? "Lỗi thanh toán")
+            }
+        } catch {
+            toast.error("Lỗi hệ thống")
+        }
+        setPaying(false)
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-cream-300 bg-cream-100 shadow-2xl overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-cream-300 bg-green-900 px-5 py-3">
+                    <div>
+                        <h3 className="font-display text-sm font-bold text-cream-50">Thanh toán đơn {order.orderNumber}</h3>
+                        <p className="text-[10px] text-cream-300 mt-0.5">
+                            {order.tableNumber ? `Bàn ${order.tableNumber}` : "Takeaway"} · {staffName}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="rounded-lg p-1 text-cream-300 hover:text-white hover:bg-white/10 transition-all">
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {/* Order Items */}
+                <div className="max-h-64 overflow-y-auto p-4 space-y-1.5">
+                    {order.items.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between rounded-lg bg-cream-50 border border-cream-200 px-3 py-2">
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-green-900 truncate">{item.productName}</p>
+                                {item.notes && <p className="text-[9px] text-amber-600 italic">💬 {item.notes}</p>}
+                            </div>
+                            <div className="text-right ml-2 shrink-0">
+                                <span className="text-[10px] text-cream-500">×{item.quantity}</span>
+                                <p className="font-mono text-[11px] font-bold text-green-800">₫{formatPrice(item.unitPrice * item.quantity)}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Total */}
+                <div className="border-t border-cream-300 px-5 py-3 bg-cream-50">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-cream-500">Tổng cộng</span>
+                        <span className="font-mono text-lg font-bold text-green-900">₫{formatPrice(order.total)}</span>
+                    </div>
+                </div>
+
+                {/* Payment Buttons */}
+                <div className="grid grid-cols-3 gap-2 p-4 bg-cream-100 border-t border-cream-200">
+                    <button
+                        onClick={() => handlePay("CASH")}
+                        disabled={paying}
+                        className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-cream-300 bg-cream-50 py-3 text-xs font-medium text-cream-600 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
+                    >
+                        <Banknote className="h-5 w-5" />
+                        <span className="font-bold">Tiền mặt</span>
+                    </button>
+                    <button
+                        onClick={() => handlePay("CARD")}
+                        disabled={paying}
+                        className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-cream-300 bg-cream-50 py-3 text-xs font-medium text-cream-600 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
+                    >
+                        <CreditCard className="h-5 w-5" />
+                        <span className="font-bold">Thẻ</span>
+                    </button>
+                    <button
+                        onClick={() => handlePay("BANK_TRANSFER")}
+                        disabled={paying}
+                        className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-cream-300 bg-cream-50 py-3 text-xs font-medium text-cream-600 hover:border-green-600 hover:bg-green-50 hover:text-green-700 transition-all disabled:opacity-50"
+                    >
+                        <QrCode className="h-5 w-5" />
+                        <span className="font-bold">Chuyển khoản</span>
+                    </button>
+                </div>
+
+                {paying && (
+                    <div className="flex items-center justify-center gap-2 py-3 bg-cream-50 border-t border-cream-200">
+                        <Loader2 className="h-4 w-4 animate-spin text-green-700" />
+                        <span className="text-xs text-cream-500">Đang xử lý thanh toán...</span>
+                    </div>
+                )}
             </div>
         </div>
     )
