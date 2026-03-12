@@ -15,17 +15,22 @@ import {
     type OpenedBottleSummary,
 } from "@/actions/wine"
 import { toast } from "sonner"
-import { DashboardInlineSkeleton } from "@/components/inline-skeletons"
 
 function formatPrice(amount: number): string {
     return new Intl.NumberFormat("vi-VN").format(amount)
 }
 
-export function BottleTrackingClient() {
-    const [openedBottles, setOpenedBottles] = useState<OpenedBottleSummary[]>([])
-    const [history, setHistory] = useState<Awaited<ReturnType<typeof getBottleHistory>>>([])
-    const [stats, setStats] = useState<Awaited<ReturnType<typeof getByGlassDashboardStats>> | null>(null)
-    const [loading, setLoading] = useState(true)
+export interface BottleTrackingInitialData {
+    openedBottles: OpenedBottleSummary[]
+    history: Awaited<ReturnType<typeof getBottleHistory>>
+    stats: Awaited<ReturnType<typeof getByGlassDashboardStats>>
+}
+
+export function BottleTrackingClient({ initial }: { initial: BottleTrackingInitialData }) {
+    const [openedBottles, setOpenedBottles] = useState<OpenedBottleSummary[]>(initial.openedBottles)
+    const [history, setHistory] = useState<Awaited<ReturnType<typeof getBottleHistory>>>(initial.history)
+    const [stats, setStats] = useState<Awaited<ReturnType<typeof getByGlassDashboardStats>> | null>(initial.stats)
+    const [loading, setLoading] = useState(false)
     const [historyExpanded, setHistoryExpanded] = useState(false)
     const [historyDays, setHistoryDays] = useState(7)
 
@@ -47,16 +52,10 @@ export function BottleTrackingClient() {
         setLoading(false)
     }, [historyDays])
 
-    useEffect(() => { refresh() }, [refresh])
-
     useEffect(() => {
         const interval = setInterval(refresh, 30000)
         return () => clearInterval(interval)
     }, [refresh])
-
-    if (loading && openedBottles.length === 0 && !stats) {
-        return <DashboardInlineSkeleton />
-    }
 
     return (
         <div className="min-h-screen bg-cream-50 p-6">
