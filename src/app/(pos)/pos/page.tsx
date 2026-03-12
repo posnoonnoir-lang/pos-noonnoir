@@ -343,6 +343,7 @@ export default function POSPage() {
     const [lastOrder, setLastOrder] = useState<{ orderNumber: string; total: number } | null>(null)
     const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
     const [payingOrder, setPayingOrder] = useState<Order | null>(null)
+    const [existingOrderData, setExistingOrderData] = useState<Order | null>(null)
 
     // Tab state
     const [openTabModal, setOpenTabModal] = useState(false)
@@ -806,6 +807,7 @@ export default function POSPage() {
                     )
                     cart.clearCart()
                     setActiveOrderId(null)
+                    setExistingOrderData(null)
                     setTimeout(() => setLastOrder(null), 5000)
                 } else {
                     toast.error(result.error ?? "Không thể thêm món")
@@ -1434,11 +1436,60 @@ export default function POSPage() {
 
                 {/* Cart Items */}
                 <div className="flex-1 overflow-y-auto">
-                    {cart.items.length === 0 ? (
+                    {/* Existing order items (read-only) when editing occupied table */}
+                    {existingOrderData && activeOrderId && (
+                        <div className="bg-cream-50 border-b-2 border-wine-200">
+                            <div className="px-4 py-2 bg-wine-50 border-b border-wine-100 flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                    <Receipt className="h-3 w-3 text-wine-600" />
+                                    <span className="text-[10px] font-bold text-wine-700">Đã order · {existingOrderData.orderNumber}</span>
+                                </div>
+                                <span className="font-mono text-[10px] font-bold text-wine-700">₫{formatPrice(existingOrderData.total)}</span>
+                            </div>
+                            <div className="divide-y divide-cream-200">
+                                {existingOrderData.items.map((item) => (
+                                    <div key={item.id} className="px-4 py-1.5 flex items-center justify-between opacity-70">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] text-cream-600 truncate">{item.productName}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-[10px] text-cream-400">×{item.quantity}</span>
+                                            <span className="font-mono text-[10px] text-cream-500">₫{formatPrice(item.unitPrice * item.quantity)}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {/* Quick Pay button for existing order */}
+                            <div className="px-4 py-2 border-t border-wine-100">
+                                <button
+                                    onClick={() => setPayingOrder(existingOrderData)}
+                                    className="w-full rounded-lg bg-green-700 py-1.5 text-[10px] font-bold text-white hover:bg-green-600 transition-all flex items-center justify-center gap-1"
+                                >
+                                    <Banknote className="h-3 w-3" />
+                                    Thanh toán đơn này · ₫{formatPrice(existingOrderData.total)}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* New items label when adding to existing order */}
+                    {existingOrderData && activeOrderId && cart.items.length > 0 && (
+                        <div className="px-4 py-1.5 bg-green-50 border-b border-green-100 flex items-center gap-1.5">
+                            <Plus className="h-3 w-3 text-green-600" />
+                            <span className="text-[10px] font-bold text-green-700">Món mới ({cart.itemCount()})</span>
+                        </div>
+                    )}
+
+                    {cart.items.length === 0 && !existingOrderData ? (
                         <div className="flex flex-col items-center justify-center h-full text-cream-400">
                             <ShoppingCart className="h-8 w-8 mb-2" />
                             <p className="text-xs">Chưa có sản phẩm</p>
                             <p className="text-[10px] mt-1">Chọn sản phẩm bên trái</p>
+                        </div>
+                    ) : cart.items.length === 0 && existingOrderData ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-cream-400">
+                            <Plus className="h-6 w-6 mb-1" />
+                            <p className="text-[10px]">Chọn món mới để thêm vào đơn</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-cream-300">
@@ -1715,7 +1766,7 @@ export default function POSPage() {
                                     <p className="text-[10px] font-bold text-wine-700">🍽 Thêm món vào bàn {cart.selectedTable.tableNumber}</p>
                                     <p className="text-[9px] text-wine-500">Các món mới sẽ được thêm vào đơn hiện tại</p>
                                 </div>
-                                <button onClick={() => { setActiveOrderId(null); cart.clearCart() }} className="text-[10px] text-wine-400 hover:text-wine-700 font-medium">Hủy</button>
+                                <button onClick={() => { setActiveOrderId(null); setExistingOrderData(null); cart.clearCart() }} className="text-[10px] text-wine-400 hover:text-wine-700 font-medium">Hủy</button>
                             </div>
                         )}
 
@@ -1931,6 +1982,7 @@ export default function POSPage() {
                 onSelectOccupied={(table, order) => {
                     cart.selectTable(table)
                     setActiveOrderId(order.id)
+                    setExistingOrderData(order)
                     toast.info(`🍽 Bàn ${table.tableNumber} — thêm món vào đơn ${order.orderNumber}`)
                 }}
                 onPayOrder={(order) => setPayingOrder(order)}
