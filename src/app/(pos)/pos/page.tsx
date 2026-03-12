@@ -2498,9 +2498,9 @@ export default function POSPage() {
 
             {/* ============ Wine Recommendations Panel ============ */}
             {showRecommendations && recommendations.length > 0 && (
-                <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setShowRecommendations(false)}>
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowRecommendations(false)}>
                     <div
-                        className="w-full max-w-2xl bg-white rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300"
+                        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -2522,7 +2522,7 @@ export default function POSPage() {
                         </div>
 
                         {/* Recommendations list */}
-                        <div className="max-h-[50vh] overflow-y-auto divide-y divide-cream-100">
+                        <div className="max-h-[60vh] overflow-y-auto divide-y divide-cream-100">
                             {recommendations.map((rec, idx) => (
                                 <button
                                     key={rec.id}
