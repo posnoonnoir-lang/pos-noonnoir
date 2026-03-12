@@ -15,8 +15,14 @@ export async function getAllCustomers() {
     })
     return customers.map((c) => ({
         ...c,
+        fullName: c.name,
         totalSpent: Number(c.totalSpent),
         tier: c.tier as CustomerTier,
+        loyaltyPoints: c.loyaltyPts,
+        visitCount: c.loyaltyPts,
+        winePreferences: [] as string[],
+        allergies: [] as string[],
+        orderHistory: [] as Array<{ id: string; orderNumber: string; date: Date; items: string[]; total: number; paymentMethod: string; staffName: string }>,
     }))
 }
 
@@ -72,6 +78,11 @@ export async function searchCRMCustomers(query: string) {
         fullName: c.name,
         totalSpent: Number(c.totalSpent),
         tier: c.tier as CustomerTier,
+        loyaltyPoints: c.loyaltyPts,
+        visitCount: c.loyaltyPts,
+        winePreferences: [] as string[],
+        allergies: [] as string[],
+        orderHistory: [] as Array<{ id: string; orderNumber: string; date: Date; items: string[]; total: number; paymentMethod: string; staffName: string }>,
     }))
 }
 
