@@ -520,8 +520,11 @@ export async function processOrderWithCOGS(
                             data: {
                                 type: "SALE",
                                 productId: item.productId,
+                                ingredientId: d.ingredientId,
                                 quantity: -d.qtyUsed,
                                 unitCost: d.costPerUnit,
+                                totalCost: d.subtotal,
+                                balanceQty: d.remainingStock,
                                 reason: `Bán ${result.productName} x${item.quantity} → trừ ${d.materialName}`,
                                 createdBy: order.createdBy,
                             },

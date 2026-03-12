@@ -363,7 +363,7 @@ export async function deleteRecipe(productId: string) {
 
 export type DeductionResult = {
     success: boolean; productName: string; qtySold: number; totalIngredientCost: number
-    deductions: { materialName: string; qtyUsed: number; unit: string; costPerUnit: number; subtotal: number; remainingStock: number; warning: string | null }[]
+    deductions: { ingredientId: string; materialName: string; qtyUsed: number; unit: string; costPerUnit: number; subtotal: number; remainingStock: number; warning: string | null }[]
     errors: string[]
 }
 
@@ -407,7 +407,7 @@ export async function deductRecipeIngredients(productId: string, qtySold: number
         if (newStock <= 0) warning = "Hết hàng! Cần nhập thêm."
         else if (newStock <= Number(mat.minStock)) warning = `Sắp hết (còn ${Math.round(newStock * 100) / 100}${mat.baseUnit})`
 
-        deductions.push({ materialName: mat.name, qtyUsed: qtyNeeded, unit: ri.unit, costPerUnit: Math.round(costPerBase * 100) / 100, subtotal, remainingStock: newStock, warning })
+        deductions.push({ ingredientId: mat.id, materialName: mat.name, qtyUsed: qtyNeeded, unit: ri.unit, costPerUnit: Math.round(costPerBase * 100) / 100, subtotal, remainingStock: newStock, warning })
     }
 
     return { success: errors.length === 0, productName, qtySold, totalIngredientCost: totalCost, deductions, errors }
