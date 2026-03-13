@@ -214,8 +214,20 @@ export default function DashboardLayout({
                                     if (collapsed) {
                                         return (
                                             <Tooltip key={item.href}>
-                                                <TooltipTrigger asChild>
-                                                    {linkContent}
+                                                <TooltipTrigger
+                                                    className={cn(
+                                                        "relative flex h-10 w-10 mx-auto items-center justify-center rounded-lg transition-all nav-link-smooth",
+                                                        isActive
+                                                            ? "bg-green-700 text-cream-50 shadow-sm"
+                                                            : "text-green-300 hover:bg-green-800 hover:text-cream-50"
+                                                    )}
+                                                    render={<Link href={item.href} prefetch={true} />}
+                                                    onMouseEnter={() => {
+                                                        const key = PREFETCH_KEYS[item.href]
+                                                        if (key) usePrefetchStore.getState().prefetch(key)
+                                                    }}
+                                                >
+                                                    <Icon className={cn("h-4 w-4 shrink-0", isActive && "scale-110")} />
                                                 </TooltipTrigger>
                                                 <TooltipContent side="right" className="bg-green-800 text-cream-50 border-green-700 text-xs">
                                                     {item.label}
@@ -236,27 +248,22 @@ export default function DashboardLayout({
                     {collapsed ? (
                         <>
                             <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Link
-                                        href="/dashboard/settings"
-                                        prefetch={true}
-                                        className="flex h-10 w-10 mx-auto items-center justify-center rounded-lg text-green-300 nav-link-smooth hover:bg-green-800 hover:text-cream-50"
-                                    >
-                                        <Settings className="h-4 w-4" />
-                                    </Link>
+                                <TooltipTrigger
+                                    className="flex h-10 w-10 mx-auto items-center justify-center rounded-lg text-green-300 nav-link-smooth hover:bg-green-800 hover:text-cream-50"
+                                    render={<Link href="/dashboard/settings" prefetch={true} />}
+                                >
+                                    <Settings className="h-4 w-4" />
                                 </TooltipTrigger>
                                 <TooltipContent side="right" className="bg-green-800 text-cream-50 border-green-700 text-xs">
                                     Cài đặt
                                 </TooltipContent>
                             </Tooltip>
                             <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <button
-                                        onClick={handleLogout}
-                                        className="flex h-10 w-10 mx-auto items-center justify-center rounded-lg text-green-300 btn-press hover:bg-wine-700 hover:text-white"
-                                    >
-                                        <LogOut className="h-4 w-4" />
-                                    </button>
+                                <TooltipTrigger
+                                    onClick={handleLogout}
+                                    className="flex h-10 w-10 mx-auto items-center justify-center rounded-lg text-green-300 btn-press hover:bg-wine-700 hover:text-white"
+                                >
+                                    <LogOut className="h-4 w-4" />
                                 </TooltipTrigger>
                                 <TooltipContent side="right" className="bg-green-800 text-cream-50 border-green-700 text-xs">
                                     {staff?.fullName ?? "Đăng xuất"}
