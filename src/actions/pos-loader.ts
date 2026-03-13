@@ -17,69 +17,78 @@ import { getUpcomingReservations } from "@/actions/reservations"
 export async function getPOSInitialData() {
     const start = Date.now()
     try {
-        // Batch 1 — ALL Prisma queries in parallel (products, categories, tables, shift, stock, glass, etc.)
+        // ALL 3 groups run concurrently — no sequential waits
+        const [txResults, wineResults, functionResults] = await Promise.all([
+            // Group 1 — Core Prisma queries in $transaction (1 DB roundtrip, 1 connection)
+            prisma.$transaction([
+                prisma.product.findMany({
+                    where: { isActive: true },
+                    include: { category: true },
+                    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+                }),
+                prisma.category.findMany({
+                    where: { isActive: true },
+                    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+                }),
+                prisma.tableZone.findMany({
+                    where: { isActive: true },
+                    orderBy: { sortOrder: "asc" },
+                }),
+                prisma.floorTable.findMany({
+                    where: { isActive: true },
+                    orderBy: { tableNumber: "asc" },
+                }),
+                prisma.shiftRecord.findFirst({
+                    where: { closedAt: null },
+                    orderBy: { openedAt: "desc" },
+                    include: { staff: { select: { fullName: true } } },
+                }),
+                prisma.out86.findMany({
+                    select: { productId: true },
+                }),
+                prisma.taxRate.findFirst({
+                    where: { isDefault: true, isActive: true },
+                }),
+                prisma.storeSettings.findFirst(),
+            ]),
+            // Group 2 — Wine queries separately (groupBy has TS circular ref in complex generics)
+            (async () => {
+                const [stock, opened] = await Promise.all([
+                    prisma.wineBottle.groupBy({
+                        by: ["productId"],
+                        where: { status: "IN_STOCK" },
+                        _count: { id: true },
+                    }) as any,
+                    prisma.wineBottle.findMany({
+                        where: { status: "OPENED" },
+                        select: {
+                            productId: true,
+                            glassesRemaining: true,
+                            product: { select: { glassesPerBottle: true } },
+                        },
+                    }),
+                ])
+                return [stock, opened] as const
+            })(),
+            // Group 3 — Function calls in parallel (make their own DB connections)
+            Promise.all([
+                getOpenTabs(),
+                getHeldOrders(),
+                getUnreadNotifications(),
+                getPushSaleItems(),
+                getUpcomingReservations(),
+                getPosConfig(),
+            ]),
+        ])
+
         const [
             products, categories, zones, tables, shift,
             out86Records, taxRate, storeSettings,
-            wineStockCounts, glassStatuses,
-        ] = await Promise.all([
-            prisma.product.findMany({
-                where: { isActive: true },
-                include: { category: true },
-                orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-            }),
-            prisma.category.findMany({
-                where: { isActive: true },
-                orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-            }),
-            prisma.tableZone.findMany({
-                where: { isActive: true },
-                orderBy: { sortOrder: "asc" },
-            }),
-            prisma.floorTable.findMany({
-                where: { isActive: true },
-                orderBy: { tableNumber: "asc" },
-            }),
-            prisma.shiftRecord.findFirst({
-                where: { closedAt: null },
-                orderBy: { openedAt: "desc" },
-                include: { staff: { select: { fullName: true } } },
-            }),
-            prisma.out86.findMany({
-                select: { productId: true },
-            }),
-            prisma.taxRate.findFirst({
-                where: { isDefault: true, isActive: true },
-            }),
-            prisma.storeSettings.findFirst(),
-            prisma.wineBottle.groupBy({
-                by: ["productId"],
-                where: { status: "IN_STOCK" },
-                _count: { id: true },
-            }),
-            prisma.wineBottle.findMany({
-                where: { status: "OPENED" },
-                select: {
-                    productId: true,
-                    glassesRemaining: true,
-                    product: { select: { glassesPerBottle: true } },
-                },
-            }),
-        ])
-        const t1 = Date.now()
+        ] = txResults as any
+        const [wineStockCounts, glassStatuses] = wineResults
+        const [openTabs, heldOrders, notifications, pushSaleItems, reservations, posConfig] = functionResults
 
-        // Batch 2 — All function calls in parallel (computed/in-memory data)
-        const [openTabs, heldOrders, notifications, pushSaleItems, reservations, posConfig] = await Promise.all([
-            getOpenTabs(),
-            getHeldOrders(),
-            getUnreadNotifications(),
-            getPushSaleItems(),
-            getUpcomingReservations(),
-            getPosConfig(),
-        ])
-        const t2 = Date.now()
-
-        console.log(`[POS] Load: batch1=${t1 - start}ms batch2=${t2 - t1}ms total=${t2 - start}ms`)
+        console.log(`[POS] Load: total=${Date.now() - start}ms`)
 
         // Serialize wine stock map
         const wineStock: Record<string, number> = {}
