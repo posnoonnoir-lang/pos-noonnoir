@@ -3,6 +3,7 @@ import { DM_Sans, Playfair_Display, Caveat, JetBrains_Mono } from "next/font/goo
 import { Toaster } from "sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/components/theme-switcher"
+import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration"
 import "./globals.css"
 
 // Critical body font — preload + swap
@@ -44,7 +45,17 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Noon & Noir — Wine Alley POS",
   description: "drink slowly · laugh quietly · stay longer",
-  icons: { icon: "/favicon.ico" },
+  icons: { icon: "/favicon.ico", apple: "/icons/icon-192.png" },
+  manifest: "/manifest.json",
+  themeColor: "#14532d",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Noon & Noir",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 }
 
 
@@ -63,6 +74,7 @@ export default function RootLayout({
             {children}
           </ThemeProvider>
         </TooltipProvider>
+        <ServiceWorkerRegistration />
         <Toaster
           position="top-right"
           toastOptions={{

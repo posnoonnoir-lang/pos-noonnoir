@@ -28,6 +28,7 @@ import {
     MessageCircle,
     GlassWater,
     PieChart,
+    Trash2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
@@ -86,6 +87,7 @@ const navSections = [
         items: [
             { label: "Cảnh báo", href: "/dashboard/alerts", icon: AlertTriangle },
             { label: "Forecast", href: "/dashboard/forecast", icon: TrendingUp },
+            { label: "Hao hụt", href: "/dashboard/waste", icon: Trash2 },
         ],
     },
 ]

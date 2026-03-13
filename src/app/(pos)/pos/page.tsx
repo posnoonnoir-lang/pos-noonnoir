@@ -94,6 +94,8 @@ import { getPosConfig, type PaymentMode } from "@/actions/pos-config"
 import { checkPromotions, type AppliedPromo } from "@/actions/promotions"
 import { getProductStock, getAllowNegativeStock, getWineRecommendations, getAlternativesForOutOfStock, type WineRecommendation } from "@/actions/wine-advisor"
 import { POSInlineSkeleton } from "@/components/inline-skeletons"
+import { usePOSShortcuts, ShortcutBadge } from "@/hooks/use-pos-shortcuts"
+import { useRef } from "react"
 import { ReceiptPrintFrame } from "@/components/pos/receipt"
 import { usePrefetchStore } from "@/stores/prefetch-store"
 import type { Product, Category, Customer, CustomerTab } from "@/types"
@@ -636,6 +638,14 @@ export default function POSPage() {
     const manualDiscount = Math.round(cart.subtotal() * discountPct / 100)
     const finalTotal = Math.round(cart.subtotal() - manualDiscount - promoDiscount + serviceCharge + taxAmount)
 
+    // Keyboard Shortcuts
+    const searchInputRef = useRef<HTMLInputElement>(null)
+    const allCategoryIds = useMemo(() => [
+        "all",
+        ...dbCategories.filter((c) => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder).map((c) => c.id),
+    ], [dbCategories])
+
+
     // Filter products
     const filteredProducts = useMemo(() => {
         let products = dbProducts.filter((p) => p.isActive)
@@ -992,7 +1002,39 @@ export default function POSPage() {
         setIsSubmitting(false)
     }
 
-    // Add cart items to a tab
+    // Keyboard Shortcuts (after handleHoldOrder + sendToKitchen defs)
+    usePOSShortcuts({
+        onCategorySelect: (index) => {
+            if (index < allCategoryIds.length) {
+                setActiveCategory(allCategoryIds[index])
+                const catName = index === 0 ? "Tất cả" : dbCategories.find((c) => c.id === allCategoryIds[index])?.name
+                toast.success(`📁 ${catName ?? "Category"}`, { duration: 1000 })
+            }
+        },
+        onFocusSearch: () => searchInputRef.current?.focus(),
+        onSelectTable: () => setTableModalOpen(true),
+        onPayOrder: () => {
+            if (cart.items.length > 0) setCashModalOpen(true)
+        },
+        onHoldOrder: handleHoldOrder,
+        onSendToKitchen: sendToKitchen,
+        onApplyDiscount: () => setDiscountModalOpen(true),
+        onEscape: () => {
+            if (searchTerm) setSearchTerm("")
+            else if (tableModalOpen) setTableModalOpen(false)
+            else if (cashModalOpen) setCashModalOpen(false)
+            else if (discountModalOpen) setDiscountModalOpen(false)
+            else if (holdModalOpen) setHoldModalOpen(false)
+            else if (showBottleSelector) setShowBottleSelector(false)
+        },
+        onClearCart: () => {
+            if (cart.items.length > 0) {
+                cart.clearCart()
+                toast.success("🗑️ Đã xóa giỏ hàng", { duration: 1500 })
+            }
+        },
+    })
+
     const handleAddToTab = async (tabId: string) => {
         if (cart.items.length === 0) {
             toast.error("Giỏ hàng trống")
@@ -1136,9 +1178,10 @@ export default function POSPage() {
                     <div className="relative flex-1 max-w-xs ml-auto">
                         <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-400" />
                         <Input
+                            ref={searchInputRef}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Tìm sản phẩm..."
+                            placeholder="Tìm sản phẩm... (Ctrl+F)"
                             className="h-8 pl-8 text-xs border-cream-300 bg-cream-50"
                         />
                     </div>
