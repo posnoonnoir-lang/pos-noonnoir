@@ -78,6 +78,7 @@ Open [http://localhost:3001](http://localhost:3001) → Login PIN: **1234** (Own
 
 ```
 pos-noonnoir/
+├── vercel.json                    # Vercel config — regions: sin1 (Singapore)
 ├── prisma/
 │   ├── schema.prisma          # 34 models, full schema (synced with Supabase)
 │   ├── seed.ts                # Database seeder
@@ -287,12 +288,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 11.1 |
+| **Version** | 11.2 |
 | **Created** | March 10, 2026 |
 | **Last Updated** | March 13, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **⚡ Performance Optimized** — SSR batch loading for POS, Dashboard & Analytics |
+| **Status** | **⚡ Performance + UX** — $transaction batching, Singapore region, collapsible sidebar |
 
 ---
 
@@ -331,7 +332,8 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-13 | **v10.0** | **📊 Analytics & COGS Enhancements** — Purchase Receipts (BQGQ), RFM customer segmentation, Finance charts, accurate stock deduction. |
 | 2026-03-13 | **v11.0** | **🔍 Spec Compliance Sprint** — Audit đặc tả vs code (78%→93%). (1) **Waste Tracking**: `waste.ts` recordWaste + getWasteReport + P&L integration, `/dashboard/waste` page. (2) **Forecast v2**: 8-week weighted average, trend/season factors, ForecastConfig, confidence scoring. (3) **Report Export API**: `GET /api/export/report` — 5 report types CSV. (4) **Public Menu API**: `GET /api/public/menu` — categories+products+wine+stock, CDN cached. (5) **Keyboard Shortcuts**: F1-F12 category, Ctrl+F/B/P/H/K/D, `use-pos-shortcuts.tsx`. (6) **PWA Offline**: Service Worker + manifest + offline POST queue + auto-replay on reconnect + installable app. (7) **Zone Heatmap**: already existed (analytics ZonesTab). **0 TS errors. 16 files. Git pushed.** |
 | 2026-03-13 | **v11.1** | **⚡ SSR Performance Sprint** — Tối ưu tốc độ load 3 trang chính. (1) **POS**: Gom ~20 API calls → 1 `getPOSInitialData()` duy nhất. Thay N+1 `getProductStock()` loop bằng `getAllWineStock()` groupBy (1 query thay 40+). Batch 3+4 load song song: wineStock, glassStatus, tabs, held orders, notifications, push sale, reservations, POS config. **Giảm 95% network roundtrips.** (2) **Analytics**: Gom 5 sequential Promise.all batches → 1 batch song song. Tạo `analytics-loader.ts` — 10 queries parallel. **~5× nhanh hơn SSR.** (3) **Dashboard**: Đã nhanh sẵn (SSR + 1 batch), không cần đổi. Fix missing `ClipboardList` import. **3 trang load tức thì, không skeleton flash.** |
+| 2026-03-13 | **v11.2** | **⚡ Deep Perf + UX** — (1) **$transaction batching**: POS loader gom 8 Prisma queries → 1 `$transaction` (1 DB roundtrip thay 8). Wine queries + function calls chạy đồng thời — tất cả 3 nhóm parallel, 0 sequential wait. (2) **Vercel Singapore**: `vercel.json {"regions": ["sin1"]}` — cùng region với Supabase, giảm latency ~200ms→~5ms/roundtrip. (3) **Connection pool warm-up**: `pool.connect()` khi import Prisma — bỏ 500ms-1s cold start penalty. Pool max 3→10, idle timeout 10s→30s. (4) **Collapsible sidebar**: Dashboard sidebar 220px↔60px toggle thủ công bằng nút mũi tên. Icons giữ nguyên cả 2 trạng thái. Tooltip on hover khi collapsed. Animation 300ms ease-out. |
 
 ---
 
-*Last updated: March 13, 2026 — SSR Performance Sprint v11.1*
+*Last updated: March 13, 2026 — Deep Perf + UX v11.2*
