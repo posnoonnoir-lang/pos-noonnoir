@@ -94,14 +94,14 @@ pos-noonnoir/
 │   │   ├── schedule.ts        # 🆕 Weekly shift schedule management
 │   │   ├── hr-config.ts       # 🆕 HR settings (shifts/attendance/payroll/leave/roles)
 │   │   ├── inventory.ts       #   Inventory management (goods)
-│   │   ├── procurement.ts     #   PO, Suppliers, Goods Receipt, FIFO
+│   │   ├── procurement.ts     #   PO, Suppliers, Phiếu nhập hàng, BQGQ (Weighted Avg Cost)
 │   │   ├── assets.ts          #   NPL, CCDC, Recipes, Depreciation
-│   │   ├── finance.ts         #   COGS (FIFO), P&L, Expense breakdown
+│   │   ├── finance.ts         #   COGS, P&L, Expense breakdown, Daily revenue chart, Top products
 │   │   ├── tabs.ts            # ⭐ Customer Tab (open/close/add items)
 │   │   ├── wine.ts            # ⭐ Wine glass/bottle tracking (FIFO)
 │   │   ├── consignment.ts     # ⭐ Consignment + createConsignment
 │   │   ├── shifts.ts          # ⭐ Shift open/close, cash counting
-│   │   ├── customers.ts       # ⭐ CRM, loyalty tiers, wine prefs
+│   │   ├── customers.ts       # ⭐ CRM, loyalty tiers, RFM analysis, favorite products
 │   │   ├── promotions.ts      # ⭐ Promotions CRUD, Happy Hour, combos
 │   │   ├── daily-pnl.ts       # ⭐ Daily P&L auto-report
 │   │   ├── notifications.ts   # ⭐ Real-time alerts & rules
@@ -200,9 +200,9 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | **Staff Detail** 🆕 | `/dashboard/staff/[id]` | Profile header, 4 sub-tabs (Overview, Attendance, Shifts, Performance) | ✅ Done |
 | **Payroll** 🆕 | `/dashboard/staff` (tab) | Monthly salary calc (base + OT 1.5x + bonus 1% DT), CSV export | ✅ Done |
 | **Schedule** 🆕 | `/dashboard/staff` (tab) | Weekly grid, 4 shift types (Sáng/Chiều/Tối/Cả ngày), copy week | ✅ Done |
-| **Procurement** | `/dashboard/procurement` | PO CRUD, 5 NCC, goods receipt, FIFO batch, Create Supplier | ✅ Done |
-| **Inventory** | `/dashboard/inventory` | 3 tabs: Hàng bán + NPL + CCDC, auto depreciation | ✅ Done |
-| **Finance/COGS** | `/dashboard/finance` | P&L, COGS FIFO, expense breakdown, per-product margin | ✅ Done |
+| **Procurement** | `/dashboard/procurement` | PO, NCC, **📥 Phiếu nhập hàng (BQGQ)**, lịch sử nhập, Create Supplier | ✅ Done |
+| **Inventory** | `/dashboard/inventory` | 3 tabs: Hàng bán + NPL + CCDC, auto depreciation, **accurate stock deduction** | ✅ Done |
+| **Finance/COGS** | `/dashboard/finance` | P&L, COGS, expense breakdown, per-product margin, **📊 30-day revenue chart**, **🏆 Top products** | ✅ Done |
 | **Settings** | `/dashboard/settings` | 10 sections: Store, Tax, Service Charge, QR Payment, Receipt, Notification, Display, Operational, **HR Config**, System | ✅ Done |
 | **Receipt** | Overlay | Thermal-style bill, print button | ✅ Done |
 | **POS → NPL** | Checkout flow | Auto deduct NPL ingredients, stock warnings, COGS tracking | ✅ Done |
@@ -211,7 +211,7 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | **Wine Tracking** ⭐ | POS `/pos` | Glass tracking (5/8 ly), FIFO bottle open, sell glass/bottle | ✅ Done |
 | **Consignment** ⭐ | `/dashboard/consignment` | Ký gửi NCC, settlement flow, **create consignment form** | ✅ Done |
 | **Shift Management** ⭐ | POS top bar | Open/close shift, cash counting, shift timer, expenses | ✅ Done |
-| **CRM** ⭐ | `/dashboard/customers` | Customer profiles, loyalty tiers (Silver/Gold/Platinum), wine prefs | ✅ Done |
+| **CRM** ⭐ | `/dashboard/customers` | Customer profiles, loyalty tiers, **RFM segmentation**, **favorite products**, **lazy-loaded profile**, **real order history** | ✅ Done |
 | **Promotions** ⭐ | `/dashboard/promotions` | Happy Hour, % off, combo, fixed amount, **create CTKM form**, delete | ✅ Done |
 | **Daily P&L** ⭐ | `/dashboard/reports` | Waterfall P&L, payment breakdown, top products, 7-day trend | ✅ Done |
 | **Notifications** ⭐ | POS 🔔 bell | Low stock, expiry, shift alerts, revenue, customer birthday | ✅ Done |
@@ -264,12 +264,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 9.1 |
+| **Version** | 10.0 |
 | **Created** | March 10, 2026 |
-| **Last Updated** | March 12, 2026 |
+| **Last Updated** | March 13, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **⚡ SSR Full Coverage + POS Bug Fix** — 14 SSR pages, occupied table order fix, 28 routes, 37 modules |
+| **Status** | **📊 Analytics & COGS Enhancements** — Purchase receipts (BQGQ), RFM customer segmentation, Finance charts, accurate stock deduction |
 
 ---
 
@@ -305,7 +305,8 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-11 | **v8.0** | **👥 Full HR Management** — (1) **Staff Audit & Fix**: sửa bug ₫undefined, thêm lương vào card + modal. (2) **Attendance**: check-in/out, nghỉ phép, summary KPIs (8 server actions). (3) **Staff Detail Page**: profile + 4 sub-tabs (Overview, Attendance, Shifts, Performance). (4) **Payroll**: tính lương tháng = Base ÷ days × worked + OT(1.5x) + bonus(1% DT nếu >5M), CSV export. (5) **Schedule**: weekly grid 7 ngày × N staff, 4 loại ca (Sáng/Chiều/Tối/Cả ngày), assign/remove/copy week. (6) **HR Settings**: 5 sub-tabs (Ca làm, Chấm công, Lương, Nghỉ phép, Vai trò & Thang lương). Schema: +2 models (StaffSchedule, SystemSetting). **28 routes, 37 modules, 34 Prisma models. 0 TS errors.** |
 | 2026-03-12 | **v9.0** | **⚡ SSR Performance + Build Compliance** — (1) **SSR Conversion**: 7 pages chuyển sang Server Components (Dashboard, Analytics, Reports, Tables, Customers, Reservations, Staff) — data hiển thị lập tức, không loading spinner. (2) **"use server" Compliance Fix**: sửa 3 action files vi phạm quy tắc Next.js (chỉ cho export async functions từ `"use server"` files): `customers.ts` (xóa re-export `calculateTier`/`TIER_THRESHOLDS`), `schedule.ts` (extract `SHIFT_TYPES` → `@/lib/shift-types.ts`), `tax.ts` (convert `export const` alias → async function wrapper). (3) **Shared Lib Extraction**: tạo `@/lib/shift-types.ts`, `@/lib/customer-tiers.ts` cho runtime constants dùng chung. **Build: 0 TS errors, next build exit 0. Deploy-ready.** |
 | 2026-03-12 | **v9.1** | **⚡ SSR Full Coverage + POS Bug Fix** — (1) **SSR Conversion (7 thêm)**: Promotions, Wine Guide, Feedback, Alerts, Forecast, Bottle Tracking, Consignment — tất cả chuyển sang Server Components, data hiển thị lập tức không loading spinner. Pattern: `page.tsx` (SSR fetch) → `*-client.tsx` (accept initial props). (2) **Procurement+Consignment SSR**: fetch song song `getConsignments()` + `getSettlements()` / procurement data server-side. (3) **POS Occupied Table Fix**: sửa bug `getActiveOrderByTable()` thiếu status `PENDING` + `READY` → click bàn OCCUPIED không hiện đơn hàng. Thêm đủ 5 statuses: `OPEN`, `PENDING`, `PREPARING`, `READY`, `SERVED`. **Tổng: 14 SSR pages. 0 loading spinners. 0 TS errors.** |
+| 2026-03-13 | **v10.0** | **📊 Analytics & COGS Enhancements** — (1) **Purchase Receipts (📥 Nhập hàng)**: `createPurchaseReceipt` + `getPurchaseReceipts` — nhập hàng link NCC, tính giá BQGQ (Bình quân gia quyền), cập nhật tồn kho + costPerUnit, ghi StockMovement. Tab mới "Nhập hàng" trên Procurement. (2) **Stock Deduction Fix**: `processOrderWithCOGS` + `deductRecipeIngredients` ghi đúng `ingredientId`, `totalCost`, `balanceQty` vào StockMovement. (3) **Customer CRM + RFM**: `getAllCustomers` trả `orderCount`, `lastVisit`; `getCustomerProfile` trả RFM scores (HIGH/MEDIUM/LOW), favorite products, avgOrderValue, daysSinceLastVisit; `getCustomerStats` trả segments (Active/At Risk/Lost); `syncCustomerTier` auto upgrade tier. UI: RFM segment cards, lazy-loaded profile, real order history. (4) **Finance Dashboard**: `getDailyRevenueChart(30)` — CSS bar chart revenue/COGS 30 ngày; `getTopProductsRevenue(10)` — Top sản phẩm tháng. **Schema: StockMovement +6 fields. 0 TS errors.** |
 
 ---
 
-*Last updated: March 12, 2026 — SSR Full Coverage + POS Bug Fix v9.1*
+*Last updated: March 13, 2026 — Analytics & COGS Enhancements v10.0*
