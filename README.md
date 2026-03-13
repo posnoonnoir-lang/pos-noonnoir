@@ -116,7 +116,10 @@ pos-noonnoir/
 │   │   ├── feedback.ts        # 🆕 V2: QR customer feedback system
 │   │   ├── waste.ts           # 🆕 Waste/spoilage tracking with P&L integration
 │   │   ├── analytics.ts       # 🆕 Zone heatmap, hourly heatmap, staff leaderboard
-│   │   └── wine-advisor.ts    # 🆕 Smart wine recommendations
+│   │   ├── wine-advisor.ts    # 🆕 Smart wine recommendations + getAllWineStock()
+│   │   ├── pos-loader.ts      # ⚡ Consolidated POS SSR loader (1 call → all data)
+│   │   ├── dashboard-loader.ts # ⚡ Consolidated Dashboard SSR loader
+│   │   └── analytics-loader.ts # ⚡ Consolidated Analytics SSR loader (10 queries parallel)
 │   ├── app/
 │   │   ├── (dashboard)/       # Admin pages (expanded sidebar)
 │   │   │   └── dashboard/
@@ -284,12 +287,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 11.0 |
+| **Version** | 11.1 |
 | **Created** | March 10, 2026 |
 | **Last Updated** | March 13, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **🔍 Spec Compliance ~93%** — PWA Offline, Keyboard Shortcuts, Waste Tracking, Forecast v2, Public Menu API, Zone Heatmap |
+| **Status** | **⚡ Performance Optimized** — SSR batch loading for POS, Dashboard & Analytics |
 
 ---
 
@@ -327,7 +330,8 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-12 | **v9.1** | **⚡ SSR Full Coverage + POS Bug Fix** — (1) **SSR Conversion (7 thêm)**: Promotions, Wine Guide, Feedback, Alerts, Forecast, Bottle Tracking, Consignment — tất cả chuyển sang Server Components, data hiển thị lập tức không loading spinner. Pattern: `page.tsx` (SSR fetch) → `*-client.tsx` (accept initial props). (2) **Procurement+Consignment SSR**: fetch song song `getConsignments()` + `getSettlements()` / procurement data server-side. (3) **POS Occupied Table Fix**: sửa bug `getActiveOrderByTable()` thiếu status `PENDING` + `READY` → click bàn OCCUPIED không hiện đơn hàng. Thêm đủ 5 statuses: `OPEN`, `PENDING`, `PREPARING`, `READY`, `SERVED`. **Tổng: 14 SSR pages. 0 loading spinners. 0 TS errors.** |
 | 2026-03-13 | **v10.0** | **📊 Analytics & COGS Enhancements** — Purchase Receipts (BQGQ), RFM customer segmentation, Finance charts, accurate stock deduction. |
 | 2026-03-13 | **v11.0** | **🔍 Spec Compliance Sprint** — Audit đặc tả vs code (78%→93%). (1) **Waste Tracking**: `waste.ts` recordWaste + getWasteReport + P&L integration, `/dashboard/waste` page. (2) **Forecast v2**: 8-week weighted average, trend/season factors, ForecastConfig, confidence scoring. (3) **Report Export API**: `GET /api/export/report` — 5 report types CSV. (4) **Public Menu API**: `GET /api/public/menu` — categories+products+wine+stock, CDN cached. (5) **Keyboard Shortcuts**: F1-F12 category, Ctrl+F/B/P/H/K/D, `use-pos-shortcuts.tsx`. (6) **PWA Offline**: Service Worker + manifest + offline POST queue + auto-replay on reconnect + installable app. (7) **Zone Heatmap**: already existed (analytics ZonesTab). **0 TS errors. 16 files. Git pushed.** |
+| 2026-03-13 | **v11.1** | **⚡ SSR Performance Sprint** — Tối ưu tốc độ load 3 trang chính. (1) **POS**: Gom ~20 API calls → 1 `getPOSInitialData()` duy nhất. Thay N+1 `getProductStock()` loop bằng `getAllWineStock()` groupBy (1 query thay 40+). Batch 3+4 load song song: wineStock, glassStatus, tabs, held orders, notifications, push sale, reservations, POS config. **Giảm 95% network roundtrips.** (2) **Analytics**: Gom 5 sequential Promise.all batches → 1 batch song song. Tạo `analytics-loader.ts` — 10 queries parallel. **~5× nhanh hơn SSR.** (3) **Dashboard**: Đã nhanh sẵn (SSR + 1 batch), không cần đổi. Fix missing `ClipboardList` import. **3 trang load tức thì, không skeleton flash.** |
 
 ---
 
-*Last updated: March 13, 2026 — Spec Compliance Sprint v11.0 (~93% spec coverage)*
+*Last updated: March 13, 2026 — SSR Performance Sprint v11.1*
