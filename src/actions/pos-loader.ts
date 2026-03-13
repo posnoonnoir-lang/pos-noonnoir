@@ -2,19 +2,27 @@
 
 import { prisma } from "@/lib/prisma"
 import { getPosConfig } from "@/actions/pos-config"
+import { getOpenTabs } from "@/actions/tabs"
+import { getHeldOrders } from "@/actions/operational"
+import { getUnreadNotifications } from "@/actions/notifications"
+import { getPushSaleItems } from "@/actions/push-sale"
+import { getUpcomingReservations } from "@/actions/reservations"
 
 /**
  * Consolidated initial data loader for POS page.
- * Split into 3 sequential batches to avoid exhausting connection pool.
- * Batch 1: Products + Categories (critical, display first)
- * Batch 2: Tables, Shift, 86, Tax, Settings (secondary)
- * Batch 3: Stock, Tabs, Notifications, Held orders, Push sale, Reservations, Config (background)
+ * ALL queries run in parallel — 2 batches:
+ * Batch 1: All Prisma queries (8 parallel)
+ * Batch 2: All function calls (6 parallel)
  */
 export async function getPOSInitialData() {
     const start = Date.now()
     try {
-        // Batch 1 — Critical data for product grid (highest priority)
-        const [products, categories] = await Promise.all([
+        // Batch 1 — ALL Prisma queries in parallel (products, categories, tables, shift, stock, glass, etc.)
+        const [
+            products, categories, zones, tables, shift,
+            out86Records, taxRate, storeSettings,
+            wineStockCounts, glassStatuses,
+        ] = await Promise.all([
             prisma.product.findMany({
                 where: { isActive: true },
                 include: { category: true },
@@ -24,10 +32,6 @@ export async function getPOSInitialData() {
                 where: { isActive: true },
                 orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
             }),
-        ])
-
-        // Batch 2 — Secondary data (tables, shift, etc.)
-        const [zones, tables, shift, out86Records, taxRate, storeSettings] = await Promise.all([
             prisma.tableZone.findMany({
                 where: { isActive: true },
                 orderBy: { sortOrder: "asc" },
@@ -48,17 +52,11 @@ export async function getPOSInitialData() {
                 where: { isDefault: true, isActive: true },
             }),
             prisma.storeSettings.findFirst(),
-        ])
-
-        // Batch 3 — Background data (stock + glass via Prisma, rest via function calls)
-        const [wineStockCounts, glassStatuses] = await Promise.all([
-            // Wine stock — single groupBy instead of N queries!
             prisma.wineBottle.groupBy({
                 by: ["productId"],
                 where: { status: "IN_STOCK" },
                 _count: { id: true },
             }),
-            // Glass statuses — opened bottles with remaining pours
             prisma.wineBottle.findMany({
                 where: { status: "OPENED" },
                 select: {
@@ -68,14 +66,9 @@ export async function getPOSInitialData() {
                 },
             }),
         ])
+        const t1 = Date.now()
 
-        // Batch 4 — Parallel function calls for computed/in-memory data
-        const { getOpenTabs } = await import("@/actions/tabs")
-        const { getHeldOrders } = await import("@/actions/operational")
-        const { getUnreadNotifications } = await import("@/actions/notifications")
-        const { getPushSaleItems } = await import("@/actions/push-sale")
-        const { getUpcomingReservations } = await import("@/actions/reservations")
-
+        // Batch 2 — All function calls in parallel (computed/in-memory data)
         const [openTabs, heldOrders, notifications, pushSaleItems, reservations, posConfig] = await Promise.all([
             getOpenTabs(),
             getHeldOrders(),
@@ -84,17 +77,16 @@ export async function getPOSInitialData() {
             getUpcomingReservations(),
             getPosConfig(),
         ])
+        const t2 = Date.now()
 
-        const elapsed = Date.now() - start
-        if (elapsed > 3000) {
-            console.warn(`[POS] Slow initial load: ${elapsed}ms`)
-        }
+        console.log(`[POS] Load: batch1=${t1 - start}ms batch2=${t2 - t1}ms total=${t2 - start}ms`)
 
         // Serialize wine stock map
         const wineStock: Record<string, number> = {}
         for (const s of wineStockCounts) {
             wineStock[s.productId] = s._count.id
         }
+
 
         // Serialize glass statuses: productId → { glassesRemaining, glassesTotal }
         const glassStatusMap: Record<string, { glassesRemaining: number; glassesTotal: number }> = {}
