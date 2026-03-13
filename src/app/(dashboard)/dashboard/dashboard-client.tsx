@@ -17,6 +17,7 @@ import {
     CheckCircle2,
     Banknote,
     ExternalLink,
+    ClipboardList,
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
