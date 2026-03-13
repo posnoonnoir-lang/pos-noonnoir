@@ -179,7 +179,7 @@ export async function authorizeDiscount(params: {
 
     await prisma.auditLog.create({
         data: {
-            action: "DISCOUNT_AUTH", tableName: "order", recordId: params.orderId ?? "none",
+            action: "DISCOUNT_AUTH", tableName: "order", recordId: params.orderId ?? "00000000-0000-0000-0000-000000000000",
             newData: {
                 discountType: params.discountType, discountValue: params.discountValue,
                 originalTotal: params.originalTotal, discountedTotal: Math.max(0, discountedTotal),

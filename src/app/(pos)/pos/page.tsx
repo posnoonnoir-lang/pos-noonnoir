@@ -92,7 +92,7 @@ import { getAllServingNotes, searchServingNotes, getPairingsForProduct, type Win
 import { getDefaultTaxRate } from "@/actions/tax"
 import { getPosConfig, type PaymentMode } from "@/actions/pos-config"
 import { checkPromotions, type AppliedPromo } from "@/actions/promotions"
-import { getProductStock, getAllowNegativeStock, getWineRecommendations, getAlternativesForOutOfStock, type WineRecommendation } from "@/actions/wine-advisor"
+import { getAllowNegativeStock, getWineRecommendations, getAlternativesForOutOfStock, type WineRecommendation } from "@/actions/wine-advisor"
 import { POSInlineSkeleton } from "@/components/inline-skeletons"
 import { usePOSShortcuts, ShortcutBadge } from "@/hooks/use-pos-shortcuts"
 import { useRef } from "react"
@@ -511,7 +511,7 @@ export default function POSPage() {
         setPushSaleItems(items)
     }, [])
 
-    // ★ CONSOLIDATED INITIAL LOAD — prioritized: main data FIRST, secondary AFTER
+    // ★ CONSOLIDATED INITIAL LOAD — ALL data in 1 server action (3 batches)
     useEffect(() => {
         const prefetchStore = usePrefetchStore.getState()
         prefetchStore.registerPrefetch('pos', getPOSInitialData)
@@ -529,18 +529,38 @@ export default function POSPage() {
             setProduct86Ids(data.out86Ids)
             setTaxRate(data.taxRate)
             setAllowNegativeStock(data.allowNegativeStock)
-            setPosLoading(false)
-        }
 
-        const loadSecondary = () => {
-            // These run AFTER main data loaded — don't compete for connections
-            refreshTabs()
-            refreshGlassStatuses()
-            refreshNotifications()
-            refreshHeld()
-            refreshPushSale()
-            getUpcomingReservations().then((list) => setUpcomingReservations(list)).catch(() => { })
-            getPosConfig().then(cfg => setPaymentMode(cfg.paymentMode)).catch(() => { })
+            // Apply batch 3 data — eliminates 8+ separate API calls
+            if (data.wineStock) {
+                const map = new Map<string, number>()
+                for (const [k, v] of Object.entries(data.wineStock)) {
+                    map.set(k, v as number)
+                }
+                setStockMap(map)
+            }
+            if (data.glassStatusMap) {
+                setGlassStatuses(data.glassStatusMap)
+            }
+            if (data.openTabs) {
+                setActiveTabs(data.openTabs as CustomerTab[])
+            }
+            if (data.heldOrders) {
+                setHeldOrders(data.heldOrders as HeldOrder[])
+            }
+            if (data.notifications) {
+                setNotifications(data.notifications as Notification[])
+            }
+            if (data.pushSaleItems) {
+                setPushSaleItems(data.pushSaleItems as PushSaleItem[])
+            }
+            if (data.upcomingReservations) {
+                setUpcomingReservations(data.upcomingReservations as Reservation[])
+            }
+            if (data.paymentMode) {
+                setPaymentMode(data.paymentMode as PaymentMode)
+            }
+
+            setPosLoading(false)
         }
 
         // Try cache first (even expired — use 10min window for stale-while-revalidate)
@@ -548,7 +568,6 @@ export default function POSPage() {
         if (cached) {
             // Apply cached data IMMEDIATELY — no skeleton flash
             applyData(cached)
-            loadSecondary()
             // Background refresh — but NEVER overwrite with empty data
             getPOSInitialData().then((data) => {
                 if (data.products && data.products.length > 0) {
@@ -563,8 +582,6 @@ export default function POSPage() {
                         prefetchStore.set('pos', data)
                     }
                     applyData(data)
-                    // Load secondary only AFTER main data
-                    loadSecondary()
                 })
                 .catch((err) => {
                     console.error("[POS] Consolidated loader failed, falling back:", err)
@@ -589,20 +606,16 @@ export default function POSPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    // Load stock for all wine products
+    // Load stock for all wine products — batch version (1 query instead of N)
     const refreshStockMap = useCallback(async () => {
-        const wineProds = dbProducts.filter(p => ["WINE_BOTTLE", "WINE_GLASS", "WINE_TASTING"].includes(p.type))
+        const { getAllWineStock } = await import("@/actions/wine-advisor")
+        const stock = await getAllWineStock()
         const map = new Map<string, number>()
-        await Promise.all(wineProds.map(async (p) => {
-            const stock = await getProductStock(p.id)
-            map.set(p.id, stock)
-        }))
+        for (const [k, v] of Object.entries(stock)) {
+            map.set(k, v)
+        }
         setStockMap(map)
-    }, [dbProducts])
-
-    useEffect(() => {
-        if (dbProducts.length > 0) refreshStockMap()
-    }, [dbProducts, refreshStockMap])
+    }, [])
 
     // Phase 8A: Calculate service charge, tax & promotions when cart changes
     useEffect(() => {
@@ -1181,7 +1194,7 @@ export default function POSPage() {
                             ref={searchInputRef}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Tìm sản phẩm... (Ctrl+F)"
+                            placeholder="Tìm sản phẩm..."
                             className="h-8 pl-8 text-xs border-cream-300 bg-cream-50"
                         />
                     </div>

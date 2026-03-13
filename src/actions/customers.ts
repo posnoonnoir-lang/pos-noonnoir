@@ -46,94 +46,98 @@ export async function getAllCustomers(): Promise<CustomerProfile[]> {
 }
 
 export async function getCustomerProfile(id: string): Promise<CustomerDetailProfile | null> {
-    const customer = await prisma.customer.findUnique({
-        where: { id },
-        include: {
-            orders: {
-                where: { status: "PAID" },
-                orderBy: { createdAt: "desc" },
-                take: 20,
-                include: {
-                    items: { include: { product: true } },
-                    payments: true,
+    try {
+        const customer = await prisma.customer.findUnique({
+            where: { id },
+            include: {
+                orders: {
+                    where: { status: "PAID" },
+                    orderBy: { createdAt: "desc" },
+                    take: 20,
+                    include: {
+                        items: { include: { product: true } },
+                        payments: true,
+                    },
                 },
+                _count: { select: { orders: { where: { status: "PAID" } } } },
             },
-            _count: { select: { orders: { where: { status: "PAID" } } } },
-        },
-    })
-    if (!customer) return null
+        })
+        if (!customer) return null
 
-    // Calculate favorite products
-    const productFrequency: Record<string, { name: string; count: number; total: number }> = {}
-    for (const order of customer.orders) {
-        for (const item of order.items) {
-            const key = item.productId
-            if (!productFrequency[key]) productFrequency[key] = { name: item.product.name, count: 0, total: 0 }
-            productFrequency[key].count += item.quantity
-            productFrequency[key].total += Number(item.subtotal)
+        // Calculate favorite products
+        const productFrequency: Record<string, { name: string; count: number; total: number }> = {}
+        for (const order of customer.orders) {
+            for (const item of order.items) {
+                const key = item.productId
+                if (!productFrequency[key]) productFrequency[key] = { name: item.product.name, count: 0, total: 0 }
+                productFrequency[key].count += item.quantity
+                productFrequency[key].total += Number(item.subtotal)
+            }
         }
-    }
-    const favoriteProducts = Object.values(productFrequency)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5)
+        const favoriteProducts = Object.values(productFrequency)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5)
 
-    // Calculate average order value
-    const totalSpent = Number(customer.totalSpent)
-    const orderCount = customer._count.orders
-    const avgOrderValue = orderCount > 0 ? Math.round(totalSpent / orderCount) : 0
+        // Calculate average order value
+        const totalSpent = Number(customer.totalSpent)
+        const orderCount = customer._count.orders
+        const avgOrderValue = orderCount > 0 ? Math.round(totalSpent / orderCount) : 0
 
-    // RFM analysis
-    const lastOrderDate = customer.orders[0]?.createdAt ?? customer.createdAt
-    const daysSinceLastVisit = Math.floor((Date.now() - lastOrderDate.getTime()) / 86400000)
+        // RFM analysis
+        const lastOrderDate = customer.orders[0]?.createdAt ?? customer.createdAt
+        const daysSinceLastVisit = Math.floor((Date.now() - lastOrderDate.getTime()) / 86400000)
 
-    let recencyScore: "HIGH" | "MEDIUM" | "LOW"
-    if (daysSinceLastVisit <= 14) recencyScore = "HIGH"
-    else if (daysSinceLastVisit <= 45) recencyScore = "MEDIUM"
-    else recencyScore = "LOW"
+        let recencyScore: "HIGH" | "MEDIUM" | "LOW"
+        if (daysSinceLastVisit <= 14) recencyScore = "HIGH"
+        else if (daysSinceLastVisit <= 45) recencyScore = "MEDIUM"
+        else recencyScore = "LOW"
 
-    let frequencyScore: "HIGH" | "MEDIUM" | "LOW"
-    if (orderCount >= 10) frequencyScore = "HIGH"
-    else if (orderCount >= 3) frequencyScore = "MEDIUM"
-    else frequencyScore = "LOW"
+        let frequencyScore: "HIGH" | "MEDIUM" | "LOW"
+        if (orderCount >= 10) frequencyScore = "HIGH"
+        else if (orderCount >= 3) frequencyScore = "MEDIUM"
+        else frequencyScore = "LOW"
 
-    let monetaryScore: "HIGH" | "MEDIUM" | "LOW"
-    if (totalSpent >= 5000000) monetaryScore = "HIGH"
-    else if (totalSpent >= 1000000) monetaryScore = "MEDIUM"
-    else monetaryScore = "LOW"
+        let monetaryScore: "HIGH" | "MEDIUM" | "LOW"
+        if (totalSpent >= 5000000) monetaryScore = "HIGH"
+        else if (totalSpent >= 1000000) monetaryScore = "MEDIUM"
+        else monetaryScore = "LOW"
 
-    return {
-        id: customer.id,
-        name: customer.name,
-        fullName: customer.name,
-        phone: customer.phone,
-        email: customer.email,
-        birthday: customer.birthday,
-        tier: (customer.tier || "REGULAR") as CustomerTier,
-        totalSpent,
-        loyaltyPts: customer.loyaltyPts,
-        loyaltyPoints: customer.loyaltyPts,
-        visitCount: orderCount,
-        orderCount,
-        lastVisit: customer.orders[0]?.createdAt ?? null,
-        notes: customer.notes,
-        winePreferences: [],
-        allergies: [],
-        createdAt: customer.createdAt,
-        updatedAt: customer.updatedAt,
-        // Enhanced fields
-        avgOrderValue,
-        daysSinceLastVisit,
-        favoriteProducts,
-        rfm: { recency: recencyScore, frequency: frequencyScore, monetary: monetaryScore },
-        orderHistory: customer.orders.map((o) => ({
-            id: o.id,
-            orderNumber: o.orderNo,
-            date: o.createdAt,
-            items: o.items.map((i) => `${i.product.name} x${i.quantity}`),
-            total: Number(o.totalAmount),
-            paymentMethod: o.payments[0]?.method ?? "CASH",
-            staffName: "",
-        })),
+        return {
+            id: customer.id,
+            name: customer.name,
+            fullName: customer.name,
+            phone: customer.phone,
+            email: customer.email,
+            birthday: customer.birthday,
+            tier: (customer.tier || "REGULAR") as CustomerTier,
+            totalSpent,
+            loyaltyPts: customer.loyaltyPts,
+            loyaltyPoints: customer.loyaltyPts,
+            visitCount: orderCount,
+            orderCount,
+            lastVisit: customer.orders[0]?.createdAt ?? null,
+            notes: customer.notes,
+            winePreferences: [],
+            allergies: [],
+            createdAt: customer.createdAt,
+            updatedAt: customer.updatedAt,
+            // Enhanced fields
+            avgOrderValue,
+            daysSinceLastVisit,
+            favoriteProducts,
+            rfm: { recency: recencyScore, frequency: frequencyScore, monetary: monetaryScore },
+            orderHistory: customer.orders.map((o) => ({
+                id: o.id,
+                orderNumber: o.orderNo,
+                date: o.createdAt,
+                items: o.items.map((i) => `${i.product.name} x${i.quantity}`),
+                total: Number(o.totalAmount),
+                paymentMethod: o.payments[0]?.method ?? "CASH",
+                staffName: "",
+            })),
+        }
+    } catch {
+        return null
     }
 }
 
@@ -219,12 +223,14 @@ export async function updateCustomerNotes(id: string, notes: string) {
  * Auto-upgrade customer tier based on totalSpent
  */
 export async function syncCustomerTier(customerId: string) {
-    const customer = await prisma.customer.findUnique({ where: { id: customerId } })
-    if (!customer) return
-    const newTier = calculateTier(Number(customer.totalSpent))
-    if (newTier !== customer.tier) {
-        await prisma.customer.update({ where: { id: customerId }, data: { tier: newTier } })
-    }
+    try {
+        const customer = await prisma.customer.findUnique({ where: { id: customerId } })
+        if (!customer) return
+        const newTier = calculateTier(Number(customer.totalSpent))
+        if (newTier !== customer.tier) {
+            await prisma.customer.update({ where: { id: customerId }, data: { tier: newTier } })
+        }
+    } catch { /* invalid UUID or DB error */ }
 }
 
 export async function getCustomerStats(): Promise<CustomerStats> {

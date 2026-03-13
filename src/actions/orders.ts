@@ -170,16 +170,20 @@ export async function getOrders(params?: { status?: OrderStatus; limit?: number;
 }
 
 export async function getOrderById(orderId: string) {
-    const order = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: {
-            items: { include: { product: true } },
-            table: true,
-            staff: true,
-            payments: true,
-        },
-    })
-    return serializeOrder(order)
+    try {
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                items: { include: { product: true } },
+                table: true,
+                staff: true,
+                payments: true,
+            },
+        })
+        return serializeOrder(order)
+    } catch {
+        return null
+    }
 }
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {

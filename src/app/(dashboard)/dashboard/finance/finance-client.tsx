@@ -177,12 +177,41 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
                                 </span>
                                 <span className="font-mono text-sm font-bold text-green-600">₫{fmt(financeSummary.grossProfit)}</span>
                             </div>
-                            {expenses.filter((e) => e.category !== "Giá vốn hàng bán (COGS)").map((exp) => (
-                                <div key={exp.category} className="flex items-center justify-between px-4 py-1.5">
-                                    <span className="text-[11px] text-cream-500 pl-4">(-) {exp.category}</span>
-                                    <span className="font-mono text-[11px] text-cream-600">-₫{fmt(exp.amount)}</span>
-                                </div>
-                            ))}
+                            {(() => {
+                                const nonWaste = expenses.filter(e => e.category !== "Giá vốn hàng bán (COGS)" && !e.category.startsWith("WASTE"))
+                                const wasteItems = expenses.filter(e => e.category.startsWith("WASTE"))
+                                const wasteTotal = wasteItems.reduce((s, w) => s + w.amount, 0)
+                                return (
+                                    <>
+                                        {nonWaste.map((exp) => (
+                                            <div key={exp.category} className="flex items-center justify-between px-4 py-1.5">
+                                                <span className="text-[11px] text-cream-500 pl-4">(-) {exp.category}</span>
+                                                <span className="font-mono text-[11px] text-cream-600">-₫{fmt(exp.amount)}</span>
+                                            </div>
+                                        ))}
+                                        {wasteItems.length > 0 && (
+                                            <details className="group">
+                                                <summary className="flex items-center justify-between px-4 py-1.5 cursor-pointer hover:bg-cream-50 rounded-md transition-all list-none">
+                                                    <span className="text-[11px] text-cream-500 pl-4 flex items-center gap-1">
+                                                        (-) Hao hụt / WASTE
+                                                        <span className="text-[9px] text-cream-400 bg-cream-200 rounded px-1">{wasteItems.length} mục</span>
+                                                        <span className="text-[9px] text-cream-400 group-open:rotate-180 transition-transform">▼</span>
+                                                    </span>
+                                                    <span className="font-mono text-[11px] text-red-600 font-medium">-₫{fmt(wasteTotal)}</span>
+                                                </summary>
+                                                <div className="ml-8 border-l-2 border-cream-200 pl-3 mb-1">
+                                                    {wasteItems.map((w) => (
+                                                        <div key={w.category} className="flex items-center justify-between py-0.5">
+                                                            <span className="text-[10px] text-cream-400">{w.category.replace("WASTE — ", "")}</span>
+                                                            <span className="font-mono text-[10px] text-cream-400">-₫{fmt(w.amount)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </details>
+                                        )}
+                                    </>
+                                )
+                            })()}
                             <div className={cn(
                                 "flex items-center justify-between rounded-lg px-4 py-3 mt-2",
                                 financeSummary.netProfit >= 0 ? "bg-green-100 border border-green-300" : "bg-red-100 border border-red-300"

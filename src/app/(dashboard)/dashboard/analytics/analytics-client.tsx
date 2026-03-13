@@ -83,12 +83,8 @@ export function AnalyticsClient({ initialData }: { initialData: AnalyticsInitial
     }, [])
 
     const fetchFromServer = useCallback(async () => {
-        const [sum, mon, cat, zone, hour, stf, wRev, topP, hData, pay] = await Promise.all([
-            getAnalyticsSummary(), getMonthlyRevenue(), getCategoryRevenue(),
-            getZoneHeatmap(), getHourlyHeatmap(), getStaffLeaderboard(),
-            getWeeklyRevenue(), getTopProducts(), getHourlyData(), getPaymentBreakdown(),
-        ])
-        return { sum, mon, cat, zone, hour, stf, wRev, topP, hData, pay }
+        const { getAnalyticsInitialData } = await import("@/actions/analytics-loader")
+        return getAnalyticsInitialData()
     }, [])
 
     const loadData = useCallback(async () => {
@@ -366,7 +362,7 @@ function OverviewTab({
                                 <span className="font-mono text-[10px] font-bold text-wine-700 whitespace-nowrap">₫{fmtK(p.revenue)}</span>
                             </div>
                         )) : (
-                            <p className="text-xs text-cream-400 text-center py-8">Chưa có dung liệu</p>
+                            <p className="text-xs text-cream-400 text-center py-8">Chưa có dữ liệu</p>
                         )}
                     </div>
                 </div>

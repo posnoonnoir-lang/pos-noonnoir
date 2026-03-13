@@ -96,8 +96,8 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
                     <KPICard
                         icon={TrendingUp}
                         label="Doanh thu hôm nay"
-                        value={`₫${formatCompact(stats.todayRevenue)}`}
-                        change={stats.revenueChange}
+                        value={stats.todayRevenue > 0 ? `₫${formatCompact(stats.todayRevenue)}` : "—"}
+                        change={stats.todayRevenue > 0 ? stats.revenueChange : undefined}
                         subtext={`Hôm qua: ₫${formatCompact(stats.yesterdayRevenue)}`}
                         color="wine"
                     />
@@ -112,7 +112,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
                     <KPICard
                         icon={Clock}
                         label="Giá trị TB / đơn"
-                        value={`₫${formatCompact(stats.avgOrderValue)}`}
+                        value={stats.avgOrderValue > 0 ? `₫${formatCompact(stats.avgOrderValue)}` : "—"}
                         subtext={`Thời gian TB: ${stats.avgTimeMinutes}p`}
                         color="amber"
                     />
@@ -210,7 +210,13 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
                     </Link>
                 </div>
                 {recentOrders.length === 0 ? (
-                    <p className="text-xs text-cream-400 text-center py-8">Chưa có đơn hàng nào</p>
+                    <div className="flex flex-col items-center justify-center py-10 gap-3">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cream-200/60">
+                            <ClipboardList className="h-7 w-7 text-cream-400" />
+                        </div>
+                        <p className="text-xs text-cream-400">Chưa có đơn hàng hôm nay</p>
+                        <Link href="/pos" className="text-[10px] font-medium text-green-700 hover:underline">Mở POS để bắt đầu →</Link>
+                    </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-2">
                         {recentOrders.map((order) => {

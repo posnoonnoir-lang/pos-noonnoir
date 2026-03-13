@@ -79,6 +79,20 @@ export async function getProductStock(productId: string): Promise<number> {
     return 999 // Non-wine products considered always in stock
 }
 
+// Batch stock count for ALL wine products — single query replaces N individual calls
+export async function getAllWineStock(): Promise<Record<string, number>> {
+    const stockCounts = await prisma.wineBottle.groupBy({
+        by: ["productId"],
+        where: { status: "IN_STOCK" },
+        _count: { id: true },
+    })
+    const result: Record<string, number> = {}
+    for (const s of stockCounts) {
+        result[s.productId] = s._count.id
+    }
+    return result
+}
+
 // Check if store allows negative stock
 export async function getAllowNegativeStock(): Promise<boolean> {
     const settings = await prisma.storeSettings.findFirst({ select: { allowNegativeStock: true } })
