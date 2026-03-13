@@ -23,9 +23,12 @@ import {
     getFinanceSummary,
     getExpenseBreakdown,
     getCOGSByProduct,
+    getDailyRevenueChart,
+    getTopProductsRevenue,
     type COGSRecord,
     type FinanceSummary,
     type ExpenseCategory,
+    type DailyChartPoint,
 } from "@/actions/finance"
 import { toast } from "sonner"
 
@@ -65,6 +68,8 @@ type FinanceInitialData = {
     financeSummary: FinanceSummary
     expenses: ExpenseCategory[]
     productCOGS: Awaited<ReturnType<typeof getCOGSByProduct>>
+    dailyChart: DailyChartPoint[]
+    topProducts: Awaited<ReturnType<typeof getTopProductsRevenue>>
 }
 
 export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
@@ -74,19 +79,19 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
     const [financeSummary, setFinanceSummary] = useState(initial.financeSummary)
     const [expenses, setExpenses] = useState(initial.expenses)
     const [productCOGS, setProductCOGS] = useState(initial.productCOGS)
+    const [dailyChart, setDailyChart] = useState(initial.dailyChart)
+    const [topProducts, setTopProducts] = useState(initial.topProducts)
     const [refreshing, setRefreshing] = useState(false)
 
     const refresh = async () => {
         setRefreshing(true)
         try {
-            const [r, cs, fs, ex, pc] = await Promise.all([
+            const [r, cs, fs, ex, pc, dc, tp] = await Promise.all([
                 getCOGSRecords(), getCOGSSummary(), getFinanceSummary(), getExpenseBreakdown(), getCOGSByProduct(),
+                getDailyRevenueChart(30), getTopProductsRevenue(10),
             ])
-            setCogsRecords(r)
-            setCogsSummary(cs)
-            setFinanceSummary(fs)
-            setExpenses(ex)
-            setProductCOGS(pc)
+            setCogsRecords(r); setCogsSummary(cs); setFinanceSummary(fs); setExpenses(ex); setProductCOGS(pc)
+            setDailyChart(dc); setTopProducts(tp)
             toast.success("Đã cập nhật dữ liệu tài chính")
         } catch {
             toast.error("Lỗi tải dữ liệu")
@@ -192,6 +197,48 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
                         </div>
                     </div>
 
+                    {/* Daily Revenue Chart */}
+                    <div className="col-span-5 rounded-xl border border-cream-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-blue-600" /> Doanh thu 30 ngày gần nhất
+                        </h3>
+                        {dailyChart.length > 0 ? (
+                            <div className="relative">
+                                <div className="flex items-end gap-[2px] h-40">
+                                    {(() => {
+                                        const maxVal = Math.max(...dailyChart.map(d => d.revenue), 1)
+                                        return dailyChart.map((d, i) => {
+                                            const h = Math.max(2, (d.revenue / maxVal) * 140)
+                                            const cogsH = d.revenue > 0 ? Math.max(0, (d.cogs / maxVal) * 140) : 0
+                                            const isToday = d.date === new Date().toISOString().slice(0, 10)
+                                            return (
+                                                <div key={i} className="flex-1 flex flex-col items-center group relative cursor-pointer">
+                                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-green-900 text-cream-50 rounded-md px-2 py-1 text-[9px] whitespace-nowrap z-10 shadow-lg pointer-events-none">
+                                                        {d.label}: ₫{fmtK(d.revenue)} / COGS ₫{fmtK(d.cogs)}
+                                                    </div>
+                                                    <div className="w-full flex flex-col items-stretch" style={{ height: h }}>
+                                                        <div className={cn("rounded-t-sm flex-1", isToday ? "bg-green-600" : "bg-green-300 group-hover:bg-green-500")} style={{ minHeight: Math.max(0, h - cogsH) }} />
+                                                        {cogsH > 0 && <div className="bg-wine-300 rounded-b-sm" style={{ height: cogsH }} />}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })
+                                    })()}
+                                </div>
+                                <div className="flex justify-between mt-1 text-[8px] text-cream-400">
+                                    <span>{dailyChart[0]?.label}</span>
+                                    <span className="flex items-center gap-3">
+                                        <span className="inline-block w-2 h-2 rounded-sm bg-green-400 mr-0.5" />Doanh thu
+                                        <span className="inline-block w-2 h-2 rounded-sm bg-wine-300 mr-0.5" />COGS
+                                    </span>
+                                    <span>{dailyChart[dailyChart.length - 1]?.label}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-cream-400 italic text-center py-8">Chưa có dữ liệu doanh thu</p>
+                        )}
+                    </div>
+
                     {/* Expense Breakdown */}
                     <div className="col-span-2 rounded-xl border border-cream-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">
@@ -235,6 +282,21 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
                                         <span className="text-cream-500">Biên LN trung bình</span>
                                         <span className="font-bold text-wine-700">{cogsSummary.avgMargin}%</span>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Top Products Revenue */}
+                        {topProducts.length > 0 && (
+                            <div className="border-t border-cream-200 pt-3 mt-3">
+                                <h4 className="text-[10px] font-bold text-cream-400 uppercase mb-2">🏆 Top sản phẩm tháng này</h4>
+                                <div className="space-y-1.5">
+                                    {topProducts.slice(0, 5).map((p, i) => (
+                                        <div key={i} className="flex items-center justify-between text-[11px]">
+                                            <span className="text-cream-600 truncate max-w-[140px]">{p.name}</span>
+                                            <span className="font-mono text-cream-500">{p.qty}× · ₫{fmtK(p.revenue)}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}

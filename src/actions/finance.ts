@@ -515,3 +515,98 @@ export async function getExpenseBreakdown(): Promise<ExpenseCategory[]> {
 
     return categories.sort((a, b) => b.amount - a.amount)
 }
+
+// ============================================================
+// DAILY REVENUE CHART + TOP PRODUCTS
+// ============================================================
+
+/** Last N days revenue/COGS/profit for chart */
+export async function getDailyRevenueChart(days: number = 30): Promise<DailyChartPoint[]> {
+    const since = new Date(); since.setDate(since.getDate() - days); since.setHours(0, 0, 0, 0)
+
+    const orders = await prisma.order.findMany({
+        where: { status: "PAID", createdAt: { gte: since } },
+        select: { totalAmount: true, createdAt: true },
+    })
+
+    const cogsTransactions = await prisma.fundTransaction.findMany({
+        where: {
+            transactionType: "EXPENSE",
+            category: "Giá vốn hàng bán (COGS)",
+            createdAt: { gte: since },
+        },
+        select: { amount: true, createdAt: true },
+    })
+
+    // Build day map
+    const dayMap = new Map<string, { revenue: number; cogs: number }>()
+    for (let d = 0; d < days; d++) {
+        const dt = new Date(since); dt.setDate(dt.getDate() + d)
+        dayMap.set(dt.toISOString().slice(0, 10), { revenue: 0, cogs: 0 })
+    }
+
+    for (const o of orders) {
+        const key = o.createdAt.toISOString().slice(0, 10)
+        const entry = dayMap.get(key)
+        if (entry) entry.revenue += Number(o.totalAmount)
+    }
+
+    for (const t of cogsTransactions) {
+        const key = t.createdAt.toISOString().slice(0, 10)
+        const entry = dayMap.get(key)
+        if (entry) entry.cogs += Number(t.amount)
+    }
+
+    return Array.from(dayMap.entries()).map(([date, { revenue, cogs }]) => ({
+        date,
+        label: new Date(date).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }),
+        revenue: Math.round(revenue),
+        cogs: Math.round(cogs),
+        profit: Math.round(revenue - cogs),
+    }))
+}
+
+/** Top selling products by revenue */
+export async function getTopProductsRevenue(limit: number = 10) {
+    const since = new Date(); since.setDate(1); since.setHours(0, 0, 0, 0) // First of month
+
+    const items = await prisma.orderItem.findMany({
+        where: {
+            order: { status: "PAID", createdAt: { gte: since } },
+        },
+        select: {
+            productId: true,
+            quantity: true,
+            subtotal: true,
+            product: { select: { name: true, type: true } },
+        },
+    })
+
+    const productMap = new Map<string, { name: string; type: string; qty: number; revenue: number }>()
+    for (const item of items) {
+        const existing = productMap.get(item.productId)
+        if (existing) {
+            existing.qty += item.quantity
+            existing.revenue += Number(item.subtotal)
+        } else {
+            productMap.set(item.productId, {
+                name: item.product.name,
+                type: item.product.type,
+                qty: item.quantity,
+                revenue: Number(item.subtotal),
+            })
+        }
+    }
+
+    return Array.from(productMap.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, limit)
+}
+
+export type DailyChartPoint = {
+    date: string
+    label: string
+    revenue: number
+    cogs: number
+    profit: number
+}
