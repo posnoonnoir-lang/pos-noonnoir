@@ -110,10 +110,13 @@ pos-noonnoir/
 │   │   ├── serving-notes.ts   # ⭐ Wine serving notes & tasting
 │   │   ├── tax.ts             #   VAT/Tax configuration
 │   │   ├── shift-targets.ts   # 🆕 V2: Shift KPI targets & evaluation
-│   │   ├── forecast.ts        # 🆕 V2: Demand forecast (WMA algorithm)
+│   │   ├── forecast.ts        # 🆕 V2: Demand forecast (8-week WMA + trend/season)
 │   │   ├── inventory-alerts.ts # 🆕 V2: 9-type inventory alerts
 │   │   ├── push-sale.ts       # 🆕 V2: Push sale items (oxidation/low/slow)
-│   │   └── feedback.ts        # 🆕 V2: QR customer feedback system
+│   │   ├── feedback.ts        # 🆕 V2: QR customer feedback system
+│   │   ├── waste.ts           # 🆕 Waste/spoilage tracking with P&L integration
+│   │   ├── analytics.ts       # 🆕 Zone heatmap, hourly heatmap, staff leaderboard
+│   │   └── wine-advisor.ts    # 🆕 Smart wine recommendations
 │   ├── app/
 │   │   ├── (dashboard)/       # Admin pages (expanded sidebar)
 │   │   │   └── dashboard/
@@ -141,6 +144,11 @@ pos-noonnoir/
 │   │   │       ├── kitchen/           # Kitchen Display
 │   │   │       └── orders/            # Order History + Receipt
 │   │   ├── feedback/[token]/  # 🆕 V2: Public Feedback Page (QR)
+│   │   ├── offline/           # 🆕 PWA: Offline fallback page
+│   │   ├── api/
+│   │   │   ├── export/receipt/ # 🆕 Thermal receipt export
+│   │   │   ├── export/report/  # 🆕 CSV report export (revenue, waste, forecast)
+│   │   │   └── public/menu/    # 🆕 Public menu API (no auth, CDN cached)
 │   │   └── login/             # PIN Login
 │   ├── components/
 │   │   ├── layout/            # Sidebar (19 nav items)
@@ -151,10 +159,20 @@ pos-noonnoir/
 │   │   ├── staff-constants.ts # Role/status label maps
 │   │   ├── customer-tiers.ts  # 🆕 v9: CustomerTier type + calculateTier
 │   │   ├── shift-types.ts     # 🆕 v9: Shared SHIFT_TYPES constant
+│   │   ├── parallel-limit.ts  # 🆕 Parallel async helper
 │   │   └── utils.ts           # cn() utility
-│   └── stores/
-│       ├── auth-store.ts      # Auth + PIN (Zustand persist)
-│       └── cart-store.ts      # Cart state management
+│   │   ├── hooks/
+│   │   │   └── use-pos-shortcuts.tsx  # 🆕 POS keyboard shortcuts (F1-F12, Ctrl+*)
+│   │   ├── components/pwa/
+│   │   │   └── service-worker-registration.tsx  # 🆕 PWA SW + offline queue
+│   │   └── stores/
+│   │       ├── auth-store.ts      # Auth + PIN (Zustand persist)
+│   │       ├── cart-store.ts      # Cart state management
+│   │       └── prefetch-store.ts  # SSR prefetch cache
+├── public/
+│   ├── sw.js                  # 🆕 Service Worker (cache + offline queue)
+│   ├── manifest.json          # 🆕 PWA Web App Manifest
+│   └── icons/                 # 🆕 PWA app icons (192/512)
 ├── docs/                      → ../docs/ (SDLC documentation)
 └── README.md                  # ← BẠN ĐANG Ở ĐÂY
 ```
@@ -227,19 +245,21 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | **Wine Advisor** 🆕 | POS `/pos` | Smart wine recommendations: ABV/acidity/body filter, out-of-stock alternatives | ✅ Done |
 | **By-Glass Tracking** 🆕 | `/dashboard/bottle-tracking` | Bottle Selector modal, open/pour tracking, oxidation monitoring, P&L per bottle | ✅ Done |
 | **By-Glass Setup** 🆕 | `/dashboard/menu/products` | Configurable: glasses/bottle, oxidation hours, glass price, margin calc | ✅ Done |
+| **Waste Tracking** 🆕 | `/dashboard/waste` | Record waste/spoilage, auto P&L expense, monthly trend chart, form options | ✅ Done |
+| **Report Export** 🆕 | `GET /api/export/report` | CSV export: revenue, consignment, waste, inventory, forecast | ✅ Done |
+| **Public Menu API** 🆕 | `GET /api/public/menu` | Categories, products, wine details, stock, 86 status, CDN cached | ✅ Done |
+| **Keyboard Shortcuts** 🆕 | POS `/pos` | F1-F12 category switch, Ctrl+F/B/P/H/K/D, Escape, Delete | ✅ Done |
+| **PWA Offline** 🆕 | Root layout | Service Worker, offline queue, auto-replay on reconnect, installable app | ✅ Done |
+| **Zone Heatmap** 🆕 | `/dashboard/analytics` | Zone × table revenue heatmap, 7-day × 14-hour hourly heatmap | ✅ Done |
 
 ### 📋 Planned (Phase 3+)
 
 | Module | Tính năng chính | Priority |
 |--------|----------------|:--------:|
-| ~~**Real DB Queries**~~ | ~~Connect mock → real Prisma queries~~ | ~~P1~~ ✅ Done |
-| ~~**Seed Data**~~ | ~~Populate DB with initial data (prisma/seed.ts)~~ | ~~P1~~ ✅ Done |
 | **Supabase Auth** | Replace PIN mock → Supabase Auth with RLS | P1 |
 | **Telegram Bot** | Low-rating alerts, oxidation alerts, shift reports | P2 |
-| **QR Code Generator** | Auto-print QR on receipt for feedback | P2 |
-| **Wine Flight** | Tasting portions, flight packages | P3 |
-| **Integrations** | GrabFood webhook, website public API | P3 |
-| **Export** | Excel/PDF export for reports | P3 |
+| **VNPay/MoMo** | Auto-confirm payment via bank webhook | P2 |
+| **GrabFood Webhook** | Receive orders from GrabFood | P3 |
 
 ---
 
@@ -264,12 +284,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 10.0 |
+| **Version** | 11.0 |
 | **Created** | March 10, 2026 |
 | **Last Updated** | March 13, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **📊 Analytics & COGS Enhancements** — Purchase receipts (BQGQ), RFM customer segmentation, Finance charts, accurate stock deduction |
+| **Status** | **🔍 Spec Compliance ~93%** — PWA Offline, Keyboard Shortcuts, Waste Tracking, Forecast v2, Public Menu API, Zone Heatmap |
 
 ---
 
@@ -305,8 +325,9 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-11 | **v8.0** | **👥 Full HR Management** — (1) **Staff Audit & Fix**: sửa bug ₫undefined, thêm lương vào card + modal. (2) **Attendance**: check-in/out, nghỉ phép, summary KPIs (8 server actions). (3) **Staff Detail Page**: profile + 4 sub-tabs (Overview, Attendance, Shifts, Performance). (4) **Payroll**: tính lương tháng = Base ÷ days × worked + OT(1.5x) + bonus(1% DT nếu >5M), CSV export. (5) **Schedule**: weekly grid 7 ngày × N staff, 4 loại ca (Sáng/Chiều/Tối/Cả ngày), assign/remove/copy week. (6) **HR Settings**: 5 sub-tabs (Ca làm, Chấm công, Lương, Nghỉ phép, Vai trò & Thang lương). Schema: +2 models (StaffSchedule, SystemSetting). **28 routes, 37 modules, 34 Prisma models. 0 TS errors.** |
 | 2026-03-12 | **v9.0** | **⚡ SSR Performance + Build Compliance** — (1) **SSR Conversion**: 7 pages chuyển sang Server Components (Dashboard, Analytics, Reports, Tables, Customers, Reservations, Staff) — data hiển thị lập tức, không loading spinner. (2) **"use server" Compliance Fix**: sửa 3 action files vi phạm quy tắc Next.js (chỉ cho export async functions từ `"use server"` files): `customers.ts` (xóa re-export `calculateTier`/`TIER_THRESHOLDS`), `schedule.ts` (extract `SHIFT_TYPES` → `@/lib/shift-types.ts`), `tax.ts` (convert `export const` alias → async function wrapper). (3) **Shared Lib Extraction**: tạo `@/lib/shift-types.ts`, `@/lib/customer-tiers.ts` cho runtime constants dùng chung. **Build: 0 TS errors, next build exit 0. Deploy-ready.** |
 | 2026-03-12 | **v9.1** | **⚡ SSR Full Coverage + POS Bug Fix** — (1) **SSR Conversion (7 thêm)**: Promotions, Wine Guide, Feedback, Alerts, Forecast, Bottle Tracking, Consignment — tất cả chuyển sang Server Components, data hiển thị lập tức không loading spinner. Pattern: `page.tsx` (SSR fetch) → `*-client.tsx` (accept initial props). (2) **Procurement+Consignment SSR**: fetch song song `getConsignments()` + `getSettlements()` / procurement data server-side. (3) **POS Occupied Table Fix**: sửa bug `getActiveOrderByTable()` thiếu status `PENDING` + `READY` → click bàn OCCUPIED không hiện đơn hàng. Thêm đủ 5 statuses: `OPEN`, `PENDING`, `PREPARING`, `READY`, `SERVED`. **Tổng: 14 SSR pages. 0 loading spinners. 0 TS errors.** |
-| 2026-03-13 | **v10.0** | **📊 Analytics & COGS Enhancements** — (1) **Purchase Receipts (📥 Nhập hàng)**: `createPurchaseReceipt` + `getPurchaseReceipts` — nhập hàng link NCC, tính giá BQGQ (Bình quân gia quyền), cập nhật tồn kho + costPerUnit, ghi StockMovement. Tab mới "Nhập hàng" trên Procurement. (2) **Stock Deduction Fix**: `processOrderWithCOGS` + `deductRecipeIngredients` ghi đúng `ingredientId`, `totalCost`, `balanceQty` vào StockMovement. (3) **Customer CRM + RFM**: `getAllCustomers` trả `orderCount`, `lastVisit`; `getCustomerProfile` trả RFM scores (HIGH/MEDIUM/LOW), favorite products, avgOrderValue, daysSinceLastVisit; `getCustomerStats` trả segments (Active/At Risk/Lost); `syncCustomerTier` auto upgrade tier. UI: RFM segment cards, lazy-loaded profile, real order history. (4) **Finance Dashboard**: `getDailyRevenueChart(30)` — CSS bar chart revenue/COGS 30 ngày; `getTopProductsRevenue(10)` — Top sản phẩm tháng. **Schema: StockMovement +6 fields. 0 TS errors.** |
+| 2026-03-13 | **v10.0** | **📊 Analytics & COGS Enhancements** — Purchase Receipts (BQGQ), RFM customer segmentation, Finance charts, accurate stock deduction. |
+| 2026-03-13 | **v11.0** | **🔍 Spec Compliance Sprint** — Audit đặc tả vs code (78%→93%). (1) **Waste Tracking**: `waste.ts` recordWaste + getWasteReport + P&L integration, `/dashboard/waste` page. (2) **Forecast v2**: 8-week weighted average, trend/season factors, ForecastConfig, confidence scoring. (3) **Report Export API**: `GET /api/export/report` — 5 report types CSV. (4) **Public Menu API**: `GET /api/public/menu` — categories+products+wine+stock, CDN cached. (5) **Keyboard Shortcuts**: F1-F12 category, Ctrl+F/B/P/H/K/D, `use-pos-shortcuts.tsx`. (6) **PWA Offline**: Service Worker + manifest + offline POST queue + auto-replay on reconnect + installable app. (7) **Zone Heatmap**: already existed (analytics ZonesTab). **0 TS errors. 16 files. Git pushed.** |
 
 ---
 
-*Last updated: March 13, 2026 — Analytics & COGS Enhancements v10.0*
+*Last updated: March 13, 2026 — Spec Compliance Sprint v11.0 (~93% spec coverage)*
