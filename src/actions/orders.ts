@@ -188,14 +188,31 @@ export async function getOrderById(orderId: string) {
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
     try {
-        await prisma.order.update({
-            where: { id: orderId },
-            data: {
-                status,
-                ...(status === "PAID" ? { closedAt: new Date() } : {}),
-            },
-        })
-        // revalidatePath("/pos")
+        await prisma.$transaction([
+            // Update order status
+            prisma.order.update({
+                where: { id: orderId },
+                data: {
+                    status,
+                    ...(status === "PAID" ? { closedAt: new Date() } : {}),
+                },
+            }),
+            // Sync OrderItem statuses to match order flow
+            // When order → READY: all PREPARING items become READY
+            ...(status === "READY" ? [
+                prisma.orderItem.updateMany({
+                    where: { orderId, status: "PREPARING" },
+                    data: { status: "READY" },
+                }),
+            ] : []),
+            // When order → SERVED: all READY items become SERVED
+            ...(status === "SERVED" ? [
+                prisma.orderItem.updateMany({
+                    where: { orderId, status: { in: ["PREPARING", "READY"] } },
+                    data: { status: "SERVED" },
+                }),
+            ] : []),
+        ])
         return { success: true }
     } catch {
         return { success: false }
@@ -431,7 +448,7 @@ export async function addItemsToOrder(
 
 export async function getActiveOrders() {
     const orders = await prisma.order.findMany({
-        where: { status: { in: ["OPEN", "PREPARING", "SERVED"] } },
+        where: { status: { in: ["OPEN", "PENDING", "PREPARING", "READY", "SERVED"] } },
         include: {
             items: { include: { product: { select: { name: true } } } },
         },
