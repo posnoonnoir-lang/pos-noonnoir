@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import {
@@ -30,10 +30,12 @@ import {
     GlassWater,
     PieChart,
     Trash2,
+    DollarSign,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
 import { usePrefetchStore } from "@/stores/prefetch-store"
+import { useSidebarStore } from "@/stores/sidebar-store"
 import { PageTransition } from "@/components/page-transition"
 import { GlobalPrefetcher } from "@/components/global-prefetcher"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -51,45 +53,51 @@ const navSections = [
         items: [
             { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
             { label: "Phân tích", href: "/dashboard/analytics", icon: PieChart },
+            { label: "Tài chính (P&L)", href: "/dashboard/finance", icon: DollarSign },
         ],
     },
     {
-        label: "Vận hành",
+        label: "Bán hàng",
         items: [
             { label: "POS Terminal", href: "/pos", icon: Wine },
-            { label: "Kitchen Display", href: "/dashboard/kitchen", icon: ChefHat },
+            { label: "Kitchen Display", href: "/pos/kitchen", icon: ChefHat },
             { label: "Đơn hàng", href: "/pos/orders", icon: ClipboardList },
-            { label: "Menu & Sản phẩm", href: "/dashboard/menu", icon: UtensilsCrossed },
             { label: "Quản lý Bàn", href: "/dashboard/tables", icon: Armchair },
-            { label: "Đặt bàn", href: "/dashboard/reservations", icon: CalendarDays },
         ],
     },
     {
-        label: "Quản lý",
+        label: "Kho & Nhập hàng",
         items: [
-            { label: "Mua hàng", href: "/dashboard/procurement", icon: Truck },
             { label: "Kho hàng", href: "/dashboard/inventory", icon: Package },
+            { label: "Mua hàng", href: "/dashboard/procurement", icon: Truck },
             { label: "Ký gửi", href: "/dashboard/consignment", icon: Handshake },
-            { label: "Nhân sự", href: "/dashboard/staff", icon: Users },
-            { label: "Lãi Lỗ (P&L)", href: "/dashboard/reports", icon: BarChart3 },
+            { label: "Cảnh báo tồn", href: "/dashboard/alerts", icon: AlertTriangle },
+            { label: "Dự báo nhập", href: "/dashboard/forecast", icon: TrendingUp },
+            { label: "Hao hụt", href: "/dashboard/waste", icon: Trash2 },
         ],
     },
     {
-        label: "CRM",
+        label: "Sản phẩm & Rượu",
+        items: [
+            { label: "Menu & Sản phẩm", href: "/dashboard/menu", icon: UtensilsCrossed },
+            { label: "Wine Guide", href: "/dashboard/wine-guide", icon: BookOpen },
+            { label: "Bán theo ly", href: "/dashboard/bottle-tracking", icon: GlassWater },
+        ],
+    },
+    {
+        label: "Khách & Marketing",
         items: [
             { label: "Khách hàng", href: "/dashboard/customers", icon: Heart },
             { label: "Khuyến mãi", href: "/dashboard/promotions", icon: Tag },
-            { label: "Wine Guide", href: "/dashboard/wine-guide", icon: BookOpen },
-            { label: "Bán theo ly", href: "/dashboard/bottle-tracking", icon: GlassWater },
             { label: "Feedback", href: "/dashboard/feedback", icon: MessageCircle },
         ],
     },
     {
-        label: "V2",
+        label: "Nội bộ",
         items: [
-            { label: "Cảnh báo", href: "/dashboard/alerts", icon: AlertTriangle },
-            { label: "Forecast", href: "/dashboard/forecast", icon: TrendingUp },
-            { label: "Hao hụt", href: "/dashboard/waste", icon: Trash2 },
+            { label: "Nhân sự", href: "/dashboard/staff", icon: Users },
+            { label: "Đặt bàn", href: "/dashboard/reservations", icon: CalendarDays },
+            { label: "Báo cáo", href: "/dashboard/reports", icon: BarChart3 },
         ],
     },
 ]
@@ -102,7 +110,7 @@ export default function DashboardLayout({
     const router = useRouter()
     const pathname = usePathname()
     const { isAuthenticated, _hasHydrated, staff, logout } = useAuthStore()
-    const [collapsed, setCollapsed] = useState(false)
+    const { collapsed, toggle: toggleSidebar } = useSidebarStore()
 
     useEffect(() => {
         if (_hasHydrated && !isAuthenticated) {
@@ -153,7 +161,7 @@ export default function DashboardLayout({
 
                 {/* Collapse toggle button */}
                 <button
-                    onClick={() => setCollapsed(c => !c)}
+                    onClick={toggleSidebar}
                     className="fixed z-50 flex h-6 w-6 items-center justify-center rounded-full bg-green-700 border-2 border-cream-50 text-cream-50 shadow-md hover:bg-green-600 transition-all duration-300 hover:scale-110"
                     style={{ left: sidebarWidth - 12, top: 72 }}
                 >

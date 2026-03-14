@@ -52,20 +52,40 @@ import { ThemePicker } from "@/components/theme-switcher"
 type TaxReportLine = Awaited<ReturnType<typeof getTaxReport>>[number]
 type TaxBreakdown = Awaited<ReturnType<typeof getTaxBreakdownByRate>>[number]
 
-type SettingSection = "setup" | "store" | "tax" | "service-charge" | "payment" | "receipt" | "notification" | "display" | "operational" | "system" | "hr"
+type SettingSection = "store" | "tax" | "service-charge" | "payment" | "receipt" | "notification" | "display" | "operational" | "system" | "hr" | "setup"
 
-const NAV_ITEMS: { id: SettingSection; label: string; icon: typeof Store }[] = [
-    { id: "setup", label: "Setup ban đầu", icon: Settings },
-    { id: "store", label: "Cửa hàng", icon: Store },
-    { id: "tax", label: "Thuế (VAT)", icon: Receipt },
-    { id: "service-charge", label: "Phí dịch vụ", icon: HandCoins },
-    { id: "payment", label: "Thanh toán QR", icon: Banknote },
-    { id: "receipt", label: "Hoá đơn & In", icon: Printer },
-    { id: "notification", label: "Thông báo", icon: Bell },
-    { id: "display", label: "Giao diện", icon: Palette },
-    { id: "operational", label: "Vận hành", icon: SlidersHorizontal },
-    { id: "hr", label: "Nhân sự", icon: Users },
-    { id: "system", label: "Hệ thống", icon: Shield },
+type NavGroup = {
+    label: string
+    items: { id: SettingSection; label: string; icon: typeof Store }[]
+}
+
+const NAV_GROUPS: NavGroup[] = [
+    {
+        label: "Cửa hàng",
+        items: [
+            { id: "store", label: "Thông tin quán", icon: Store },
+            { id: "operational", label: "Vận hành POS", icon: SlidersHorizontal },
+            { id: "setup", label: "Cấu hình ban đầu", icon: Settings },
+        ],
+    },
+    {
+        label: "Thanh toán & Tài chính",
+        items: [
+            { id: "payment", label: "Thanh toán QR", icon: Banknote },
+            { id: "tax", label: "Thuế (VAT)", icon: Receipt },
+            { id: "service-charge", label: "Phí dịch vụ", icon: HandCoins },
+            { id: "receipt", label: "Hoá đơn & In", icon: Printer },
+        ],
+    },
+    {
+        label: "Hệ thống & Giao diện",
+        items: [
+            { id: "display", label: "Giao diện", icon: Palette },
+            { id: "notification", label: "Thông báo", icon: Bell },
+            { id: "hr", label: "Cài đặt nhân sự", icon: Users },
+            { id: "system", label: "Hệ thống", icon: Shield },
+        ],
+    },
 ]
 
 export default function SettingsPage() {
@@ -105,27 +125,36 @@ export default function SettingsPage() {
                 )}
             </div>
 
-            <div className="grid grid-cols-[200px,1fr] gap-6">
-                {/* Settings Nav */}
-                <div className="space-y-1">
-                    {NAV_ITEMS.map((item) => {
-                        const Icon = item.icon
-                        return (
-                            <button
-                                key={item.id}
-                                onClick={() => setActiveSection(item.id)}
-                                className={cn(
-                                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-medium transition-all",
-                                    activeSection === item.id
-                                        ? "bg-green-900 text-cream-50"
-                                        : "text-cream-500 hover:bg-cream-200"
-                                )}
-                            >
-                                <Icon className="h-4 w-4" />
-                                {item.label}
-                            </button>
-                        )
-                    })}
+            <div className="grid grid-cols-[220px,1fr] gap-6">
+                {/* Settings Nav — Grouped */}
+                <div className="space-y-4">
+                    {NAV_GROUPS.map((group) => (
+                        <div key={group.label}>
+                            <p className="mb-1.5 px-2 text-[9px] font-bold uppercase tracking-wider text-cream-400">
+                                {group.label}
+                            </p>
+                            <div className="space-y-0.5">
+                                {group.items.map((item) => {
+                                    const Icon = item.icon
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => setActiveSection(item.id)}
+                                            className={cn(
+                                                "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
+                                                activeSection === item.id
+                                                    ? "bg-green-900 text-cream-50"
+                                                    : "text-cream-500 hover:bg-cream-200"
+                                            )}
+                                        >
+                                            <Icon className="h-3.5 w-3.5" />
+                                            {item.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    ))}
                 </div>
 
                 {/* Settings Content */}
