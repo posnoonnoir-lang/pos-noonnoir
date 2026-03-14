@@ -122,61 +122,63 @@ pos-noonnoir/
 │   │   ├── dashboard-loader.ts # ⚡ Consolidated Dashboard SSR loader
 │   │   └── analytics-loader.ts # ⚡ Consolidated Analytics SSR loader (10 queries parallel)
 │   ├── app/
-│   │   ├── (dashboard)/       # Admin pages (expanded sidebar)
-│   │   │   └── dashboard/
-│   │   │       ├── page.tsx           # Dashboard Home
-│   │   │       ├── tables/            # Table Management
-│   │   │       ├── menu/categories/   # Category CRUD
-│   │   │       ├── menu/products/     # Product CRUD
-│   │   │       ├── reports/           # ⭐ Daily P&L Report
-│   │   │       ├── staff/             # Staff Management (4 tabs + detail page)
-│   │   │       │   └── [id]/          # 🆕 Staff Detail (4 sub-tabs)
-│   │   │       ├── procurement/       # PO & Suppliers
-│   │   │       ├── inventory/         # Goods + NPL + CCDC (3 tabs)
-│   │   │       ├── finance/           # COGS FIFO + P&L
-│   │   │       ├── customers/         # ⭐ CRM Dashboard
-│   │   │       ├── promotions/        # ⭐ Promotions Manager
-│   │   │       ├── wine-guide/        # ⭐ Wine Serving Notes
-│   │   │       ├── bottle-tracking/   # 🆕 By-Glass Sales Tracking
-│   │   │       ├── settings/          # Settings + Tax Config + HR Config
-│   │   │       ├── alerts/            # 🆕 V2: Inventory Alerts (9 types)
-│   │   │       ├── forecast/          # 🆕 V2: Demand Forecast
-│   │   │       └── feedback/          # 🆕 V2: Customer Feedback Dashboard
-│   │   ├── (pos)/             # POS pages (compact sidebar)
-│   │   │   └── pos/
-│   │   │       ├── page.tsx           # POS Terminal + Push Sale Sidebar + Wine Guide
-│   │   │       ├── kitchen/           # Kitchen Display
+│   │   ├── (dashboard)/       # Unified layout (collapsible sidebar, persistent state)
+│   │   │   ├── layout.tsx            # Single layout — sidebar 220px↔60px, 6 nav groups
+│   │   │   ├── dashboard/
+│   │   │   │   ├── page.tsx           # Dashboard Home
+│   │   │   │   ├── analytics/         # 📊 Analytics (zone heatmap, hourly)
+│   │   │   │   ├── finance/           # 💰 COGS FIFO + P&L
+│   │   │   │   ├── tables/            # Table Management
+│   │   │   │   ├── menu/              # Menu (categories, products, recipes)
+│   │   │   │   ├── reports/           # ⭐ Daily P&L Report
+│   │   │   │   ├── staff/             # Staff Management (4 tabs + detail)
+│   │   │   │   │   └── [id]/          # Staff Detail (4 sub-tabs)
+│   │   │   │   ├── procurement/       # PO & Suppliers
+│   │   │   │   ├── inventory/         # Goods + NPL + CCDC (3 tabs)
+│   │   │   │   ├── consignment/       # ⭐ Consignment management
+│   │   │   │   ├── customers/         # ⭐ CRM Dashboard
+│   │   │   │   ├── promotions/        # ⭐ Promotions Manager
+│   │   │   │   ├── wine-guide/        # 🍷 Wine Serving Notes
+│   │   │   │   ├── bottle-tracking/   # 🍷 By-Glass Sales Tracking
+│   │   │   │   ├── reservations/      # 📅 Reservation management
+│   │   │   │   ├── settings/          # ⚙️ Settings (3 groups, 11 sections)
+│   │   │   │   ├── alerts/            # ⚠️ Inventory Alerts (9 types)
+│   │   │   │   ├── forecast/          # 📈 Demand Forecast
+│   │   │   │   ├── waste/             # 🗑️ Waste/Spoilage Tracking
+│   │   │   │   └── feedback/          # 💬 Customer Feedback Dashboard
+│   │   │   └── pos/                   # POS pages (same layout!)
+│   │   │       ├── page.tsx           # POS Terminal + Push Sale + Wine Guide
+│   │   │       ├── kitchen/           # Kitchen Display (Kanban 3-column)
 │   │   │       └── orders/            # Order History + Receipt
-│   │   ├── feedback/[token]/  # 🆕 V2: Public Feedback Page (QR)
-│   │   ├── offline/           # 🆕 PWA: Offline fallback page
+│   │   ├── feedback/[token]/  # V2: Public Feedback Page (QR)
+│   │   ├── offline/           # PWA: Offline fallback page
 │   │   ├── api/
-│   │   │   ├── export/receipt/ # 🆕 Thermal receipt export
-│   │   │   ├── export/report/  # 🆕 CSV report export (revenue, waste, forecast)
-│   │   │   └── public/menu/    # 🆕 Public menu API (no auth, CDN cached)
+│   │   │   ├── export/receipt/ # Thermal receipt export
+│   │   │   ├── export/report/  # CSV report export
+│   │   │   └── public/menu/    # Public menu API (CDN cached)
 │   │   └── login/             # PIN Login
 │   ├── components/
-│   │   ├── layout/            # Sidebar (19 nav items)
 │   │   ├── pos/               # Receipt component
 │   │   └── ui/                # shadcn/ui base components
 │   ├── lib/
-│   │   ├── mock-data.ts       # Legacy (no longer imported by actions)
 │   │   ├── staff-constants.ts # Role/status label maps
-│   │   ├── customer-tiers.ts  # 🆕 v9: CustomerTier type + calculateTier
-│   │   ├── shift-types.ts     # 🆕 v9: Shared SHIFT_TYPES constant
-│   │   ├── parallel-limit.ts  # 🆕 Parallel async helper
+│   │   ├── customer-tiers.ts  # CustomerTier type + calculateTier
+│   │   ├── shift-types.ts     # Shared SHIFT_TYPES constant
+│   │   ├── parallel-limit.ts  # Parallel async helper
 │   │   └── utils.ts           # cn() utility
-│   │   ├── hooks/
-│   │   │   └── use-pos-shortcuts.tsx  # 🆕 POS keyboard shortcuts (F1-F12, Ctrl+*)
-│   │   ├── components/pwa/
-│   │   │   └── service-worker-registration.tsx  # 🆕 PWA SW + offline queue
-│   │   └── stores/
-│   │       ├── auth-store.ts      # Auth + PIN (Zustand persist)
-│   │       ├── cart-store.ts      # Cart state management
-│   │       └── prefetch-store.ts  # SSR prefetch cache
+│   ├── hooks/
+│   │   └── use-pos-shortcuts.tsx  # POS keyboard shortcuts (F1-F12)
+│   ├── components/pwa/
+│   │   └── service-worker-registration.tsx  # PWA SW + offline queue
+│   └── stores/
+│       ├── auth-store.ts      # Auth + PIN (Zustand persist)
+│       ├── cart-store.ts      # Cart state management
+│       ├── prefetch-store.ts  # SSR prefetch cache
+│       └── sidebar-store.ts   # 🆕 Sidebar collapsed state (Zustand persist)
 ├── public/
-│   ├── sw.js                  # 🆕 Service Worker (cache + offline queue)
-│   ├── manifest.json          # 🆕 PWA Web App Manifest
-│   └── icons/                 # 🆕 PWA app icons (192/512)
+│   ├── sw.js                  # Service Worker (cache + offline queue)
+│   ├── manifest.json          # PWA Web App Manifest
+│   └── icons/                 # PWA app icons (192/512)
 ├── docs/                      → ../docs/ (SDLC documentation)
 └── README.md                  # ← BẠN ĐANG Ở ĐÂY
 ```
@@ -225,7 +227,7 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | **Procurement** | `/dashboard/procurement` | PO, NCC, **📥 Phiếu nhập hàng (BQGQ)**, lịch sử nhập, Create Supplier | ✅ Done |
 | **Inventory** | `/dashboard/inventory` | 3 tabs: Hàng bán + NPL + CCDC, auto depreciation, **accurate stock deduction** | ✅ Done |
 | **Finance/COGS** | `/dashboard/finance` | P&L, COGS, expense breakdown, per-product margin, **📊 30-day revenue chart**, **🏆 Top products** | ✅ Done |
-| **Settings** | `/dashboard/settings` | 10 sections: Store, Tax, Service Charge, QR Payment, Receipt, Notification, Display, Operational, **HR Config**, System | ✅ Done |
+| **Settings** | `/dashboard/settings` | 3 grouped categories (Cửa hàng, Thanh toán & Tài chính, Hệ thống & Giao diện), 11 sections | ✅ Done |
 | **Receipt** | Overlay | Thermal-style bill, print button | ✅ Done |
 | **POS → NPL** | Checkout flow | Auto deduct NPL ingredients, stock warnings, COGS tracking | ✅ Done |
 | **POS Table Orders** 🆕 | POS `/pos` | **View occupied table orders**, **add items to existing order**, order detail panel | ✅ Done |
@@ -288,12 +290,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 11.2 |
+| **Version** | 12.0 |
 | **Created** | March 10, 2026 |
-| **Last Updated** | March 13, 2026 |
+| **Last Updated** | March 14, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **⚡ Performance + UX** — $transaction batching, Singapore region, collapsible sidebar |
+| **Status** | **🏗️ Layout Unification + UX** — unified single layout, 6-group navigation, persistent sidebar, grouped settings |
 
 ---
 
@@ -333,7 +335,8 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-13 | **v11.0** | **🔍 Spec Compliance Sprint** — Audit đặc tả vs code (78%→93%). (1) **Waste Tracking**: `waste.ts` recordWaste + getWasteReport + P&L integration, `/dashboard/waste` page. (2) **Forecast v2**: 8-week weighted average, trend/season factors, ForecastConfig, confidence scoring. (3) **Report Export API**: `GET /api/export/report` — 5 report types CSV. (4) **Public Menu API**: `GET /api/public/menu` — categories+products+wine+stock, CDN cached. (5) **Keyboard Shortcuts**: F1-F12 category, Ctrl+F/B/P/H/K/D, `use-pos-shortcuts.tsx`. (6) **PWA Offline**: Service Worker + manifest + offline POST queue + auto-replay on reconnect + installable app. (7) **Zone Heatmap**: already existed (analytics ZonesTab). **0 TS errors. 16 files. Git pushed.** |
 | 2026-03-13 | **v11.1** | **⚡ SSR Performance Sprint** — Tối ưu tốc độ load 3 trang chính. (1) **POS**: Gom ~20 API calls → 1 `getPOSInitialData()` duy nhất. Thay N+1 `getProductStock()` loop bằng `getAllWineStock()` groupBy (1 query thay 40+). Batch 3+4 load song song: wineStock, glassStatus, tabs, held orders, notifications, push sale, reservations, POS config. **Giảm 95% network roundtrips.** (2) **Analytics**: Gom 5 sequential Promise.all batches → 1 batch song song. Tạo `analytics-loader.ts` — 10 queries parallel. **~5× nhanh hơn SSR.** (3) **Dashboard**: Đã nhanh sẵn (SSR + 1 batch), không cần đổi. Fix missing `ClipboardList` import. **3 trang load tức thì, không skeleton flash.** |
 | 2026-03-13 | **v11.2** | **⚡ Deep Perf + UX** — (1) **$transaction batching**: POS loader gom 8 Prisma queries → 1 `$transaction` (1 DB roundtrip thay 8). Wine queries + function calls chạy đồng thời — tất cả 3 nhóm parallel, 0 sequential wait. (2) **Vercel Singapore**: `vercel.json {"regions": ["sin1"]}` — cùng region với Supabase, giảm latency ~200ms→~5ms/roundtrip. (3) **Connection pool warm-up**: `pool.connect()` khi import Prisma — bỏ 500ms-1s cold start penalty. Pool max 3→10, idle timeout 10s→30s. (4) **Collapsible sidebar**: Dashboard sidebar 220px↔60px toggle thủ công bằng nút mũi tên. Icons giữ nguyên cả 2 trạng thái. Tooltip on hover khi collapsed. Animation 300ms ease-out. |
+| 2026-03-14 | **v12.0** | **🏗️ Layout Unification + Navigation Redesign** — (1) **Unified Layout**: Xoá `(pos)` route group riêng, merge vào `(dashboard)`. Toàn bộ app dùng 1 layout duy nhất với collapsible sidebar. (2) **Persistent Sidebar**: `useSidebarStore` (Zustand + localStorage) — sidebar state giữ nguyên khi chuyển trang, reload. (3) **Navigation Reorganize**: 6 nhóm nghiệp vụ (Tổng quan, Bán hàng, Kho & Nhập hàng, Sản phẩm & Rượu, Khách & Marketing, Nội bộ). Di chuyển Alerts/Forecast/Waste từ "V2" → "Kho & Nhập hàng". Thêm Finance (P&L) vào sidebar. (4) **Settings Redesign**: Nav phẳng 11 items → 3 nhóm (Cửa hàng, Thanh toán & Tài chính, Hệ thống & Giao diện). (5) **Kitchen Display Unified**: Xoá bản dark cũ, thống nhất Kanban 3-column. (6) **Dashboard Pages Enhanced**: Alerts, Forecast, Waste — full-width 2-column layout + analytics sidebar. **0 TS errors. Git pushed.** |
 
 ---
 
-*Last updated: March 13, 2026 — Deep Perf + UX v11.2*
+*Last updated: March 14, 2026 — Layout Unification + Navigation Redesign v12.0*
