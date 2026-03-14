@@ -31,6 +31,7 @@ import {
     PieChart,
     Trash2,
     DollarSign,
+    Target,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/stores/auth-store"
@@ -54,6 +55,7 @@ const navSections = [
             { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
             { label: "Phân tích", href: "/dashboard/analytics", icon: PieChart },
             { label: "Tài chính (P&L)", href: "/dashboard/finance", icon: DollarSign },
+            { label: "Chỉ tiêu KPI", href: "/dashboard/kpi", icon: Target },
         ],
     },
     {

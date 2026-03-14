@@ -47,6 +47,7 @@ import { getBankConfig, updateBankConfig, type QRPaymentConfig } from "@/actions
 import type { TaxRate } from "@/types"
 import { getHrConfig, updateHrConfig, type HrConfigData } from "@/actions/hr-config"
 import { getPosConfig, updatePosConfig, type PosConfig, type PaymentMode } from "@/actions/pos-config"
+import { isKpiEnabled, setKpiEnabled } from "@/actions/kpi"
 import { ThemePicker } from "@/components/theme-switcher"
 
 type TaxReportLine = Awaited<ReturnType<typeof getTaxReport>>[number]
@@ -1668,9 +1669,39 @@ function HrSettings() {
 // ============================================================
 function OperationalSettings() {
     const [discountThreshold, setDiscountThreshold] = useState("10")
+    const [kpiEnabled, setKpiEnabledState] = useState(false)
+    const [kpiLoading, setKpiLoading] = useState(true)
+
+    useEffect(() => {
+        isKpiEnabled().then(v => { setKpiEnabledState(v); setKpiLoading(false) })
+    }, [])
+
+    const handleToggleKpi = async (v: boolean) => {
+        setKpiEnabledState(v)
+        await setKpiEnabled(v)
+        toast.success(v ? "Đã bật chỉ tiêu KPI" : "Đã tắt chỉ tiêu KPI")
+    }
 
     return (
         <>
+            <SettingGroup title="Chỉ tiêu KPI">
+                <SettingRow label="Bật tính năng KPI" description="Cho phép đặt chỉ tiêu doanh thu, đơn hàng, v.v. theo tháng/tuần/ca">
+                    {kpiLoading ? (
+                        <div className="w-11 h-6 rounded-full bg-cream-200 animate-pulse" />
+                    ) : (
+                        <Toggle checked={kpiEnabled} onChange={handleToggleKpi} />
+                    )}
+                </SettingRow>
+                {kpiEnabled && (
+                    <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                        <p className="text-[10px] text-green-700">
+                            ✅ KPI đang bật — Chủ quán có thể đặt chỉ tiêu tháng/tuần tại <strong>Dashboard → Chỉ tiêu KPI</strong>.
+                            Quản lý ca set chỉ tiêu đầu ca. Hệ thống tự cascade: Tháng → Tuần → Ca.
+                        </p>
+                    </div>
+                )}
+            </SettingGroup>
+
             <SettingGroup title="Giới hạn giảm giá">
                 <SettingRow label="Ngưỡng giảm giá cần xác thực" description="Giảm giá vượt mức này cần Manager PIN">
                     <div className="flex items-center gap-1">

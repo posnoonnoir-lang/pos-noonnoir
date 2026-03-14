@@ -671,8 +671,9 @@ model ShiftRecord {
   openedAt     DateTime  @default(now()) @map("opened_at")
   closedAt     DateTime? @map("closed_at")
 
-  staff   Staff         @relation(fields: [staffId], references: [id])
-  targets ShiftTarget[]
+  staff      Staff         @relation(fields: [staffId], references: [id])
+  targets    ShiftTarget[]
+  kpiTargets KpiTarget[]   @relation("KpiShiftTargets")
 
   @@index([staffId])
   @@map("shift_record")
@@ -1072,6 +1073,57 @@ model DepreciationEntry {
 
   @@unique([equipmentId, month])
   @@map("depreciation_entry")
+}
+
+// ============================================================
+// KPI TARGETS (Chỉ tiêu — tháng / tuần / ca)
+// ============================================================
+
+enum KpiPeriod {
+  MONTHLY
+  WEEKLY
+  SHIFT
+}
+
+model KpiMetric {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String   @unique                  // e.g. "revenue", "orders", "customers", "wine_bottles", "avg_ticket"
+  name        String                             // Display name: "Doanh thu", "Số đơn hàng"
+  unit        String   @default("")              // "₫", "đơn", "khách", "chai", "₫/đơn"
+  icon        String   @default("📊")            // Emoji icon
+  isDefault   Boolean  @default(false) @map("is_default")  // System-provided metric
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  targets KpiTarget[]
+
+  @@map("kpi_metric")
+}
+
+model KpiTarget {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  metricId     String    @map("metric_id") @db.Uuid
+  period       KpiPeriod                          // MONTHLY, WEEKLY, SHIFT
+  year         Int                                // 2026
+  month        Int?                               // 1-12 (for MONTHLY/WEEKLY)
+  week         Int?                               // 1-53 (for WEEKLY)
+  shiftId      String?   @map("shift_id") @db.Uuid // FK to ShiftRecord (for SHIFT)
+  targetValue  Decimal   @map("target_value") @db.Decimal(14, 2)
+  actualValue  Decimal?  @map("actual_value") @db.Decimal(14, 2)
+  achievePct   Decimal?  @map("achieve_pct") @db.Decimal(5, 1) // e.g. 85.5%
+  setBy        String    @map("set_by") @db.Uuid  // Staff who set this target
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  metric KpiMetric   @relation(fields: [metricId], references: [id])
+  shift  ShiftRecord? @relation("KpiShiftTargets", fields: [shiftId], references: [id])
+
+  @@unique([metricId, period, year, month, week, shiftId])
+  @@index([period, year, month])
+  @@index([shiftId])
+  @@map("kpi_target")
 }
 
 // ============================================================
