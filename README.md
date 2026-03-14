@@ -38,7 +38,7 @@ Hệ thống POS chuyên biệt cho Wine Bar, hỗ trợ bán ly thông minh, th
 |-------|-----------|:------:|
 | **Framework** | Next.js 16.1.6 (Turbopack, App Router, TypeScript) | ✅ |
 | **Database** | PostgreSQL (Supabase) | ✅ Connected |
-| **ORM** | Prisma v7 (34 models, schema synced) | ✅ |
+| **ORM** | Prisma v7 (36 models, schema synced) | ✅ |
 | **UI** | shadcn/ui + Tailwind CSS v4 | ✅ |
 | **State** | Zustand (persist) | ✅ |
 | **Auth** | PIN Login (mock, Supabase planned) | ✅ |
@@ -80,7 +80,7 @@ Open [http://localhost:3001](http://localhost:3001) → Login PIN: **1234** (Own
 pos-noonnoir/
 ├── vercel.json                    # Vercel config — regions: sin1 (Singapore)
 ├── prisma/
-│   ├── schema.prisma          # 34 models, full schema (synced with Supabase)
+│   ├── schema.prisma          # 36 models, full schema (synced with Supabase)
 │   ├── seed.ts                # Database seeder
 │   └── reset.ts               # Database reset utility
 ├── src/
@@ -118,6 +118,7 @@ pos-noonnoir/
 │   │   ├── waste.ts           # 🆕 Waste/spoilage tracking with P&L integration
 │   │   ├── analytics.ts       # 🆕 Zone heatmap, hourly heatmap, staff leaderboard
 │   │   ├── wine-advisor.ts    # 🆕 Smart wine recommendations + getAllWineStock()
+│   │   ├── kpi.ts             # 🆕 KPI targets system (metrics, targets, cascade, overview)
 │   │   ├── pos-loader.ts      # ⚡ Consolidated POS SSR loader (1 call → all data)
 │   │   ├── dashboard-loader.ts # ⚡ Consolidated Dashboard SSR loader
 │   │   └── analytics-loader.ts # ⚡ Consolidated Analytics SSR loader (10 queries parallel)
@@ -145,7 +146,8 @@ pos-noonnoir/
 │   │   │   │   ├── alerts/            # ⚠️ Inventory Alerts (9 types)
 │   │   │   │   ├── forecast/          # 📈 Demand Forecast
 │   │   │   │   ├── waste/             # 🗑️ Waste/Spoilage Tracking
-│   │   │   │   └── feedback/          # 💬 Customer Feedback Dashboard
+│   │   │   │   ├── feedback/          # 💬 Customer Feedback Dashboard
+│   │   │   │   └── kpi/               # 🎯 KPI Targets Dashboard (3 tabs)
 │   │   │   └── pos/                   # POS pages (same layout!)
 │   │   │       ├── page.tsx           # POS Terminal + Push Sale + Wine Guide
 │   │   │       ├── kitchen/           # Kitchen Display (Kanban 3-column)
@@ -290,12 +292,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 12.0 |
+| **Version** | 13.0 |
 | **Created** | March 10, 2026 |
 | **Last Updated** | March 14, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **🏗️ Layout Unification + UX** — unified single layout, 6-group navigation, persistent sidebar, grouped settings |
+| **Status** | **🎯 KPI System + Push Sale Fix** — multi-level KPI targets, push sale interactivity, menu SSR perf |
 
 ---
 
@@ -336,7 +338,8 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-13 | **v11.1** | **⚡ SSR Performance Sprint** — Tối ưu tốc độ load 3 trang chính. (1) **POS**: Gom ~20 API calls → 1 `getPOSInitialData()` duy nhất. Thay N+1 `getProductStock()` loop bằng `getAllWineStock()` groupBy (1 query thay 40+). Batch 3+4 load song song: wineStock, glassStatus, tabs, held orders, notifications, push sale, reservations, POS config. **Giảm 95% network roundtrips.** (2) **Analytics**: Gom 5 sequential Promise.all batches → 1 batch song song. Tạo `analytics-loader.ts` — 10 queries parallel. **~5× nhanh hơn SSR.** (3) **Dashboard**: Đã nhanh sẵn (SSR + 1 batch), không cần đổi. Fix missing `ClipboardList` import. **3 trang load tức thì, không skeleton flash.** |
 | 2026-03-13 | **v11.2** | **⚡ Deep Perf + UX** — (1) **$transaction batching**: POS loader gom 8 Prisma queries → 1 `$transaction` (1 DB roundtrip thay 8). Wine queries + function calls chạy đồng thời — tất cả 3 nhóm parallel, 0 sequential wait. (2) **Vercel Singapore**: `vercel.json {"regions": ["sin1"]}` — cùng region với Supabase, giảm latency ~200ms→~5ms/roundtrip. (3) **Connection pool warm-up**: `pool.connect()` khi import Prisma — bỏ 500ms-1s cold start penalty. Pool max 3→10, idle timeout 10s→30s. (4) **Collapsible sidebar**: Dashboard sidebar 220px↔60px toggle thủ công bằng nút mũi tên. Icons giữ nguyên cả 2 trạng thái. Tooltip on hover khi collapsed. Animation 300ms ease-out. |
 | 2026-03-14 | **v12.0** | **🏗️ Layout Unification + Navigation Redesign** — (1) **Unified Layout**: Xoá `(pos)` route group riêng, merge vào `(dashboard)`. Toàn bộ app dùng 1 layout duy nhất với collapsible sidebar. (2) **Persistent Sidebar**: `useSidebarStore` (Zustand + localStorage) — sidebar state giữ nguyên khi chuyển trang, reload. (3) **Navigation Reorganize**: 6 nhóm nghiệp vụ (Tổng quan, Bán hàng, Kho & Nhập hàng, Sản phẩm & Rượu, Khách & Marketing, Nội bộ). Di chuyển Alerts/Forecast/Waste từ "V2" → "Kho & Nhập hàng". Thêm Finance (P&L) vào sidebar. (4) **Settings Redesign**: Nav phẳng 11 items → 3 nhóm (Cửa hàng, Thanh toán & Tài chính, Hệ thống & Giao diện). (5) **Kitchen Display Unified**: Xoá bản dark cũ, thống nhất Kanban 3-column. (6) **Dashboard Pages Enhanced**: Alerts, Forecast, Waste — full-width 2-column layout + analytics sidebar. **0 TS errors. Git pushed.** |
+| 2026-03-14 | **v13.0** | **🎯 KPI System + Push Sale + Menu Perf** — (1) **KPI Targets System**: Schema `KpiMetric` + `KpiTarget` (36 models). 6 default metrics (doanh thu, đơn, khách, TB/đơn, chai wine, ly wine). Owner set chỉ tiêu tháng → auto cascade chia tuần (÷4~5). Dashboard `/dashboard/kpi` 3 tabs: Tổng quan (progress cards + 6-month history charts), Đặt chỉ tiêu (bulk input + cascade), Quản lý chỉ số (add/toggle/delete custom KPIs). (2) **KPI Toggle**: On/off trong Settings → Vận hành POS, persist via `SystemSetting`. (3) **Push Sale Fix**: Items giờ clickable → add product trực tiếp vào cart. Thêm nút "+ Giỏ" xanh bên cạnh "Giảm giá". Cursor pointer + hover shadow + active scale feedback. (4) **Menu Page Speed**: Thay redirect `/dashboard/menu` → `/dashboard/menu/categories` bằng direct SSR render (bỏ extra server roundtrip). **Schema: 36 models. 0 TS errors. Git pushed.** |
 
 ---
 
-*Last updated: March 14, 2026 — Layout Unification + Navigation Redesign v12.0*
+*Last updated: March 14, 2026 — KPI System + Push Sale + Menu Perf v13.0*
