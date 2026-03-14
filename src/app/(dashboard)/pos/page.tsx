@@ -1949,68 +1949,92 @@ export default function POSPage() {
                             </div>
                         ) : (
                             <div className="p-2 space-y-2">
-                                {pushSaleItems.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        className={cn(
-                                            "rounded-lg border p-2.5 transition-all hover:shadow-sm",
-                                            item.urgency === "HIGH"
-                                                ? "border-red-200 bg-red-50"
-                                                : item.urgency === "MEDIUM"
-                                                    ? "border-amber-200 bg-amber-50"
-                                                    : "border-cream-200 bg-cream-100"
-                                        )}
-                                    >
-                                        <div className="flex items-start gap-2">
-                                            <span className="text-sm mt-0.5">
-                                                {item.reasonType === "OXIDATION" ? "🍷" :
-                                                    item.reasonType === "LOW_GLASSES" ? "🥂" :
-                                                        item.reasonType === "SLOW_MOVING" ? "🐌" : "⏰"}
-                                            </span>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[11px] font-bold text-green-900 truncate">
-                                                    {item.productName}
-                                                </p>
-                                                <p className={cn(
-                                                    "text-[9px] font-medium",
-                                                    item.urgency === "HIGH" ? "text-red-600" :
-                                                        item.urgency === "MEDIUM" ? "text-amber-600" : "text-cream-500"
+                                {pushSaleItems.map((item) => {
+                                    const product = dbProducts.find(p => p.id === item.productId)
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            onClick={() => {
+                                                if (product) {
+                                                    cart.addItem(product)
+                                                    toast.success(`Đã thêm ${item.productName} vào giỏ`)
+                                                } else {
+                                                    toast.error("Không tìm thấy sản phẩm")
+                                                }
+                                            }}
+                                            className={cn(
+                                                "rounded-lg border p-2.5 transition-all hover:shadow-md cursor-pointer active:scale-[0.98]",
+                                                item.urgency === "HIGH"
+                                                    ? "border-red-200 bg-red-50 hover:border-red-300"
+                                                    : item.urgency === "MEDIUM"
+                                                        ? "border-amber-200 bg-amber-50 hover:border-amber-300"
+                                                        : "border-cream-200 bg-cream-100 hover:border-cream-300"
+                                            )}
+                                        >
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-sm mt-0.5">
+                                                    {item.reasonType === "OXIDATION" ? "🍷" :
+                                                        item.reasonType === "LOW_GLASSES" ? "🥂" :
+                                                            item.reasonType === "SLOW_MOVING" ? "🐌" : "⏰"}
+                                                </span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[11px] font-bold text-green-900 truncate">
+                                                        {item.productName}
+                                                    </p>
+                                                    <p className={cn(
+                                                        "text-[9px] font-medium",
+                                                        item.urgency === "HIGH" ? "text-red-600" :
+                                                            item.urgency === "MEDIUM" ? "text-amber-600" : "text-cream-500"
+                                                    )}>
+                                                        {item.reason}
+                                                    </p>
+                                                    <p className="text-[9px] text-cream-400 mt-0.5">
+                                                        {item.detail}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 mt-2">
+                                                <Badge className={cn(
+                                                    "text-[9px] px-1.5 py-0",
+                                                    item.urgency === "HIGH" ? "bg-red-100 text-red-700 border-red-200" :
+                                                        item.urgency === "MEDIUM" ? "bg-amber-100 text-amber-700 border-amber-200" :
+                                                            "bg-cream-200 text-cream-600 border-cream-300"
                                                 )}>
-                                                    {item.reason}
-                                                </p>
-                                                <p className="text-[9px] text-cream-400 mt-0.5">
-                                                    {item.detail}
-                                                </p>
+                                                    Giảm {item.suggestedDiscount}%
+                                                </Badge>
+                                                <span className="text-[9px] font-mono text-cream-400">
+                                                    ₫{formatPrice(Math.round(item.currentPrice * (1 - item.suggestedDiscount / 100)))}
+                                                </span>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        if (product) {
+                                                            cart.addItem(product)
+                                                            toast.success(`Đã thêm ${item.productName} vào giỏ`)
+                                                        }
+                                                    }}
+                                                    className="ml-auto rounded-md bg-green-700 px-2 py-0.5 text-[9px] font-bold text-white hover:bg-green-600 transition-all"
+                                                >
+                                                    + Giỏ
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        toast.info(`Áp dụng giảm ${item.suggestedDiscount}% cho ${item.productName} — cần PIN Manager`, {
+                                                            action: {
+                                                                label: "Duyệt",
+                                                                onClick: () => setDiscountModalOpen(true),
+                                                            },
+                                                        })
+                                                    }}
+                                                    className="rounded-md bg-wine-700 px-2 py-0.5 text-[9px] font-bold text-white hover:bg-wine-600 transition-all"
+                                                >
+                                                    Giảm giá
+                                                </button>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-1.5 mt-2">
-                                            <Badge className={cn(
-                                                "text-[9px] px-1.5 py-0",
-                                                item.urgency === "HIGH" ? "bg-red-100 text-red-700 border-red-200" :
-                                                    item.urgency === "MEDIUM" ? "bg-amber-100 text-amber-700 border-amber-200" :
-                                                        "bg-cream-200 text-cream-600 border-cream-300"
-                                            )}>
-                                                Giảm {item.suggestedDiscount}%
-                                            </Badge>
-                                            <span className="text-[9px] font-mono text-cream-400">
-                                                ₫{formatPrice(Math.round(item.currentPrice * (1 - item.suggestedDiscount / 100)))}
-                                            </span>
-                                            <button
-                                                onClick={() => {
-                                                    toast.info(`Áp dụng giảm ${item.suggestedDiscount}% cho ${item.productName} — cần PIN Manager`, {
-                                                        action: {
-                                                            label: "Duyệt",
-                                                            onClick: () => setDiscountModalOpen(true),
-                                                        },
-                                                    })
-                                                }}
-                                                className="ml-auto rounded-md bg-wine-700 px-2 py-0.5 text-[9px] font-bold text-white hover:bg-wine-600 transition-all"
-                                            >
-                                                Giảm giá
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
                     </div>
