@@ -218,7 +218,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
             {mainTab === "inventory" && (
                 <>
                     {stats && (
-                        <div className="grid grid-cols-6 gap-3">
+                        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                             <StatCard label="Tổng SKU" value={stats.totalItems} color="text-green-900" icon={Package} />
                             <StatCard label="Còn hàng" value={stats.inStock} color="text-green-600" icon={CheckCircle2} />
                             <StatCard label="Sắp hết" value={stats.lowStock} color="text-amber-600" icon={AlertTriangle} />
@@ -360,7 +360,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
             {mainTab === "npl" && (
                 <>
                     {nplStats && (
-                        <div className="grid grid-cols-7 gap-3">
+                        <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
                             <StatCard label="Tổng NPL" value={nplStats.totalItems} color="text-green-900" icon={Beaker} />
                             <StatCard label="Còn hàng" value={nplStats.inStock} color="text-green-600" icon={CheckCircle2} />
                             <StatCard label="Sắp hết" value={nplStats.lowStock} color="text-amber-600" icon={AlertTriangle} />
@@ -523,7 +523,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
             {mainTab === "ccdc" && (
                 <>
                     {eqStats && (
-                        <div className="grid grid-cols-6 gap-3">
+                        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                             <StatCard label="Tổng CCDC" value={eqStats.totalItems} color="text-green-900" icon={Wrench} />
                             <StatCard label="Đang dùng" value={eqStats.activeItems} color="text-green-600" icon={CheckCircle2} />
                             <StatCard label="Nguyên giá" value={`₫${fmtK(eqStats.totalOriginalValue)}`} color="text-blue-700" icon={Archive} />

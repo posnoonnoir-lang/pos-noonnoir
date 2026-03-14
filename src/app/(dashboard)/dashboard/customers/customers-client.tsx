@@ -137,7 +137,7 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
             {/* Stats */}
             {stats && (
                 <div className="space-y-3">
-                    <div className="grid grid-cols-6 gap-3">
+                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                         <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
                             <div className="flex items-center gap-1.5 mb-1"><Users className="h-3.5 w-3.5 text-cream-400" /><span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">Tổng KH</span></div>
                             <p className="font-mono text-xl font-bold text-green-900">{stats.totalCustomers}</p>
@@ -157,7 +157,7 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
                         </div>
                     </div>
                     {/* RFM Segments */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                         <div className="rounded-xl border border-green-200 bg-green-50 p-3.5 shadow-sm">
                             <div className="flex items-center gap-1.5 mb-1"><Activity className="h-3.5 w-3.5 text-green-600" /><span className="text-[10px] font-medium uppercase tracking-wider text-green-600">Active (≤30 ngày)</span></div>
                             <p className="font-mono text-xl font-bold text-green-700">{stats.segments?.active ?? 0}</p>
@@ -269,7 +269,7 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
                                     {loadingDetail ? (
                                         <div className="py-6 text-center text-sm text-cream-400">Đang tải chi tiết...</div>
                                     ) : expandedDetail ? (
-                                        <div className="grid grid-cols-3 gap-5">
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-5">
                                             {/* Left: Info + RFM */}
                                             <div className="space-y-3">
                                                 <div>

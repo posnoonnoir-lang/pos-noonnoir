@@ -363,7 +363,7 @@ export default function CategoriesClient({ initialCategories }: CategoriesClient
                             <Label className="text-sm font-medium text-green-900">
                                 Icon
                             </Label>
-                            <div className="grid grid-cols-6 gap-2">
+                            <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
                                 {CATEGORY_ICONS.map((icon) => (
                                     <button
                                         key={icon}

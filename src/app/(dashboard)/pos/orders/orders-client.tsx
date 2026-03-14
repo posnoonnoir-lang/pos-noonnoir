@@ -100,9 +100,9 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
     }
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden bg-cream-50">
+        <div className="flex h-[100dvh] flex-col overflow-hidden bg-cream-50">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-cream-300 bg-cream-100 px-5 py-3">
+            <div className="flex items-center justify-between border-b border-cream-300 bg-cream-100 px-3 lg:px-5 py-2.5 lg:py-3">
                 <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-100">
                         <ClipboardList className="h-5 w-5 text-green-700" />
@@ -131,7 +131,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-4 gap-3 px-5 py-3 border-b border-cream-200">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 px-3 lg:px-5 py-2.5 lg:py-3 border-b border-cream-200">
                 {[
                     { label: "Tổng đơn", value: stats.total, color: "text-green-900" },
                     { label: "Đang xử lý", value: stats.active, color: "text-amber-600" },
@@ -151,8 +151,8 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
             </div>
 
             {/* Filters */}
-            <div className="flex items-center gap-3 px-5 py-3 border-b border-cream-200">
-                <div className="relative flex-1 max-w-xs">
+            <div className="flex flex-col lg:flex-row gap-2 lg:gap-3 px-3 lg:px-5 py-2.5 lg:py-3 border-b border-cream-200">
+                <div className="relative flex-1 lg:max-w-xs">
                     <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cream-400" />
                     <Input
                         value={searchTerm}
@@ -161,7 +161,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
                         className="h-8 pl-8 text-xs border-cream-300"
                     />
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 overflow-x-auto scroll-hide-bar">
                     <button
                         onClick={() => setStatusFilter("ALL")}
                         className={cn(
@@ -193,7 +193,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
             </div>
 
             {/* Order List + Detail */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="relative flex flex-1 overflow-hidden">
                 {/* Order List */}
                 <div className="flex-1 overflow-y-auto">
                     {filteredOrders.length === 0 ? (
@@ -222,12 +222,12 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
                                         key={order.id}
                                         onClick={() => setSelectedOrder(isSelected ? null : order)}
                                         className={cn(
-                                            "flex w-full items-center gap-4 px-5 py-3 text-left transition-all hover:bg-cream-100",
+                                            "flex w-full items-center gap-2 lg:gap-4 px-3 lg:px-5 py-2.5 lg:py-3 text-left transition-all hover:bg-cream-100",
                                             isSelected && "bg-green-50 border-l-2 border-green-700"
                                         )}
                                     >
                                         {/* Order Number */}
-                                        <div className="min-w-[100px]">
+                                        <div className="min-w-[70px] lg:min-w-[100px]">
                                             <p className="font-mono text-xs font-bold text-green-900">
                                                 {order.orderNumber}
                                             </p>
@@ -242,7 +242,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
                                         </span>
 
                                         {/* Items count */}
-                                        <span className="text-[10px] text-cream-500 min-w-[50px]">
+                                        <span className="text-[10px] text-cream-500 min-w-[40px] hidden sm:inline">
                                             {order.items.length} món
                                         </span>
 
@@ -259,7 +259,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
 
                                         {/* Payment */}
                                         {PayIcon && (
-                                            <span className="flex items-center gap-1 text-[10px] text-cream-500">
+                                            <span className="hidden sm:flex items-center gap-1 text-[10px] text-cream-500">
                                                 <PayIcon className="h-3 w-3" />
                                                 {order.paymentMethod}
                                             </span>
@@ -271,7 +271,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
                                         </span>
 
                                         {/* Staff */}
-                                        <span className="text-[10px] text-cream-400 min-w-[60px] text-right">
+                                        <span className="hidden lg:inline text-[10px] text-cream-400 min-w-[60px] text-right">
                                             {order.staffName}
                                         </span>
                                     </button>
@@ -283,7 +283,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
 
                 {/* Detail Panel */}
                 {selectedOrder && (
-                    <div className="w-[380px] border-l border-cream-300 bg-cream-50 overflow-y-auto">
+                    <div className="absolute inset-0 lg:relative lg:inset-auto w-full lg:w-[380px] border-l-0 lg:border-l border-cream-300 bg-cream-50 overflow-y-auto z-20">
                         <div className="sticky top-0 bg-cream-50 border-b border-cream-200 px-5 py-3 flex items-center justify-between z-10">
                             <div>
                                 <p className="font-mono text-sm font-bold text-green-900">

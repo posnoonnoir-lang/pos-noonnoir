@@ -121,7 +121,7 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                 <StatCard label="Doanh thu" value={`₫${fmtK(financeSummary.totalRevenue)}`} sub={monthLabel} color="text-green-700" icon={TrendingUp} accent="bg-green-100" />
                 <StatCard label="Giá vốn (COGS)" value={`₫${fmtK(financeSummary.totalCOGS)}`} sub="Tính từ công thức" color="text-wine-700" icon={Package} accent="bg-wine-100" />
                 <StatCard label="Lợi nhuận gộp" value={`₫${fmtK(financeSummary.grossProfit)}`} sub={`GM: ${financeSummary.grossMargin}%`} color="text-green-600" icon={ArrowUpRight} accent="bg-green-100" />
@@ -155,7 +155,7 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
 
             {/* ═══════════ P&L OVERVIEW ═══════════ */}
             {tab === "overview" && (
-                <div className="grid grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
                     {/* P&L Statement */}
                     <div className="col-span-3 rounded-xl border border-cream-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">

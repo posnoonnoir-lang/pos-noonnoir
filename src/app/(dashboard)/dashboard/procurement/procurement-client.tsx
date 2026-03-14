@@ -232,7 +232,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
 
             {/* Stats */}
             {stats && (
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                     <StatCard label="Tổng PO" value={stats.totalPOs} color="text-green-900" icon={FileText} />
                     <StatCard label="Đang chờ" value={stats.pendingPOs} color="text-blue-600" icon={Clock} />
                     <StatCard label="Nháp" value={stats.draftPOs} color="text-cream-500" icon={FileText} />
@@ -285,7 +285,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
                         <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">
                             <Plus className="h-4 w-4" /> Tạo phiếu nhập hàng
                         </h3>
-                        <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4 mb-4">
                             <div>
                                 <label className="text-[10px] font-bold uppercase text-cream-400 mb-1 block">Nhà cung cấp *</label>
                                 <select
@@ -483,7 +483,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
                                             {/* Expanded Detail */}
                                             {isExpanded && (
                                                 <div className="border-t border-cream-200 bg-cream-50 px-5 py-4">
-                                                    <div className="grid grid-cols-3 gap-5">
+                                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-5">
                                                         {/* Items */}
                                                         <div className="col-span-2">
                                                             <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-2">Chi tiết sản phẩm</h4>
@@ -715,7 +715,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
                 <div className="space-y-4">
                     {/* Consignment Stats */}
                     {csmStats && (
-                        <div className="grid grid-cols-5 gap-3">
+                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                             <StatCard label="Tổng lô" value={csmStats.totalConsignments} color="text-green-900" icon={Handshake} />
                             <StatCard label="Lô đang hoạt động" value={csmStats.activeConsignments} color="text-blue-600" icon={Wine} />
                             <StatCard label="Tổng chai" value={csmStats.totalItems} color="text-cream-600" icon={Layers} />
@@ -773,7 +773,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
                                     {/* Expanded: Item List */}
                                     {isExpanded && (
                                         <div className="border-t border-cream-200 bg-cream-50 px-5 py-4">
-                                            <div className="grid grid-cols-3 gap-5">
+                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-5">
                                                 <div className="col-span-2">
                                                     <h4 className="text-[10px] font-bold uppercase text-cream-400 mb-2">Chi tiết chai ký gửi</h4>
                                                     <table className="w-full">
@@ -1063,7 +1063,7 @@ function CreatePOModal({ suppliers, staffName, onClose, onCreated }: { suppliers
 
                 <div className="p-6 space-y-5">
                     {/* Supplier + Date */}
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                         <div className="col-span-2">
                             <label className="text-[10px] font-bold uppercase tracking-wider text-cream-400 mb-1.5 block">Nhà cung cấp</label>
                             <select
@@ -1248,7 +1248,7 @@ function CreateSupplierModal({ onClose, onCreated }: { onClose: () => void; onCr
 
                 <div className="p-6 space-y-4">
                     {/* Name + Category */}
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                         <div className="col-span-2">
                             <label className={fieldLabel}>Tên nhà cung cấp *</label>
                             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Vang Đại Việt" className="h-9 text-xs border-cream-300" autoFocus />

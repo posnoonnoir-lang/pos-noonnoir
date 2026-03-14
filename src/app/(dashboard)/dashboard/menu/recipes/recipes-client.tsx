@@ -137,7 +137,7 @@ export default function RecipesClient({ initialRecipes, initialProducts, initial
             {/* Content */}
             <div className="p-6 space-y-5">
                 {/* Stats */}
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
                         <div className="flex items-center gap-1.5 mb-1.5">
                             <ChefHat className="h-3.5 w-3.5 text-cream-400" />
@@ -550,7 +550,7 @@ function CreateRecipeFlow({
                                         </option>
                                     ))}
                                 </select>
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                                     <div className="col-span-1">
                                         <label className="text-[10px] font-medium text-cream-400 mb-1 block">Số lượng</label>
                                         <input

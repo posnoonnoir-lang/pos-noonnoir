@@ -270,7 +270,7 @@ export default function WineGuideClient({ initial }: { initial: WineGuideInitial
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-5">
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-5">
                                         {/* Left: Serving Info */}
                                         <div className="space-y-3">
                                             <h4 className="text-[10px] font-bold uppercase text-cream-400">HƯỚNG DẪN PHỤC VỤ</h4>

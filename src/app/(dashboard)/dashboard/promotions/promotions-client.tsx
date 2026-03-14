@@ -117,7 +117,7 @@ export default function PromotionsClient({ initial }: { initial: PromotionsIniti
 
             {/* Stats */}
             {stats && (
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                     <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
                         <div className="flex items-center gap-1.5 mb-1"><Tag className="h-3.5 w-3.5 text-cream-400" /><span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">Tổng KM</span></div>
                         <p className="font-mono text-xl font-bold text-green-900">{stats.totalPromotions}</p>
@@ -334,7 +334,7 @@ function CreatePromoModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-[480px] max-h-[90vh] overflow-y-auto rounded-2xl border border-cream-200 bg-white shadow-2xl">
+            <div className="w-full max-w-[480px] max-h-[90vh] overflow-y-auto rounded-2xl border border-cream-200 bg-white shadow-2xl">
                 <div className="sticky top-0 flex items-center justify-between px-5 py-4 border-b border-cream-200 bg-white z-10">
                     <h2 className="text-lg font-bold text-green-900">➕ Tạo khuyến mãi mới</h2>
                     <button onClick={onClose} className="rounded-lg p-2 hover:bg-cream-100"><X className="h-4 w-4 text-cream-400" /></button>

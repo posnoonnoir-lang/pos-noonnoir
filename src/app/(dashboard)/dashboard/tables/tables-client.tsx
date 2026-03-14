@@ -185,7 +185,7 @@ export function TablesClient({ initialData }: { initialData: TablesPageData }) {
             </div>
 
             {/* Stats Bar */}
-            <div className="grid grid-cols-5 gap-3 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
                 {[
                     { label: "Tổng bàn", value: stats.total, icon: Armchair, color: "text-green-900", bg: "bg-cream-100" },
                     { label: "Trống", value: stats.available, icon: Check, color: "text-green-600", bg: "bg-green-50" },
@@ -286,7 +286,7 @@ export function TablesClient({ initialData }: { initialData: TablesPageData }) {
             )}
 
             {/* Table Grid */}
-            <div className="grid grid-cols-4 gap-4 xl:grid-cols-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 xl:grid-cols-6">
                 {tables.map((table) => {
                     const cfg = STATUS_CONFIG[table.status]
                     const isSelected = selectedTable?.id === table.id
@@ -520,7 +520,7 @@ function AddTableModal({ zones, onClose, onCreated }: { zones: TableZone[]; onCl
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-modal-backdrop">
-            <div className="w-[380px] rounded-2xl border border-cream-200 bg-white shadow-2xl animate-modal-content">
+            <div className="w-full max-w-[380px] rounded-2xl border border-cream-200 bg-white shadow-2xl animate-modal-content">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200">
                     <h2 className="text-lg font-bold text-green-900">➕ Thêm bàn mới</h2>
                     <button onClick={onClose} className="rounded-lg p-2 hover:bg-cream-100"><X className="h-4 w-4 text-cream-400" /></button>
@@ -587,7 +587,7 @@ function ZoneManagerModal({ zones, onClose, onChanged }: { zones: TableZone[]; o
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-modal-backdrop">
-            <div className="w-[360px] rounded-2xl border border-cream-200 bg-white shadow-2xl animate-modal-content">
+            <div className="w-full max-w-[360px] rounded-2xl border border-cream-200 bg-white shadow-2xl animate-modal-content">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200">
                     <h2 className="text-lg font-bold text-green-900">📍 Quản lý khu vực</h2>
                     <button onClick={onClose} className="rounded-lg p-2 hover:bg-cream-100"><X className="h-4 w-4 text-cream-400" /></button>

@@ -61,7 +61,7 @@ export default function FeedbackClient({ initial }: { initial: FeedbackData }) {
             </div>
 
             {/* Stats Summary */}
-            <div className="grid grid-cols-5 gap-3 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center">
                     <p className="text-[9px] font-bold uppercase text-amber-700">Tổng thể</p>
                     <p className="font-mono text-2xl font-bold text-amber-800">{stats.avgOverall}</p>

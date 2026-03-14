@@ -210,7 +210,7 @@ function OverviewTab({
     return (
         <div className="space-y-5">
             {/* KPI Row */}
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <KPICard icon={DollarSign} label="Doanh thu tháng" value={`₫${fmtK(summary.totalRevenue)}`} change={summary.revenueGrowth} color="green" />
                 <KPICard icon={ShoppingCart} label="Tổng đơn" value={String(summary.totalOrders)} change={summary.ordersGrowth} color="amber" />
                 <KPICard icon={TrendingUp} label="Giá trị TB/đơn" value={`₫${fmtK(summary.avgTicket)}`} color="blue" />
@@ -219,7 +219,7 @@ function OverviewTab({
             </div>
 
             {/* Charts Row 1: Revenue + Category Pie */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                 {/* Weekly Revenue Chart */}
                 <div className="col-span-2 rounded-xl border border-cream-200 bg-white shadow-sm p-5">
                     <h3 className="text-xs font-bold uppercase text-cream-400 mb-4 flex items-center gap-1.5">
@@ -276,7 +276,7 @@ function OverviewTab({
             </div>
 
             {/* Charts Row 2: Hourly + Payments + Top products */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                 {/* Hourly Line */}
                 <div className="rounded-xl border border-cream-200 bg-white shadow-sm p-5">
                     <h3 className="text-xs font-bold uppercase text-cream-400 mb-4 flex items-center gap-1.5">
@@ -374,7 +374,7 @@ function OverviewTab({
                     <h3 className="text-xs font-bold uppercase text-cream-400 mb-4 flex items-center gap-1.5">
                         <Users className="h-3.5 w-3.5" /> Bảng xếp hạng nhân viên (tháng này)
                     </h3>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                         {staff.slice(0, 3).map((s, i) => (
                             <div key={s.id} className={cn(
                                 "rounded-xl p-4 text-center",

@@ -111,15 +111,15 @@ export default function KitchenClient({ initialOrders }: KitchenClientProps) {
     const totalActive = pendingOrders.length + preparingOrders.length + readyOrders.length
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden bg-cream-100">
+        <div className="flex h-[100dvh] flex-col overflow-hidden bg-cream-100">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-cream-300 bg-cream-50 px-5 py-3">
+            <div className="flex items-center justify-between border-b border-cream-300 bg-cream-50 px-3 lg:px-5 py-2.5 lg:py-3">
                 <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-100">
                         <ChefHat className="h-5 w-5 text-orange-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-lg font-bold text-green-900">
+                        <h1 className="font-display text-base lg:text-lg font-bold text-green-900">
                             Kitchen Display
                         </h1>
                         <p className="text-[10px] text-cream-400">
@@ -168,9 +168,9 @@ export default function KitchenClient({ initialOrders }: KitchenClientProps) {
             </div>
 
             {/* 3-Column Kanban */}
-            <div className="flex flex-1 gap-4 overflow-hidden p-4">
+            <div className="flex flex-col lg:flex-row flex-1 gap-3 lg:gap-4 overflow-y-auto lg:overflow-hidden p-3 lg:p-4">
                 {/* PENDING Column */}
-                <div className="flex flex-1 flex-col rounded-xl border border-amber-200 bg-amber-50/30">
+                <div className="flex flex-1 flex-col rounded-xl border border-amber-200 bg-amber-50/30 min-h-[200px] lg:min-h-0">
                     <div className="flex items-center gap-2 border-b border-amber-200 px-4 py-3">
                         <AlertCircle className="h-4 w-4 text-amber-500" />
                         <span className="text-sm font-bold text-amber-800">Chờ xử lý</span>
@@ -193,7 +193,7 @@ export default function KitchenClient({ initialOrders }: KitchenClientProps) {
                 </div>
 
                 {/* PREPARING Column */}
-                <div className="flex flex-1 flex-col rounded-xl border border-orange-200 bg-orange-50/30">
+                <div className="flex flex-1 flex-col rounded-xl border border-orange-200 bg-orange-50/30 min-h-[200px] lg:min-h-0">
                     <div className="flex items-center gap-2 border-b border-orange-200 px-4 py-3">
                         <Flame className="h-4 w-4 text-orange-500" />
                         <span className="text-sm font-bold text-orange-800">Đang làm</span>
@@ -216,7 +216,7 @@ export default function KitchenClient({ initialOrders }: KitchenClientProps) {
                 </div>
 
                 {/* READY Column */}
-                <div className="flex flex-1 flex-col rounded-xl border border-green-200 bg-green-50/30">
+                <div className="flex flex-1 flex-col rounded-xl border border-green-200 bg-green-50/30 min-h-[200px] lg:min-h-0">
                     <div className="flex items-center gap-2 border-b border-green-200 px-4 py-3">
                         <Bell className="h-4 w-4 text-green-500" />
                         <span className="text-sm font-bold text-green-800">Sẵn sàng</span>
@@ -345,7 +345,7 @@ function OrderCard({
                 <button
                     onClick={() => onStatusChange(order.id, flow.next)}
                     className={cn(
-                        "w-full rounded-lg py-2 text-xs font-bold text-white transition-all active:scale-95",
+                        "w-full rounded-lg py-3 lg:py-2 text-sm lg:text-xs font-bold text-white transition-all active:scale-95 touch-target",
                         flow.color
                     )}
                 >

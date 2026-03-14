@@ -100,7 +100,7 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -108,7 +108,7 @@ export default function SettingsPage() {
                         <Settings className="h-5 w-5 text-green-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Cài đặt</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Cài đặt</h1>
                         <p className="text-sm text-cream-500">Tuỳ chỉnh hệ thống POS</p>
                     </div>
                 </div>
@@ -126,15 +126,15 @@ export default function SettingsPage() {
                 )}
             </div>
 
-            <div className="grid grid-cols-[220px,1fr] gap-6">
+            <div className="flex flex-col lg:grid lg:grid-cols-[220px,1fr] gap-4 lg:gap-6">
                 {/* Settings Nav — Grouped */}
-                <div className="space-y-4">
+                <div className="flex lg:flex-col gap-2 lg:gap-0 lg:space-y-4 overflow-x-auto scroll-hide-bar pb-2 lg:pb-0">
                     {NAV_GROUPS.map((group) => (
                         <div key={group.label}>
-                            <p className="mb-1.5 px-2 text-[9px] font-bold uppercase tracking-wider text-cream-400">
+                            <p className="hidden lg:block mb-1.5 px-2 text-[9px] font-bold uppercase tracking-wider text-cream-400">
                                 {group.label}
                             </p>
-                            <div className="space-y-0.5">
+                            <div className="flex lg:flex-col gap-1 lg:gap-0 lg:space-y-0.5">
                                 {group.items.map((item) => {
                                     const Icon = item.icon
                                     return (
@@ -142,10 +142,11 @@ export default function SettingsPage() {
                                             key={item.id}
                                             onClick={() => setActiveSection(item.id)}
                                             className={cn(
-                                                "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all",
+                                                "flex items-center gap-2 lg:gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition-all touch-target",
                                                 activeSection === item.id
                                                     ? "bg-green-900 text-cream-50"
-                                                    : "text-cream-500 hover:bg-cream-200"
+                                                    : "text-cream-500 hover:bg-cream-200",
+                                                "lg:w-full"
                                             )}
                                         >
                                             <Icon className="h-3.5 w-3.5" />
@@ -159,7 +160,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Settings Content */}
-                <div className="rounded-xl border border-cream-300 bg-cream-100 p-6">
+                <div className="rounded-xl border border-cream-300 bg-cream-100 p-4 lg:p-6">
                     {activeSection === "setup" && <SetupSettings />}
                     {activeSection === "store" && <StoreSettings />}
                     {activeSection === "tax" && <TaxSettings />}
@@ -596,7 +597,7 @@ function TaxReportView({
     return (
         <>
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-5">
                 <div className="rounded-lg bg-green-50 border border-green-200 p-3">
                     <p className="text-[10px] text-green-600 font-medium mb-0.5">Thuế đầu ra (Output)</p>
                     <p className="text-sm font-bold text-green-800">{formatVND(totalOutput)}</p>

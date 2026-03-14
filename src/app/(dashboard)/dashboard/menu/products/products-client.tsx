@@ -572,7 +572,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                             <div className="space-y-1.5">
                                 <Label>Loại <span className="text-red-500">*</span></Label>
                                 <select
@@ -616,7 +616,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                         {/* Pricing */}
                         <div className="rounded-lg border border-cream-300 bg-cream-100/50 p-4">
                             <h3 className="mb-3 text-sm font-semibold text-green-900">💰 Giá</h3>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                                 <div className="space-y-1.5">
                                     <Label>Giá vốn</Label>
                                     <Input
@@ -650,7 +650,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                         {isWineType && (
                             <div className="rounded-lg border border-wine-100 bg-wine-50 p-4">
                                 <h3 className="mb-3 text-sm font-semibold text-wine-700">🍷 Thông tin rượu</h3>
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                                     <div className="space-y-1.5">
                                         <Label>Vintage</Label>
                                         <Input
@@ -709,7 +709,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                                         />
                                     </div>
                                 </div>
-                                <div className="mt-3 grid grid-cols-3 gap-4">
+                                <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                                     <div className="space-y-1.5">
                                         <Label>Nhiệt độ phục vụ</Label>
                                         <Input
@@ -758,7 +758,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                                     </div>
 
                                     {form.isByGlass && (
-                                        <div className="grid grid-cols-3 gap-4 pt-2 border-t border-green-200">
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4 pt-2 border-t border-green-200">
                                             <div className="space-y-1.5">
                                                 <Label className="flex items-center gap-1">
                                                     <GlassWater className="h-3 w-3 text-green-700" /> Số ly / chai

@@ -198,7 +198,7 @@ export default function WasteClient({
         : 0
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -324,7 +324,7 @@ export default function WasteClient({
             </div>
 
             {/* By Type breakdown - horizontal mini cards */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                 {report.summary.byType.map((t) => {
                     const config = TYPE_CONFIG[t.type]
                     const pct = report.summary.totalCost > 0 ? Math.round((t.cost / report.summary.totalCost) * 100) : 0

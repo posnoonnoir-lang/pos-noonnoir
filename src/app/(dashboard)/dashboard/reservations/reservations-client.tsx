@@ -154,7 +154,7 @@ export function ReservationsClient({ initialData }: { initialData: ReservationsI
 
             {/* Stats */}
             {stats && isToday && (
-                <div className="grid grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                     <div className="rounded-xl border border-cream-200 bg-white p-3.5 shadow-sm">
                         <div className="flex items-center gap-1.5 mb-1"><CalendarDays className="h-3.5 w-3.5 text-cream-400" /><span className="text-[10px] font-medium uppercase tracking-wider text-cream-400">Hôm nay</span></div>
                         <p className="font-mono text-xl font-bold text-green-900">{stats.todayTotal}</p>
@@ -558,7 +558,7 @@ function AssignTableModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-[500px] max-h-[70vh] rounded-2xl border border-cream-200 bg-white shadow-2xl overflow-hidden">
+            <div className="w-full max-w-[500px] max-h-[70vh] rounded-2xl border border-cream-200 bg-white shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200">
                     <div>
                         <h2 className="text-lg font-bold text-green-900">🪑 Xếp bàn</h2>
@@ -584,7 +584,7 @@ function AssignTableModal({
                 </div>
 
                 {/* Tables */}
-                <div className="p-5 grid grid-cols-3 gap-3 max-h-[40vh] overflow-y-auto">
+                <div className="p-5 grid grid-cols-1 lg:grid-cols-3 gap-3 max-h-[40vh] overflow-y-auto">
                     {filteredTables.length > 0 ? filteredTables.map((t) => (
                         <button
                             key={t.id}

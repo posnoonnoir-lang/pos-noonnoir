@@ -399,7 +399,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
                 {[
                     { label: "Tổng nhân viên", value: stats.total, icon: Users, color: "text-green-900" },
                     { label: "Đang làm việc", value: stats.active, icon: UserCheck, color: "text-green-600" },
@@ -481,7 +481,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
                     </div>
 
                     {/* Staff Grid */}
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                         {filtered.map((staff) => {
                             const RoleIcon = ROLE_ICONS[staff.role as StaffRole]
                             const isSelected = selectedStaff?.id === staff.id
@@ -541,7 +541,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
                                     </div>
 
                                     {/* Stats */}
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                         <div className="rounded-lg bg-cream-50 px-2.5 py-1.5 text-center">
                                             <p className="font-mono text-xs font-bold text-green-900">{staff.totalOrders ?? 0}</p>
                                             <p className="text-[8px] text-cream-400">đơn hàng</p>
@@ -572,7 +572,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
 
             {/* ============ TAB: CHẤM CÔNG ============ */}
             {activeTab === "attendance" && (
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                     {/* Left — Attendance Grid */}
                     <div className="col-span-2">
                         <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-hidden">
@@ -735,7 +735,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
                                     </button>
                                 </div>
                                 <div className="p-4 space-y-3">
-                                    <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
                                         <div>
                                             <p className="font-mono text-lg font-bold text-green-700">{attSummary.present}</p>
                                             <p className="text-[8px] text-cream-400">Có mặt</p>
@@ -799,7 +799,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
 
                     {/* Summary KPIs */}
                     {payrollData && (
-                        <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4 mb-4">
                             <div className="rounded-xl border border-cream-300 bg-cream-100 p-4 text-center">
                                 <p className="font-mono text-2xl font-bold text-green-900">₫{formatCompact(payrollData.totalPayroll)}</p>
                                 <p className="text-[9px] text-cream-400">Tổng quỹ lương</p>

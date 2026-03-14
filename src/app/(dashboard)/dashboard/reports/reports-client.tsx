@@ -157,7 +157,7 @@ function DailyPnLView({ initialData }: { initialData: ReportsPnlData }) {
 
             {/* Comparison KPIs (only show for today) */}
             {isToday && (
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <StatCard
                         label="Doanh thu"
                         value={`₫${fmtK(summary.today.revenue)}`}
@@ -192,7 +192,7 @@ function DailyPnLView({ initialData }: { initialData: ReportsPnlData }) {
             )}
 
             {/* Main P&L waterfall */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                 {/* LEFT: P&L Breakdown */}
                 <div className="col-span-2 rounded-xl border border-cream-200 bg-white shadow-sm">
                     <div className="px-5 py-3.5 border-b border-cream-200">
@@ -338,7 +338,7 @@ function FinanceView({ initialData }: { initialData: ReportsFinanceData }) {
         <div className="space-y-5">
             {/* KPI Cards */}
             {financeSummary && cogsSummary && (
-                <div className="grid grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                     <FinanceStatCard label="Doanh thu" value={`₫${fmtK(financeSummary.totalRevenue ?? 0)}`} sub="Tháng này" color="text-green-700" icon={TrendingUp} accent="bg-green-100" />
                     <FinanceStatCard label="Giá vốn (COGS)" value={`₫${fmtK(financeSummary.totalCOGS ?? 0)}`} sub="FIFO method" color="text-wine-700" icon={Package} accent="bg-wine-100" />
                     <FinanceStatCard label="Lợi nhuận gộp" value={`₫${fmtK(financeSummary.grossProfit ?? 0)}`} sub={`GM: ${financeSummary.grossMargin ?? 0}%`} color="text-green-600" icon={ArrowUpRight} accent="bg-green-100" />
@@ -373,7 +373,7 @@ function FinanceView({ initialData }: { initialData: ReportsFinanceData }) {
 
             {/* ═══ P&L OVERVIEW ═══ */}
             {tab === "overview" && financeSummary && (
-                <div className="grid grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
                     {/* P&L Statement */}
                     <div className="col-span-3 rounded-xl border border-cream-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-bold text-green-900 mb-4 flex items-center gap-2">

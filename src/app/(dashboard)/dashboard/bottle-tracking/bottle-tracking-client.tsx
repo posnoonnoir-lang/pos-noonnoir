@@ -206,7 +206,7 @@ export function BottleTrackingClient({ initial }: { initial: BottleTrackingIniti
                                     </div>
 
                                     {/* Metrics */}
-                                    <div className="grid grid-cols-3 gap-2 border-t border-cream-200 pt-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-cream-200 pt-3">
                                         <div className="text-center">
                                             <p className="font-mono text-lg font-bold text-green-900">{bottle.glassesRemaining}</p>
                                             <p className="text-[9px] text-cream-500">ly còn lại</p>

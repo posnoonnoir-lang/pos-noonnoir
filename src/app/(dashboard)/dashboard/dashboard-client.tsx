@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import {
     Wine,
     ShoppingCart,
@@ -66,14 +66,14 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
     })()
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-6">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-4 lg:space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between animate-fade-in-up">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between animate-fade-in-up">
                 <div>
-                    <h1 className="font-display text-2xl font-bold text-green-900">
+                    <h1 className="font-display text-xl lg:text-2xl font-bold text-green-900">
                         {greeting}, {staff?.fullName?.split(" ").pop()} 👋
                     </h1>
-                    <p className="text-sm text-cream-500">
+                    <p className="text-xs lg:text-sm text-cream-500">
                         {new Date().toLocaleDateString("vi-VN", {
                             weekday: "long",
                             day: "numeric",
@@ -84,7 +84,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
                 </div>
                 <Link
                     href="/pos"
-                    className="flex items-center gap-2 rounded-xl bg-green-900 px-5 py-2.5 text-sm font-medium text-cream-50 btn-press hover:bg-green-800 hover:shadow-lg"
+                    className="hidden sm:flex items-center gap-2 rounded-xl bg-green-900 px-5 py-2.5 text-sm font-medium text-cream-50 btn-press hover:bg-green-800 hover:shadow-lg"
                 >
                     <Wine className="h-4 w-4" />
                     Mở POS
@@ -93,7 +93,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
 
             {/* KPI Cards */}
             {stats && (
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
                     <KPICard
                         icon={TrendingUp}
                         label="Doanh thu hôm nay"
@@ -128,9 +128,9 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
             )}
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Mini Revenue Chart */}
-                <div className="col-span-2 rounded-xl border border-cream-300 bg-cream-100 p-5">
+                <div className="lg:col-span-2 rounded-xl border border-cream-300 bg-cream-100 p-4 lg:p-5">
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="font-display text-sm font-bold text-green-900">
                             📈 Doanh thu 7 ngày
@@ -139,13 +139,13 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
                             Chi tiết <ExternalLink className="h-2.5 w-2.5" />
                         </Link>
                     </div>
-                    <div className="flex items-end gap-2 h-[140px]">
+                    <div className="flex items-end gap-1.5 lg:gap-2 h-[120px] lg:h-[140px]">
                         {weeklyRevenue.map((day, i) => {
                             const height = (day.revenue / maxRevenue) * 100
                             const isToday = i === weeklyRevenue.length - 1
                             return (
                                 <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
-                                    <span className="text-[8px] font-mono text-cream-500">{formatCompact(day.revenue)}</span>
+                                    <span className="text-[7px] lg:text-[8px] font-mono text-cream-500">{formatCompact(day.revenue)}</span>
                                     <div
                                         className={cn(
                                             "w-full rounded-t-lg transition-all",
@@ -155,7 +155,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
                                         )}
                                         style={{ height: `${height}%` }}
                                     />
-                                    <span className={cn("text-[10px]", isToday ? "font-bold text-wine-700" : "text-cream-500")}>
+                                    <span className={cn("text-[9px] lg:text-[10px]", isToday ? "font-bold text-wine-700" : "text-cream-500")}>
                                         {day.date}
                                     </span>
                                 </div>
@@ -165,7 +165,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
                 </div>
 
                 {/* Table Overview */}
-                <div className="rounded-xl border border-cream-300 bg-cream-100 p-5">
+                <div className="rounded-xl border border-cream-300 bg-cream-100 p-4 lg:p-5">
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="font-display text-sm font-bold text-green-900">🪑 Bàn</h3>
                         <Link href="/dashboard/tables" className="text-[10px] text-cream-400 hover:text-green-700 flex items-center gap-0.5 transition-all">
@@ -201,7 +201,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
             </div>
 
             {/* Recent Orders */}
-            <div className="rounded-xl border border-cream-300 bg-cream-100 p-5">
+            <div className="rounded-xl border border-cream-300 bg-cream-100 p-4 lg:p-5">
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="font-display text-sm font-bold text-green-900">
                         🍷 Đơn hàng gần đây
@@ -238,7 +238,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
                                 >
                                     <StatusIcon className={cn("h-4 w-4 shrink-0", statusColor)} />
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <span className="font-mono text-[10px] text-cream-400">{order.orderNumber}</span>
                                             <span className="rounded bg-green-900 px-1 py-0.5 text-[8px] font-bold text-cream-50">
                                                 {order.tableNumber ?? "TK"}
@@ -248,7 +248,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
                                             </span>
                                         </div>
                                     </div>
-                                    <span className="font-mono text-xs font-bold text-green-900">
+                                    <span className="font-mono text-xs font-bold text-green-900 shrink-0">
                                         ₫{formatPrice(order.total)}
                                     </span>
                                 </div>
@@ -259,7 +259,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
             </div>
 
             {/* Quick Links */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
                     { label: "POS Terminal", href: "/pos", icon: Wine, desc: "Bán hàng" },
                     { label: "Kitchen", href: "/pos/kitchen", icon: ChefHat, desc: "Xem bếp" },
@@ -307,14 +307,14 @@ function KPICard({
     }
     const c = colorMap[color]
     return (
-        <div className={cn("rounded-xl border p-4 card-hover", c.bg, c.border)}>
-            <div className="flex items-center justify-between mb-3">
-                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg icon-hover", c.icon)}>
-                    <Icon className="h-4 w-4" />
+        <div className={cn("rounded-xl border p-3 lg:p-4 card-hover", c.bg, c.border)}>
+            <div className="flex items-center justify-between mb-2 lg:mb-3">
+                <div className={cn("flex h-7 w-7 lg:h-8 lg:w-8 items-center justify-center rounded-lg icon-hover", c.icon)}>
+                    <Icon className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
                 </div>
                 {change !== undefined && (
                     <span className={cn(
-                        "flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                        "flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] lg:text-[10px] font-bold",
                         change >= 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                     )}>
                         {change >= 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
@@ -322,9 +322,9 @@ function KPICard({
                     </span>
                 )}
             </div>
-            <p className={cn("font-mono text-2xl font-bold", c.text)}>{value}</p>
-            <p className="text-[10px] text-cream-400 mt-0.5">{label}</p>
-            <p className="text-[9px] text-cream-400 mt-1">{subtext}</p>
+            <p className={cn("font-mono text-xl lg:text-2xl font-bold", c.text)}>{value}</p>
+            <p className="text-[9px] lg:text-[10px] text-cream-400 mt-0.5">{label}</p>
+            <p className="text-[8px] lg:text-[9px] text-cream-400 mt-1">{subtext}</p>
         </div>
     )
 }

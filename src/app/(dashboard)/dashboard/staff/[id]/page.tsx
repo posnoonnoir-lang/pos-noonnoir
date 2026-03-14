@@ -233,7 +233,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* ============ TAB: OVERVIEW ============ */}
             {activeTab === "overview" && (
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                     {/* Left — Attendance Summary */}
                     <div className="space-y-4">
                         <div className="rounded-xl border border-cream-300 bg-cream-100 p-5">
@@ -341,7 +341,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* ============ TAB: ATTENDANCE ============ */}
             {activeTab === "attendance" && (
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                     <div className="col-span-2">
                         <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-hidden">
                             <div className="px-5 py-3 border-b border-cream-200 bg-cream-50">
@@ -503,7 +503,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* ============ TAB: PERFORMANCE ============ */}
             {activeTab === "performance" && performance && (
-                <div className="grid grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
                     {[
                         { label: "Đơn hàng (30 ngày)", value: performance.totalOrders, color: "text-green-900" },
                         { label: "Doanh thu (30 ngày)", value: `₫${formatCompact(performance.totalRevenue)}`, color: "text-wine-700" },
