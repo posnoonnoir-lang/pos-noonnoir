@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { DM_Sans, Playfair_Display, Caveat, JetBrains_Mono } from "next/font/google"
 import { Toaster } from "sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -56,6 +56,14 @@ export const metadata: Metadata = {
   other: {
     "mobile-web-app-capable": "yes",
   },
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 }
 
 
