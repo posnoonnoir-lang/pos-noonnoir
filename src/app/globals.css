@@ -621,3 +621,13 @@ body {
     opacity: 1;
   }
 }
+
+/* Hide scrollbar but keep scrolling */
+.scroll-hide-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-hide-bar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
