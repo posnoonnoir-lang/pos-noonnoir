@@ -14,7 +14,7 @@ export default function DashboardChildLoading() {
             </div>
 
             {/* KPI row skeleton */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {[1, 2, 3, 4].map((i) => (
                     <div
                         key={i}
@@ -33,7 +33,7 @@ export default function DashboardChildLoading() {
 
             {/* Table skeleton with staggered rows */}
             <div
-                className="rounded-xl border border-cream-200 bg-cream-100 overflow-hidden"
+                className="rounded-xl border border-cream-200 bg-cream-100 overflow-x-auto"
                 style={{ animation: "fadeInUp 350ms var(--ease-out-expo) 300ms both" }}
             >
                 {/* Table header */}

@@ -993,7 +993,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
             {/* Assign Shift Modal */}
             {showAssignModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="w-[340px] rounded-xl bg-cream-50 p-6 shadow-2xl">
+                    <div className="w-full max-w-[340px] mx-4 rounded-xl bg-cream-50 p-6 shadow-2xl">
                         <h3 className="font-display text-lg font-bold text-green-900 mb-1">Gán ca làm</h3>
                         <p className="text-xs text-cream-500 mb-4">
                             {staffList.find((s) => s.id === showAssignModal.staffId)?.fullName} — {new Date(showAssignModal.date).toLocaleDateString("vi-VN")}
@@ -1029,8 +1029,8 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
 
             {/* Selected Staff Actions Panel */}
             {selectedStaff && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
-                    <div className="flex items-center gap-2 rounded-xl border border-cream-300 bg-cream-50 px-4 py-3 shadow-xl">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 w-[95vw] max-w-[700px]">
+                    <div className="flex items-center gap-2 rounded-xl border border-cream-300 bg-cream-50 px-4 py-3 shadow-xl flex-wrap">
                         <span className="text-xs font-bold text-green-900 mr-2">
                             {selectedStaff.fullName}
                         </span>
@@ -1093,7 +1093,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
             {/* PIN Reset Modal */}
             {showPinReset && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="w-[320px] rounded-xl bg-cream-50 p-6 shadow-2xl">
+                    <div className="w-full max-w-[320px] mx-4 rounded-xl bg-cream-50 p-6 shadow-2xl">
                         <h3 className="font-display text-lg font-bold text-green-900 mb-1">Đặt lại PIN</h3>
                         <p className="text-xs text-cream-500 mb-4">Nhập mã PIN mới (4 chữ số)</p>
                         <Input
@@ -1180,7 +1180,7 @@ function AddStaffModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="w-[420px] rounded-xl bg-cream-50 shadow-2xl">
+            <div className="w-full max-w-[420px] mx-4 rounded-xl bg-cream-50 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-cream-200 px-6 py-4">
                     <h3 className="font-display text-lg font-bold text-green-900">Thêm nhân viên</h3>
                     <button onClick={onClose} className="rounded-lg p-1 text-cream-400 hover:bg-cream-200">
@@ -1330,7 +1330,7 @@ function EditStaffModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="w-[420px] rounded-xl bg-cream-50 shadow-2xl">
+            <div className="w-full max-w-[420px] mx-4 rounded-xl bg-cream-50 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-cream-200 px-6 py-4">
                     <div>
                         <h3 className="font-display text-lg font-bold text-green-900">Chỉnh sửa nhân viên</h3>

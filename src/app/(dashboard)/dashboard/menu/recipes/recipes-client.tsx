@@ -301,28 +301,30 @@ function RecipeCard({ recipe, onEdit, onDeleted }: { recipe: Recipe; onEdit: () 
                     </div>
                 </div>
             </div>
-            <table className="w-full">
-                <thead>
-                    <tr>
-                        <th className={TH}>Nguyên liệu</th>
-                        <th className={cn(THR)} style={{ width: 90 }}>Số lượng</th>
-                        <th className={cn(THR)} style={{ width: 110 }}>Đơn giá</th>
-                        <th className={cn(THR)} style={{ width: 110 }}>Thành tiền</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {recipe.ingredients.map((ing, i) => (
-                        <tr key={i} className="hover:bg-green-50/30 transition-colors">
-                            <td className={TD}>
-                                <span className="font-medium">{ing.materialName}</span>
-                            </td>
-                            <td className={TDR}>{ing.quantity} {ing.unit}</td>
-                            <td className={TDR}>₫{fmt(Math.round(ing.costPerBaseUnit || ing.costPerUnit))}/{ing.baseUnit || ing.unit}</td>
-                            <td className={cn(TDR, "font-bold text-wine-700")}>₫{fmt(Math.round(ing.quantity * (ing.costPerBaseUnit || ing.costPerUnit)))}</td>
+            <div className="overflow-x-auto">
+                <table className="w-full">
+                    <thead>
+                        <tr>
+                            <th className={TH}>Nguyên liệu</th>
+                            <th className={cn(THR)} style={{ width: 90 }}>Số lượng</th>
+                            <th className={cn(THR)} style={{ width: 110 }}>Đơn giá</th>
+                            <th className={cn(THR)} style={{ width: 110 }}>Thành tiền</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {recipe.ingredients.map((ing, i) => (
+                            <tr key={i} className="hover:bg-green-50/30 transition-colors">
+                                <td className={TD}>
+                                    <span className="font-medium">{ing.materialName}</span>
+                                </td>
+                                <td className={TDR}>{ing.quantity} {ing.unit}</td>
+                                <td className={TDR}>₫{fmt(Math.round(ing.costPerBaseUnit || ing.costPerUnit))}/{ing.baseUnit || ing.unit}</td>
+                                <td className={cn(TDR, "font-bold text-wine-700")}>₫{fmt(Math.round(ing.quantity * (ing.costPerBaseUnit || ing.costPerUnit)))}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
             {recipe.notes && <p className="px-4 py-2 text-[10px] text-cream-400 italic border-t border-cream-100">📝 {recipe.notes}</p>}
         </div>
     )
