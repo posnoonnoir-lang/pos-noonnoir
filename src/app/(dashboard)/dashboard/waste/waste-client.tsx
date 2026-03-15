@@ -675,7 +675,7 @@ export default function WasteClient({
             {showForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                     <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-cream-200 p-6">
-                        <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center justify-between flex-wrap gap-2 mb-5">
                             <h2 className="font-display text-lg font-bold text-green-900">
                                 Ghi nhận Hao hụt
                             </h2>

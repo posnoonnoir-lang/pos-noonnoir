@@ -604,7 +604,7 @@ function ZonesTab({ zones, hourly }: { zones: ZoneHeatmap[]; hourly: HourlyHeatm
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {zones.map((zone) => (
                     <div key={zone.zoneId} className="rounded-xl border border-cream-200 bg-white shadow-sm p-5">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
                             <h3 className="font-display text-sm font-bold text-green-900">{zone.zoneName}</h3>
                             <div className="text-right">
                                 <p className="font-mono text-sm font-bold text-green-700">₫{fmtK(zone.totalRevenue)}</p>

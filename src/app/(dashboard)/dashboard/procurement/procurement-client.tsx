@@ -243,7 +243,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
 
             {/* Tabs + Filters */}
             <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5">
+                <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5 overflow-x-auto scroll-hide-bar">
                     {([
                         { key: "purchase" as TabType, label: "📥 Nhập hàng", count: purchaseReceipts.length },
                         { key: "orders" as TabType, label: "📦 Đơn nhập", count: orders.length },

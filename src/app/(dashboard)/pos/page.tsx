@@ -4382,7 +4382,7 @@ function WineGuidePopup({ onClose }: { onClose: () => void }) {
             >
                 {/* Header */}
                 <div className="bg-green-900 px-6 py-4 shrink-0">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
                         <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-800 border border-green-700">
                                 <BookOpen className="h-4 w-4 text-cream-200" />

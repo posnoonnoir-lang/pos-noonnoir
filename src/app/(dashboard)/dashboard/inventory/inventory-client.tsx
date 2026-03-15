@@ -230,7 +230,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
 
                     {/* Sub tabs + filters */}
                     <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5">
+                        <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5 overflow-x-auto scroll-hide-bar">
                             <button onClick={() => setSubTab("list")} className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-all", subTab === "list" ? "bg-green-900 text-cream-50" : "text-cream-500")}>Tồn kho</button>
                             <button onClick={() => setSubTab("movements")} className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-all", subTab === "movements" ? "bg-green-900 text-cream-50" : "text-cream-500")}>Lịch sử XNK</button>
                         </div>
@@ -372,7 +372,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
                     )}
 
                     <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5">
+                        <div className="flex gap-1 rounded-lg bg-cream-200 p-0.5 overflow-x-auto scroll-hide-bar">
                             <button onClick={() => setNplSubTab("materials")} className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-all", nplSubTab === "materials" ? "bg-green-900 text-cream-50" : "text-cream-500")}>🧪 Nguyên liệu</button>
                             <button onClick={() => setNplSubTab("recipes")} className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-all", nplSubTab === "recipes" ? "bg-green-900 text-cream-50" : "text-cream-500")}>🍳 Công thức ({recipes.length})</button>
                         </div>
@@ -449,7 +449,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
                         <div className="space-y-4">
                             {recipes.map((recipe) => (
                                 <div key={recipe.id} className="rounded-xl border border-cream-200 bg-white p-4 shadow-sm">
-                                    <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
                                         <div className="flex items-center gap-2">
                                             <CookingPot className="h-4 w-4 text-green-700" />
                                             <h3 className="text-sm font-bold text-green-900">{recipe.productName}</h3>

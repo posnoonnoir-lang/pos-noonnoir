@@ -276,7 +276,7 @@ export default function KpiClient({ initialEnabled, initialMetrics, initialOverv
                                         }}
                                         className="rounded-xl border border-cream-300 bg-cream-50 p-5 hover:border-green-400 hover:shadow-sm transition-all cursor-pointer"
                                     >
-                                        <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xl">{o.metric.icon}</span>
                                                 <div>

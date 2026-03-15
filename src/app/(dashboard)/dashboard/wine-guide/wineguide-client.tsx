@@ -233,7 +233,7 @@ export default function WineGuideClient({ initial }: { initial: WineGuideInitial
                             {isExpanded && (
                                 <div className="border-t border-cream-200 bg-cream-50 px-5 py-5">
                                     {/* Edit toggle button */}
-                                    <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
                                         <h3 className="text-xs font-bold text-green-900">
                                             {isEditing ? "📝 Đang chỉnh sửa Wine Guide" : "📋 Thông tin Wine Guide"}
                                         </h3>

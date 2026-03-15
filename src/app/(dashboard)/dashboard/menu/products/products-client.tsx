@@ -737,7 +737,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                                     </h4>
 
                                     {/* isByGlass toggle */}
-                                    <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
                                         <div>
                                             <Label className="text-sm font-semibold text-green-900">Cho phép bán theo ly</Label>
                                             <p className="text-[10px] text-cream-500 mt-0.5">Bật để nhân viên rót ly từ chai tại POS</p>

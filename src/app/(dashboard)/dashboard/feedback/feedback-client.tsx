@@ -38,7 +38,7 @@ export default function FeedbackClient({ initial }: { initial: FeedbackData }) {
     return (
         <div className="p-6 max-w-6xl">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
                 <div>
                     <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900 flex items-center gap-2">
                         <MessageCircle className="h-6 w-6 text-wine-600" />

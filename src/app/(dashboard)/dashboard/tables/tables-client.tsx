@@ -213,7 +213,7 @@ export function TablesClient({ initialData }: { initialData: TablesPageData }) {
             </div>
 
             {/* View Toggle + Zone Filter */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
                 <div className="flex items-center gap-1.5 overflow-x-auto">
                     <button
                         onClick={() => setSelectedZone("all")}

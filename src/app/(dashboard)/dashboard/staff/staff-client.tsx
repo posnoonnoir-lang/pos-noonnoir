@@ -368,7 +368,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
     return (
         <div className="min-h-screen bg-cream-50 p-4 lg:p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
                         <Users className="h-5 w-5 text-green-700" />
@@ -783,7 +783,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
             {/* ============ TAB: BẢNG LƯƠNG ============ */}
             {activeTab === "payroll" && (
                 <div>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
                         <h3 className="text-xs font-bold text-green-900 uppercase flex items-center gap-1.5">
                             <Wallet className="h-3.5 w-3.5" /> Bảng lương — {payrollData?.monthLabel ?? "..."}
                         </h3>
@@ -880,7 +880,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
             {activeTab === "schedule" && (
                 <div>
                     {/* Week navigation */}
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
                         <div className="flex items-center gap-2">
                             <button onClick={() => shiftWeek(-1)} className="rounded-lg p-1.5 hover:bg-cream-200 transition-all">
                                 <ChevronLeft className="h-4 w-4 text-cream-500" />

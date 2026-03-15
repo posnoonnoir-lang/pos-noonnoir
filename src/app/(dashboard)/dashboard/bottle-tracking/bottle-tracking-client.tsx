@@ -60,7 +60,7 @@ export function BottleTrackingClient({ initial }: { initial: BottleTrackingIniti
     return (
         <div className="min-h-screen bg-cream-50 p-4 lg:p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
                 <div>
                     <h1 className="text-2xl font-display font-bold text-green-900 flex items-center gap-3">
                         <Wine className="h-6 w-6 text-wine-600" />

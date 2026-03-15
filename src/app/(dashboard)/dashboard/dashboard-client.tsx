@@ -131,7 +131,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Mini Revenue Chart */}
                 <div className="lg:col-span-2 rounded-xl border border-cream-300 bg-cream-100 p-4 lg:p-5">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
                         <h3 className="font-display text-sm font-bold text-green-900">
                             📈 Doanh thu 7 ngày
                         </h3>
@@ -166,7 +166,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
 
                 {/* Table Overview */}
                 <div className="rounded-xl border border-cream-300 bg-cream-100 p-4 lg:p-5">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
                         <h3 className="font-display text-sm font-bold text-green-900">🪑 Bàn</h3>
                         <Link href="/dashboard/tables" className="text-[10px] text-cream-400 hover:text-green-700 flex items-center gap-0.5 transition-all">
                             Quản lý <ExternalLink className="h-2.5 w-2.5" />
@@ -202,7 +202,7 @@ export function DashboardClient({ initialData }: { initialData: DashboardData })
 
             {/* Recent Orders */}
             <div className="rounded-xl border border-cream-300 bg-cream-100 p-4 lg:p-5">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
                     <h3 className="font-display text-sm font-bold text-green-900">
                         🍷 Đơn hàng gần đây
                     </h3>

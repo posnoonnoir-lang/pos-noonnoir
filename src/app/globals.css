@@ -631,3 +631,25 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Touch-friendly tap targets (44px minimum per Apple/Google HIG) */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Mobile button spacing - prevent overlap */
+@media (max-width: 768px) {
+
+  button,
+  [role="button"],
+  a[href] {
+    min-height: 36px;
+  }
+
+  /* Ensure tab bar buttons don't shrink */
+  .overflow-x-auto button,
+  .overflow-x-auto a {
+    flex-shrink: 0;
+  }
+}

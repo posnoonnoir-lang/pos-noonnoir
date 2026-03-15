@@ -102,7 +102,7 @@ export default function SettingsPage() {
     return (
         <div className="min-h-screen bg-cream-50 p-4 lg:p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
                         <Settings className="h-5 w-5 text-green-700" />
@@ -499,7 +499,7 @@ function TaxRateFormModal({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="bg-cream-100 rounded-xl border border-cream-300 p-6 w-full max-w-md shadow-2xl">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
                     <h3 className="font-display text-sm font-bold text-green-900">
                         {rate ? "Chỉnh sửa thuế suất" : "Thêm thuế suất mới"}
                     </h3>
