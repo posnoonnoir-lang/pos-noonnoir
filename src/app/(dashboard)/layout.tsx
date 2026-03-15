@@ -319,7 +319,7 @@ export default function DashboardLayout({
     )
 
     return (
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen max-w-[100vw] overflow-x-hidden">
             {/* ============ MOBILE: Top Header Bar ============ */}
             {isMobile && !isFullScreenPOS && (
                 <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between border-b border-cream-300 bg-cream-100/95 px-4 py-2.5 backdrop-blur-sm safe-area-top">
@@ -444,7 +444,7 @@ export default function DashboardLayout({
             {/* ============ Main Content ============ */}
             <main
                 className={cn(
-                    "flex-1 min-h-screen bg-cream-50 transition-all duration-300 ease-out",
+                    "flex-1 min-h-screen bg-cream-50 transition-all duration-300 ease-out max-w-[100vw] overflow-x-hidden",
                     isMobile && !isFullScreenPOS && "pt-[52px] pb-mobile-nav",
                 )}
                 style={!isMobile ? { marginLeft: sidebarWidth } : undefined}

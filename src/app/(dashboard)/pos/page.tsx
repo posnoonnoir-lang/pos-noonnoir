@@ -1099,11 +1099,11 @@ export default function POSPage() {
     }
 
     return (
-        <div className="flex h-[100dvh] flex-col lg:flex-row overflow-hidden bg-cream-50">
+        <div className="flex h-[100dvh] w-full max-w-[100vw] flex-col lg:flex-row overflow-hidden bg-cream-50">
             {/* ============ LEFT: Product Grid ============ */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Top Bar */}
-                <div className="flex items-center gap-2 lg:gap-3 border-b border-cream-300 bg-cream-100 px-3 lg:px-4 py-2 lg:py-3 flex-wrap min-w-0">
+                <div className="flex items-center gap-1.5 lg:gap-3 border-b border-cream-300 bg-cream-100 px-2 lg:px-4 py-2 lg:py-3 min-w-0 w-full overflow-x-auto scroll-hide-bar">
                     {/* Mobile: Back to Dashboard */}
                     {isMobile && (
                         <a
