@@ -292,12 +292,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 13.0 |
+| **Version** | 14.0 |
 | **Created** | March 10, 2026 |
-| **Last Updated** | March 14, 2026 |
+| **Last Updated** | March 15, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **🎯 KPI System + Push Sale Fix** — multi-level KPI targets, push sale interactivity, menu SSR perf |
+| **Status** | **📱 Mobile First & Next.js Security** — Full audit 24 pages responsive, POS mobile drawer, Next.js Middleware auth, P0 security passing. |
 
 ---
 
@@ -339,7 +339,8 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-13 | **v11.2** | **⚡ Deep Perf + UX** — (1) **$transaction batching**: POS loader gom 8 Prisma queries → 1 `$transaction` (1 DB roundtrip thay 8). Wine queries + function calls chạy đồng thời — tất cả 3 nhóm parallel, 0 sequential wait. (2) **Vercel Singapore**: `vercel.json {"regions": ["sin1"]}` — cùng region với Supabase, giảm latency ~200ms→~5ms/roundtrip. (3) **Connection pool warm-up**: `pool.connect()` khi import Prisma — bỏ 500ms-1s cold start penalty. Pool max 3→10, idle timeout 10s→30s. (4) **Collapsible sidebar**: Dashboard sidebar 220px↔60px toggle thủ công bằng nút mũi tên. Icons giữ nguyên cả 2 trạng thái. Tooltip on hover khi collapsed. Animation 300ms ease-out. |
 | 2026-03-14 | **v12.0** | **🏗️ Layout Unification + Navigation Redesign** — (1) **Unified Layout**: Xoá `(pos)` route group riêng, merge vào `(dashboard)`. Toàn bộ app dùng 1 layout duy nhất với collapsible sidebar. (2) **Persistent Sidebar**: `useSidebarStore` (Zustand + localStorage) — sidebar state giữ nguyên khi chuyển trang, reload. (3) **Navigation Reorganize**: 6 nhóm nghiệp vụ (Tổng quan, Bán hàng, Kho & Nhập hàng, Sản phẩm & Rượu, Khách & Marketing, Nội bộ). Di chuyển Alerts/Forecast/Waste từ "V2" → "Kho & Nhập hàng". Thêm Finance (P&L) vào sidebar. (4) **Settings Redesign**: Nav phẳng 11 items → 3 nhóm (Cửa hàng, Thanh toán & Tài chính, Hệ thống & Giao diện). (5) **Kitchen Display Unified**: Xoá bản dark cũ, thống nhất Kanban 3-column. (6) **Dashboard Pages Enhanced**: Alerts, Forecast, Waste — full-width 2-column layout + analytics sidebar. **0 TS errors. Git pushed.** |
 | 2026-03-14 | **v13.0** | **🎯 KPI System + Push Sale + Menu Perf** — (1) **KPI Targets System**: Schema `KpiMetric` + `KpiTarget` (36 models). 6 default metrics (doanh thu, đơn, khách, TB/đơn, chai wine, ly wine). Owner set chỉ tiêu tháng → auto cascade chia tuần (÷4~5). Dashboard `/dashboard/kpi` 3 tabs: Tổng quan (progress cards + 6-month history charts), Đặt chỉ tiêu (bulk input + cascade), Quản lý chỉ số (add/toggle/delete custom KPIs). (2) **KPI Toggle**: On/off trong Settings → Vận hành POS, persist via `SystemSetting`. (3) **Push Sale Fix**: Items giờ clickable → add product trực tiếp vào cart. Thêm nút "+ Giỏ" xanh bên cạnh "Giảm giá". Cursor pointer + hover shadow + active scale feedback. (4) **Menu Page Speed**: Thay redirect `/dashboard/menu` → `/dashboard/menu/categories` bằng direct SSR render (bỏ extra server roundtrip). **Schema: 36 models. 0 TS errors. Git pushed.** |
+| 2026-03-15 | **v14.0** | **📱 Mobile First & Next.js Security** — (1) **Mobile Responsive Audit**: 24 server/client pages verified. Fixes: POS sidebar drawer (hamburger menu), POS viewport constraint (S22 Ultra), 6 fixed modals → fluid w-full max-w, 15 page toolbars wrapped correctly (flex-wrap gap-2). Tab bars horizontally scrollable, touch-target CSS (44px min). (2) **Security Audit**: P0 priority fix — Added `src/middleware.ts` for route protection (/pos, /dashboard). Added HTTP-only server cookies on PIN authentication `verifyStaffPin` and `logoutStaff` action to sync state across client/server. Chặn hoàn toàn unauthenticated users. (3) **Performance Check**: 48% client / 52% server ratio, zero heavy library bundle, strict build checked. **Build: 0 TS errors. Deployed.** |
 
 ---
 
-*Last updated: March 14, 2026 — KPI System + Push Sale + Menu Perf v13.0*
+*Last updated: March 15, 2026 — Mobile First & Next.js Security v14.0*
