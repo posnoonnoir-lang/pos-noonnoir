@@ -70,7 +70,7 @@ export function ReportsClient({
     const [mainTab, setMainTab] = useState<MainTab>("pnl")
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
@@ -78,7 +78,7 @@ export function ReportsClient({
                         <BarChart3 className="h-5 w-5 text-green-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Lãi Lỗ (P&L)</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Lãi Lỗ (P&L)</h1>
                         <p className="text-sm text-cream-500">Báo cáo lãi lỗ & phân tích tài chính</p>
                     </div>
                 </div>
@@ -289,7 +289,7 @@ function DailyPnLView({ initialData }: { initialData: ReportsPnlData }) {
                                         className={cn("w-full flex items-center gap-2 rounded-lg py-1 px-1.5 transition-all", selectedDay === i ? "bg-green-50 ring-1 ring-green-300" : "hover:bg-cream-50")}
                                     >
                                         <span className="text-[9px] w-14 text-left text-cream-500 font-medium">{dayLabel}</span>
-                                        <div className="flex-1 h-3 rounded-full bg-cream-100 overflow-hidden">
+                                        <div className="flex-1 h-3 rounded-full bg-cream-100 overflow-x-auto">
                                             <div
                                                 className={cn("h-full rounded-full transition-all", d.netProfit > 0 ? "bg-green-400" : "bg-red-400")}
                                                 style={{ width: `${pct}%` }}
@@ -498,7 +498,7 @@ function FinanceView({ initialData }: { initialData: ReportsFinanceData }) {
 
             {/* ═══ PRODUCT MARGIN ═══ */}
             {tab === "products" && (
-                <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                     {productCOGS.length === 0 ? (
                         <div className="text-center py-12 text-cream-400 text-sm">Chưa có dữ liệu biên lợi nhuận</div>
                     ) : (

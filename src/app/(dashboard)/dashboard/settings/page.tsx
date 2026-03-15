@@ -349,7 +349,7 @@ function TaxSettings() {
                         <>
                             {/* Tax Rates Table */}
                             <SettingGroup title="Bảng thuế suất">
-                                <div className="rounded-lg border border-cream-200 overflow-hidden">
+                                <div className="rounded-lg border border-cream-200 overflow-x-auto">
                                     <table className="w-full text-xs">
                                         <thead className="bg-cream-200/60">
                                             <tr>
@@ -628,7 +628,7 @@ function TaxReportView({
 
             {/* Breakdown by Tax Rate */}
             <SettingGroup title="Phân tích theo thuế suất">
-                <div className="rounded-lg border border-cream-200 overflow-hidden">
+                <div className="rounded-lg border border-cream-200 overflow-x-auto">
                     <table className="w-full text-xs">
                         <thead className="bg-cream-200/60">
                             <tr>
@@ -657,7 +657,7 @@ function TaxReportView({
 
             {/* Monthly Report */}
             <SettingGroup title="Báo cáo thuế theo tháng (2026)">
-                <div className="rounded-lg border border-cream-200 overflow-hidden max-h-[300px] overflow-y-auto">
+                <div className="rounded-lg border border-cream-200 overflow-x-auto max-h-[300px] overflow-y-auto">
                     <table className="w-full text-xs">
                         <thead className="bg-cream-200/60 sticky top-0">
                             <tr>
@@ -1116,7 +1116,7 @@ function HrSettings() {
             {activeTab === "shifts" && (
                 <>
                     <SettingGroup title="Định nghĩa ca làm việc">
-                        <div className="rounded-lg border border-cream-200 overflow-hidden">
+                        <div className="rounded-lg border border-cream-200 overflow-x-auto">
                             <table className="w-full text-xs">
                                 <thead className="bg-cream-200/60">
                                     <tr>
@@ -1578,7 +1578,7 @@ function HrSettings() {
             {/* ===== ROLES TAB ===== */}
             {activeTab === "roles" && (
                 <SettingGroup title="Vai trò & Thang lương">
-                    <div className="rounded-lg border border-cream-200 overflow-hidden">
+                    <div className="rounded-lg border border-cream-200 overflow-x-auto">
                         <table className="w-full text-xs">
                             <thead className="bg-cream-200/60">
                                 <tr>

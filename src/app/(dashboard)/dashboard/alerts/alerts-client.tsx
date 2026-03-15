@@ -162,7 +162,7 @@ export default function AlertsClient({ initial }: { initial: InventoryAlert[] })
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="font-display text-2xl font-bold text-green-900 flex items-center gap-2">
+                    <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900 flex items-center gap-2">
                         <AlertTriangle className="h-6 w-6 text-amber-600" />
                         Trung tâm Cảnh báo
                     </h1>

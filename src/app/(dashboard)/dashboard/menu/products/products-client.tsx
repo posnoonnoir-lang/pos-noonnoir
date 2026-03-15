@@ -253,7 +253,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                         <UtensilsCrossed className="h-5 w-5 text-green-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">
                             Menu & Sản phẩm
                         </h1>
                         <p className="text-sm text-cream-500">
@@ -336,7 +336,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                         </Button>
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-xl border border-cream-300 bg-cream-100">
+                    <div className="overflow-x-auto rounded-xl border border-cream-300 bg-cream-100">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-cream-300 bg-cream-200/50">

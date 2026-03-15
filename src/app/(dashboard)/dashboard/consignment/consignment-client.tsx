@@ -124,7 +124,7 @@ export function ConsignmentClient({ initial }: { initial: ConsignmentInitialData
 
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
@@ -132,7 +132,7 @@ export function ConsignmentClient({ initial }: { initial: ConsignmentInitialData
                         <Handshake className="h-5 w-5 text-teal-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Ký gửi (Consignment)</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Ký gửi (Consignment)</h1>
                         <p className="text-sm text-cream-500">Quản lý hàng ký gửi NCC, quyết toán hoa hồng</p>
                     </div>
                 </div>
@@ -189,7 +189,7 @@ export function ConsignmentClient({ initial }: { initial: ConsignmentInitialData
                         const soldPct = csm.totalItems > 0 ? Math.round((csm.soldItems / csm.totalItems) * 100) : 0
 
                         return (
-                            <div key={csm.id} className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition-all">
+                            <div key={csm.id} className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-x-auto hover:shadow-md transition-all">
                                 <div
                                     className={cn("flex items-center cursor-pointer px-5 py-4 gap-4", isExpanded && "bg-cream-50")}
                                     onClick={() => setExpandedId(isExpanded ? null : csm.id)}

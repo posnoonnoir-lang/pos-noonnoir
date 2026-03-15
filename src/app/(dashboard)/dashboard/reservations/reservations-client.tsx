@@ -135,7 +135,7 @@ export function ReservationsClient({ initialData }: { initialData: ReservationsI
     }
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
@@ -143,7 +143,7 @@ export function ReservationsClient({ initialData }: { initialData: ReservationsI
                         <CalendarDays className="h-5 w-5 text-blue-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Đặt bàn</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Đặt bàn</h1>
                         <p className="text-sm text-cream-500">Quản lý reservation, xếp bàn khách</p>
                     </div>
                 </div>

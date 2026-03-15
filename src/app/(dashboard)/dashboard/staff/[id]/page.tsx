@@ -143,7 +143,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
     ]
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6">
             {/* Back + Header */}
             <button
                 onClick={() => router.push("/dashboard/staff")}
@@ -162,7 +162,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
                     {/* Info */}
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-1">
-                            <h1 className="font-display text-2xl font-bold text-green-900">{staff.fullName}</h1>
+                            <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">{staff.fullName}</h1>
                             <span className={cn(
                                 "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-bold",
                                 ROLE_COLORS[staff.role]
@@ -343,7 +343,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
             {activeTab === "attendance" && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                     <div className="col-span-2">
-                        <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-hidden">
+                        <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-x-auto">
                             <div className="px-5 py-3 border-b border-cream-200 bg-cream-50">
                                 <h3 className="text-xs font-bold text-green-900 uppercase flex items-center gap-1.5">
                                     <CalendarDays className="h-3.5 w-3.5" /> Lịch sử chấm công
@@ -425,7 +425,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* ============ TAB: SHIFTS ============ */}
             {activeTab === "shifts" && (
-                <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-hidden">
+                <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-x-auto">
                     <div className="px-5 py-3 border-b border-cream-200 bg-cream-50">
                         <h3 className="text-xs font-bold text-green-900 uppercase flex items-center gap-1.5">
                             <Timer className="h-3.5 w-3.5" /> Lịch sử ca làm ({shifts.length} ca)
@@ -517,7 +517,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
                     ))}
 
                     {/* Daily breakdown table */}
-                    <div className="col-span-4 rounded-xl border border-cream-300 bg-cream-100 overflow-hidden">
+                    <div className="col-span-4 rounded-xl border border-cream-300 bg-cream-100 overflow-x-auto">
                         <div className="px-5 py-3 border-b border-cream-200 bg-cream-50">
                             <h3 className="text-xs font-bold text-green-900 uppercase flex items-center gap-1.5">
                                 <BarChart3 className="h-3.5 w-3.5" /> Chi tiết theo ngày

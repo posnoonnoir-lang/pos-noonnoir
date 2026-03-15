@@ -208,7 +208,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
     }
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
@@ -216,7 +216,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
                         <Truck className="h-5 w-5 text-blue-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Mua hàng</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Mua hàng</h1>
                         <p className="text-sm text-cream-500">Đơn hàng nhập, nhà cung cấp, phiếu nhận & FIFO</p>
                     </div>
                 </div>
@@ -388,7 +388,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
                     </div>
 
                     {/* Purchase History */}
-                    <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                    <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                         <div className="px-4 py-3 border-b border-cream-200 bg-cream-50">
                             <h3 className="text-xs font-bold text-green-900 uppercase tracking-wider">Lịch sử nhập hàng</h3>
                         </div>
@@ -436,7 +436,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
 
             {/* ═══════════ ORDERS TAB ═══════════ */}
             {tab === "orders" && (
-                <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                     <table className="w-full">
                         <thead>
                             <tr>
@@ -582,7 +582,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
                             <Plus className="mr-1 h-3.5 w-3.5" /> Thêm NCC
                         </Button>
                     </div>
-                    <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                    <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                         <table className="w-full">
                             <thead>
                                 <tr>
@@ -620,7 +620,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
 
             {/* ═══════════ RECEIPTS TAB ═══════════ */}
             {tab === "receipts" && (
-                <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                     <table className="w-full">
                         <thead>
                             <tr>
@@ -659,7 +659,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
 
             {/* ═══════════ FIFO BATCHES TAB ═══════════ */}
             {tab === "fifo" && (
-                <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                     <table className="w-full">
                         <thead>
                             <tr>
@@ -693,7 +693,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
                                         </td>
                                         <td className={TD}>
                                             <div className="flex items-center gap-1.5">
-                                                <div className="flex-1 h-1.5 rounded-full bg-cream-200 overflow-hidden">
+                                                <div className="flex-1 h-1.5 rounded-full bg-cream-200 overflow-x-auto">
                                                     <div className="h-full rounded-full bg-wine-400 transition-all" style={{ width: `${usedPct}%` }} />
                                                 </div>
                                                 <span className="text-[9px] text-cream-500 min-w-[28px] text-right">{Math.round(usedPct)}%</span>
@@ -888,7 +888,7 @@ export function ProcurementClient({ initial }: { initial: ProcurementInitialData
 
             {/* ═══════════ SETTLEMENT TAB ═══════════ */}
             {tab === "settlement" && (
-                <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                     <table className="w-full">
                         <thead>
                             <tr>
@@ -1090,7 +1090,7 @@ function CreatePOModal({ suppliers, staffName, onClose, onCreated }: { suppliers
                                 <Plus className="h-3 w-3" /> Thêm dòng
                             </button>
                         </div>
-                        <div className="rounded-lg border border-cream-200 overflow-hidden">
+                        <div className="rounded-lg border border-cream-200 overflow-x-auto">
                             <table className="w-full table-fixed">
                                 <colgroup>
                                     <col />

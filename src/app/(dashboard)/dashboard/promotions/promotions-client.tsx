@@ -97,7 +97,7 @@ export default function PromotionsClient({ initial }: { initial: PromotionsIniti
     }
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ export default function PromotionsClient({ initial }: { initial: PromotionsIniti
                         <Sparkles className="h-5 w-5 text-amber-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Khuyến mãi</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Khuyến mãi</h1>
                         <p className="text-sm text-cream-500">Happy Hour, combo deals, giảm giá tự động</p>
                     </div>
                 </div>
@@ -142,7 +142,7 @@ export default function PromotionsClient({ initial }: { initial: PromotionsIniti
             )}
 
             {/* Filter tabs */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
                 {(["ALL", "ACTIVE", "EXPIRED", "DISABLED"] as const).map((f) => (
                     <button
                         key={f}
@@ -161,7 +161,7 @@ export default function PromotionsClient({ initial }: { initial: PromotionsIniti
             </div>
 
             {/* Promotion Cards */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {filtered.map((promo) => {
                     const cfg = TYPE_CFG[promo.type]
                     const statusCfg = STATUS_CFG[promo.status]
@@ -350,7 +350,7 @@ function CreatePromoModal({ onClose, onCreated }: { onClose: () => void; onCreat
                     </div>
                     <div>
                         <label className="text-[10px] font-bold uppercase text-cream-400 mb-1 block">Loại CTKM</label>
-                        <div className="grid grid-cols-4 gap-1">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
                             {(["PERCENT_OFF", "FIXED_AMOUNT", "HAPPY_HOUR", "COMBO"] as const).map((t) => (
                                 <button key={t} onClick={() => setType(t)} className={cn("rounded-md py-2 text-[10px] font-medium border", type === t ? "bg-green-900 text-cream-50 border-green-900" : "border-cream-300 text-cream-500")}>
                                     {TYPE_CFG[t].label}

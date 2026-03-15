@@ -154,7 +154,7 @@ export function TablesClient({ initialData }: { initialData: TablesPageData }) {
                         <Armchair className="h-5 w-5 text-green-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Quản lý Bàn</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Quản lý Bàn</h1>
                         <p className="text-sm text-cream-500">Sơ đồ bàn & trạng thái real-time</p>
                     </div>
                 </div>
@@ -304,7 +304,7 @@ export function TablesClient({ initialData }: { initialData: TablesPageData }) {
                             )}
                         >
                             {/* Table number */}
-                            <span className="font-display text-2xl font-bold text-green-900">
+                            <span className="font-display text-lg lg:text-2xl font-bold text-green-900">
                                 {table.tableNumber}
                             </span>
 

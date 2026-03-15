@@ -121,7 +121,7 @@ export default function RecipesClient({ initialRecipes, initialProducts, initial
                         <CookingPot className="h-5 w-5 text-green-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">
                             Menu & Sản phẩm
                         </h1>
                         <p className="text-sm text-cream-500">

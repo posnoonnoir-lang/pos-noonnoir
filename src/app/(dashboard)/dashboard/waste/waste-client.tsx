@@ -202,7 +202,7 @@ export default function WasteClient({
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="font-display text-2xl font-bold text-green-900 flex items-center gap-2">
+                    <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900 flex items-center gap-2">
                         <Trash2 className="h-6 w-6 text-red-600" />
                         Quản lý Hao hụt & Hư hỏng
                     </h1>
@@ -234,7 +234,7 @@ export default function WasteClient({
 
             {/* Summary Cards - Full width 6-col */}
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                <div className="rounded-xl border border-red-200 bg-gradient-to-br from-red-50 to-red-100/50 px-4 py-4 relative overflow-hidden">
+                <div className="rounded-xl border border-red-200 bg-gradient-to-br from-red-50 to-red-100/50 px-4 py-4 relative overflow-x-auto">
                     <div className="absolute -right-3 -top-3 opacity-10">
                         <DollarSign className="h-14 w-14 text-red-600" />
                     </div>

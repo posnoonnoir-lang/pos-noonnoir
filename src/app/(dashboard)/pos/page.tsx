@@ -201,7 +201,7 @@ function TableSelector({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className={cn(
                 "max-h-[85vh] rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden transition-all",
-                viewingOrder ? "w-[840px] grid grid-cols-[1fr_320px]" : "w-[600px]"
+                viewingOrder ? "w-full max-w-[840px] lg:grid lg:grid-cols-[1fr_320px]" : "w-full max-w-[600px]"
             )}>
                 <div className="flex flex-col">
                     {/* Header */}
@@ -234,7 +234,7 @@ function TableSelector({
                     </div>
 
                     {/* Table grid */}
-                    <div className="grid grid-cols-4 gap-3 p-5 max-h-[50vh] overflow-y-auto">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-5 max-h-[50vh] overflow-y-auto">
                         {filteredTables.map((table) => {
                             const isViewing = viewingOrder?.table.id === table.id
                             return (
@@ -1809,7 +1809,7 @@ export default function POSPage() {
                         )}
 
                         {/* Payment Buttons */}
-                        <div className="grid grid-cols-3 gap-2 px-4 pb-2">
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 px-4 pb-2">
                             <button
                                 onClick={() => {
                                     if (cart.items.length === 0) { toast.error("Giỏ hàng trống"); return }
@@ -2212,7 +2212,7 @@ export default function POSPage() {
             {/* ============ QR Payment Modal ============ */}
             {qrModalOpen && qrPayment && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="w-[380px] rounded-2xl border border-cream-300 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="w-full max-w-[380px] rounded-2xl border border-cream-300 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         {/* Header */}
                         <div className="bg-green-900 text-cream-50 px-5 py-4 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -2371,7 +2371,7 @@ export default function POSPage() {
                             {/* Quick Denomination Buttons */}
                             <div>
                                 <p className="text-[10px] font-bold uppercase text-cream-400 mb-2">Chọn nhanh</p>
-                                <div className="grid grid-cols-5 gap-2">
+                                <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
                                     {[100000, 200000, 500000, 1000000, 2000000].map((amt) => (
                                         <button
                                             key={amt}
@@ -2888,7 +2888,7 @@ function OpenTabModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-[560px] max-h-[85vh] rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden flex flex-col">
+            <div className="w-full max-w-[560px] max-h-[85vh] rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-cream-300 px-5 py-4">
                     <div>
@@ -3159,7 +3159,7 @@ function TabDetailModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-[520px] max-h-[85vh] rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden flex flex-col">
+            <div className="w-full max-w-[520px] max-h-[85vh] rounded-2xl border border-cream-300 bg-cream-50 shadow-2xl overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-cream-300 px-5 py-4">
                     <div>
@@ -3241,7 +3241,7 @@ function TabDetailModal({
                 {tab.items.length > 0 && tab.status !== "CLOSED" && (
                     <div className="border-t border-cream-300 px-5 py-3">
                         <p className="text-[10px] font-semibold text-green-900 mb-2">Đóng tab & thanh toán</p>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                             <button
                                 onClick={() => handleCloseTab("CASH")}
                                 disabled={closing}
@@ -3460,7 +3460,7 @@ function ShiftModal({
                 {currentShift && !showClose && (
                     <div className="p-5 space-y-4">
                         {/* Stats grid */}
-                        <div className="grid grid-cols-3 gap-2.5">
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
                             <div className="rounded-lg border border-cream-200 bg-cream-50 p-3 text-center">
                                 <p className="text-[9px] font-bold uppercase text-cream-400 mb-0.5">Doanh thu</p>
                                 <p className="font-mono text-lg font-bold text-green-900">₫{fmt(currentShift.totalSales)}</p>
@@ -3486,7 +3486,7 @@ function ShiftModal({
                                         <span className="text-[8px] text-green-600 italic">{targetSuggestion.basedOn}</span>
                                     )}
                                 </div>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                                     <div>
                                         <p className="text-[8px] text-green-600 mb-0.5">Doanh thu</p>
                                         <Input
@@ -3646,7 +3646,7 @@ function ShiftModal({
                         {targetSuggestion && (
                             <div className="rounded-lg border border-green-200 bg-green-50 p-3 space-y-2">
                                 <p className="text-[9px] font-bold uppercase text-green-700">📊 TỔNG KẾT CHỈ TIÊU CA</p>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                                     {[
                                         { label: "Doanh thu", actual: currentShift.totalSales, target: parseInt(editRevTarget || "1") },
                                         { label: "Đơn hàng", actual: currentShift.orderCount, target: parseInt(editOrdTarget || "1") },
@@ -3832,7 +3832,7 @@ function DiscountAuthModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-[360px] rounded-2xl border border-cream-200 bg-white shadow-2xl overflow-hidden">
+            <div className="w-full max-w-[360px] rounded-2xl border border-cream-200 bg-white shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200">
                     <div>
                         <h2 className="text-lg font-bold text-green-900">🏷️ Giảm giá</h2>
@@ -3848,7 +3848,7 @@ function DiscountAuthModal({
                 {!needsPin ? (
                     <div className="p-5 space-y-4">
                         {/* Preset percentages */}
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                             {[5, 10, 15, 20].map((pct) => (
                                 <button
                                     key={pct}
@@ -4305,7 +4305,7 @@ function PayExistingOrderModal({
                 </div>
 
                 {/* Payment Buttons */}
-                <div className="grid grid-cols-3 gap-2 p-4 bg-cream-100 border-t border-cream-200">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 p-4 bg-cream-100 border-t border-cream-200">
                     <button
                         onClick={() => handlePay("CASH")}
                         disabled={paying}

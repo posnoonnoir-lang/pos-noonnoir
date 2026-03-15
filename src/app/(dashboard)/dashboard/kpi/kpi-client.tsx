@@ -167,7 +167,7 @@ export default function KpiClient({ initialEnabled, initialMetrics, initialOverv
                             <Target className="h-5 w-5 text-amber-700" />
                         </div>
                         <div>
-                            <h1 className="font-display text-2xl font-bold text-green-900">Chỉ tiêu KPI</h1>
+                            <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Chỉ tiêu KPI</h1>
                             <p className="text-sm text-cream-500">Quản lý chỉ tiêu doanh thu, đơn hàng, và các KPI khác</p>
                         </div>
                     </div>
@@ -199,7 +199,7 @@ export default function KpiClient({ initialEnabled, initialMetrics, initialOverv
                             <Target className="h-5 w-5 text-amber-700" />
                         </div>
                         <div>
-                            <h1 className="font-display text-2xl font-bold text-green-900">Chỉ tiêu KPI</h1>
+                            <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Chỉ tiêu KPI</h1>
                             <p className="text-sm text-cream-500">
                                 {MONTH_NAMES[month]} {year} · {metrics.length} chỉ số đang theo dõi
                             </p>

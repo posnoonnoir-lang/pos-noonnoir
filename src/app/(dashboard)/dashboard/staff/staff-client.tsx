@@ -366,7 +366,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
     }
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -374,7 +374,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
                         <Users className="h-5 w-5 text-green-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Nhân sự</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Nhân sự</h1>
                         <p className="text-sm text-cream-500">Quản lý nhân viên Noon & Noir</p>
                     </div>
                 </div>
@@ -575,7 +575,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                     {/* Left — Attendance Grid */}
                     <div className="col-span-2">
-                        <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-hidden">
+                        <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-x-auto">
                             <div className="flex items-center justify-between px-5 py-3 border-b border-cream-200 bg-cream-50">
                                 <h3 className="text-xs font-bold text-green-900 uppercase flex items-center gap-1.5">
                                     <CalendarDays className="h-3.5 w-3.5" />
@@ -905,7 +905,7 @@ export function StaffClient({ initialData }: { initialData: StaffInitialData }) 
                     </div>
 
                     {/* Schedule Grid */}
-                    <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-hidden">
+                    <div className="rounded-xl border border-cream-300 bg-cream-100 overflow-x-auto">
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs">
                                 <thead>

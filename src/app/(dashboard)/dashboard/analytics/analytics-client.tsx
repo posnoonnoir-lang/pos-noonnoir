@@ -123,13 +123,13 @@ export function AnalyticsClient({ initialData }: { initialData: AnalyticsInitial
         <div className="min-h-screen bg-cream-50">
             {/* Header */}
             <div className="border-b border-cream-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-                <div className="px-6 py-4 flex items-center justify-between">
+                <div className="px-4 lg:px-6 py-3 lg:py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-600 to-green-800 shadow-md">
                             <BarChart3 className="h-5 w-5 text-cream-50" />
                         </div>
                         <div>
-                            <h1 className="font-display text-2xl font-bold text-green-900">Phân tích</h1>
+                            <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Phân tích</h1>
                             <p className="text-xs text-cream-400 flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
                                 Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}
@@ -153,13 +153,13 @@ export function AnalyticsClient({ initialData }: { initialData: AnalyticsInitial
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 px-6 pb-0">
+                <div className="flex gap-1 px-4 lg:px-6 pb-0 overflow-x-auto scroll-hide-bar">
                     {TABS.map(({ id, label, icon: Icon }) => (
                         <button
                             key={id}
                             onClick={() => setActiveTab(id)}
                             className={cn(
-                                "flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium rounded-t-lg border-b-2 transition-all",
+                                "flex items-center gap-1.5 px-3 lg:px-4 py-2.5 text-xs font-medium rounded-t-lg border-b-2 transition-all whitespace-nowrap",
                                 activeTab === id
                                     ? "border-green-700 text-green-900 bg-cream-50"
                                     : "border-transparent text-cream-400 hover:text-green-700 hover:bg-cream-50/50"
@@ -172,7 +172,7 @@ export function AnalyticsClient({ initialData }: { initialData: AnalyticsInitial
             </div>
 
             {/* Content */}
-            <div className="p-6">
+            <div className="p-4 lg:p-6">
                 {activeTab === "overview" && (
                     <OverviewTab
                         summary={summary} monthly={monthly} categories={categories}
@@ -436,7 +436,7 @@ function RevenueTab({
                 </ResponsiveContainer>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Weekly Bar */}
                 <div className="rounded-xl border border-cream-200 bg-white shadow-sm p-5">
                     <h3 className="text-xs font-bold uppercase text-cream-400 mb-4">Doanh thu 7 ngày</h3>
@@ -474,7 +474,7 @@ function RevenueTab({
             </div>
 
             {/* Monthly Table */}
-            <div className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-x-auto">
                 <div className="px-5 py-3.5 bg-green-900">
                     <h3 className="text-xs font-bold uppercase text-cream-100">Chi tiết doanh thu 6 tháng</h3>
                 </div>
@@ -522,7 +522,7 @@ function ProductsTab({
                 </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Category Bar Chart */}
                 <div className="rounded-xl border border-cream-200 bg-white shadow-sm p-5">
                     <h3 className="text-xs font-bold uppercase text-cream-400 mb-4">Doanh thu theo danh mục</h3>
@@ -557,7 +557,7 @@ function ProductsTab({
             </div>
 
             {/* Products Table */}
-            <div className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-x-auto">
                 <div className="px-5 py-3.5 bg-green-900">
                     <h3 className="text-xs font-bold uppercase text-cream-100">Top sản phẩm bán chạy (hôm nay)</h3>
                 </div>
@@ -601,7 +601,7 @@ function ZonesTab({ zones, hourly }: { zones: ZoneHeatmap[]; hourly: HourlyHeatm
             <h2 className="font-display text-lg font-bold text-green-900">📍 Phân tích khu vực & thời gian</h2>
 
             {/* Zone Cards with Table Heatmap */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {zones.map((zone) => (
                     <div key={zone.zoneId} className="rounded-xl border border-cream-200 bg-white shadow-sm p-5">
                         <div className="flex items-center justify-between mb-4">
@@ -611,7 +611,7 @@ function ZonesTab({ zones, hourly }: { zones: ZoneHeatmap[]; hourly: HourlyHeatm
                                 <p className="text-[9px] text-cream-400">{zone.totalOrders} đơn</p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                             {zone.tables.map((table) => (
                                 <div
                                     key={table.tableId}
@@ -693,7 +693,7 @@ function StaffTab({ staff, onExport }: { staff: StaffLeaderboard[]; onExport: (t
 
             {/* Podium */}
             {staff.length >= 3 && (
-                <div className="flex justify-center items-end gap-4 py-4">
+                <div className="flex flex-col lg:flex-row justify-center items-center lg:items-end gap-4 py-4">
                     {/* 2nd place */}
                     <div className="text-center w-40">
                         <div className="rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-5">
@@ -743,7 +743,7 @@ function StaffTab({ staff, onExport }: { staff: StaffLeaderboard[]; onExport: (t
             )}
 
             {/* Full Table */}
-            <div className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-cream-200 bg-white shadow-sm overflow-x-auto">
                 <div className="px-5 py-3.5 bg-green-900">
                     <h3 className="text-xs font-bold uppercase text-cream-100">Bảng xếp hạng đầy đủ</h3>
                 </div>

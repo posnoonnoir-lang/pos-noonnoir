@@ -175,7 +175,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
     )
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-5">
             {/* ── Header ── */}
             <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
@@ -183,7 +183,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
                         <Package className="h-5 w-5 text-green-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Kho hàng</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Kho hàng</h1>
                         <p className="text-sm text-cream-500">Hàng bán, Nguyên liệu & Công cụ dụng cụ</p>
                     </div>
                 </div>
@@ -250,7 +250,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
                     </div>
 
                     {subTab === "list" ? (
-                        <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                        <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                             <table className="w-full">
                                 <thead>
                                     <tr>
@@ -287,7 +287,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
                                                 </td>
                                                 <td className={cn(TDC, "text-[11px] text-cream-500")}>{item.minStock} / {item.maxStock}</td>
                                                 <td className={TD}>
-                                                    <div className="h-1.5 w-full rounded-full bg-cream-200 overflow-hidden">
+                                                    <div className="h-1.5 w-full rounded-full bg-cream-200 overflow-x-auto">
                                                         <div className={cn("h-full rounded-full transition-all", item.status === "OUT_OF_STOCK" ? "bg-red-400" : item.status === "LOW_STOCK" ? "bg-amber-400" : "bg-green-500")} style={{ width: `${stockPct}%` }} />
                                                     </div>
                                                 </td>
@@ -427,7 +427,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
                                                 </td>
                                                 <td className={cn(TDC, "text-[11px] text-cream-500")}>{mat.minStock}</td>
                                                 <td className={TD}>
-                                                    <div className="h-1.5 w-full rounded-full bg-cream-200 overflow-hidden">
+                                                    <div className="h-1.5 w-full rounded-full bg-cream-200 overflow-x-auto">
                                                         <div className={cn("h-full rounded-full", mat.status === "OUT_OF_STOCK" ? "bg-red-400" : mat.status === "LOW_STOCK" ? "bg-amber-400" : "bg-green-500")} style={{ width: `${stockPct}%` }} />
                                                     </div>
                                                 </td>
@@ -575,7 +575,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
                     </div>
 
                     {ccdcSubTab === "list" ? (
-                        <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                        <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                             <table className="w-full">
                                 <thead>
                                     <tr>
@@ -604,7 +604,7 @@ export function InventoryClient({ initialData }: { initialData: InventoryInitial
                                                 <td className={TDR}>₫{fmtK(eq.totalValue)}</td>
                                                 <td className={TD}>
                                                     <div className="flex items-center gap-2">
-                                                        <div className="flex-1 h-1.5 rounded-full bg-cream-200 overflow-hidden">
+                                                        <div className="flex-1 h-1.5 rounded-full bg-cream-200 overflow-x-auto">
                                                             <div className="h-full rounded-full bg-wine-400 transition-all" style={{ width: `${depPct}%` }} />
                                                         </div>
                                                         <span className="font-mono text-[10px] text-wine-600 min-w-[48px] text-right">₫{fmtK(eq.accumulatedDepreciation)}</span>

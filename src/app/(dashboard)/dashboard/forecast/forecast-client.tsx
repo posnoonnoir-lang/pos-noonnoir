@@ -137,7 +137,7 @@ export default function ForecastClient({ initial }: { initial: ForecastInitialDa
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="font-display text-2xl font-bold text-green-900 flex items-center gap-2">
+                    <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900 flex items-center gap-2">
                         <TrendingUp className="h-6 w-6 text-green-700" />
                         Dự báo Đặt hàng
                     </h1>
@@ -170,7 +170,7 @@ export default function ForecastClient({ initial }: { initial: ForecastInitialDa
             {/* Summary Cards - Full width */}
             {summary && (
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                    <div className="rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-green-100/50 px-5 py-4 relative overflow-hidden">
+                    <div className="rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-green-100/50 px-5 py-4 relative overflow-x-auto">
                         <div className="absolute -right-3 -top-3 opacity-10">
                             <Package className="h-16 w-16 text-green-600" />
                         </div>

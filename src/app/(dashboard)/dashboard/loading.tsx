@@ -1,6 +1,6 @@
 export default function DashboardChildLoading() {
     return (
-        <div className="min-h-screen bg-cream-50 p-6 animate-fade-in">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 animate-fade-in">
             {/* Header skeleton with shimmer */}
             <div className="flex items-center justify-between mb-6">
                 <div className="space-y-2">

@@ -4,7 +4,7 @@ export default function DashboardLayoutLoading() {
     return (
         <div className="flex min-h-screen">
             {/* Sidebar skeleton */}
-            <aside className="fixed left-0 top-0 z-40 flex h-screen w-[220px] flex-col bg-green-900 animate-fade-in">
+            <aside className="hidden lg:flex fixed left-0 top-0 z-40 h-screen w-[220px] flex-col bg-green-900 animate-fade-in">
                 {/* Logo */}
                 <div className="flex items-center gap-3 px-4 py-5 border-b border-green-800">
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-800">
@@ -32,7 +32,7 @@ export default function DashboardLayoutLoading() {
             </aside>
 
             {/* Content skeleton */}
-            <main className="ml-[220px] flex-1 min-h-screen bg-cream-50 flex items-center justify-center">
+            <main className="lg:ml-[220px] flex-1 min-h-screen bg-cream-50 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
                     <Loader2 className="h-6 w-6 animate-spin text-green-600" />
                     <span className="text-xs text-cream-400 animate-pulse">Đang tải...</span>

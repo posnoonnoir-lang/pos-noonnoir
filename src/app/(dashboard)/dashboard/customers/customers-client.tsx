@@ -117,7 +117,7 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
         : customers.filter((c) => c.tier === tierFilter)
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
@@ -125,7 +125,7 @@ export function CustomersClient({ initialData }: { initialData: CustomersInitial
                         <Users className="h-5 w-5 text-amber-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Khách hàng & CRM</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Khách hàng & CRM</h1>
                         <p className="text-sm text-cream-500">Quản lý profile, loyalty, sở thích rượu</p>
                     </div>
                 </div>

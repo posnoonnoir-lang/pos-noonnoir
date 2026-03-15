@@ -58,7 +58,7 @@ export function BottleTrackingClient({ initial }: { initial: BottleTrackingIniti
     }, [refresh])
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
@@ -179,7 +179,7 @@ export function BottleTrackingClient({ initial }: { initial: BottleTrackingIniti
                                                 {bottle.glassesPoured}/{bottle.glassesTotal}
                                             </span>
                                         </div>
-                                        <div className="h-2.5 rounded-full bg-cream-200 overflow-hidden">
+                                        <div className="h-2.5 rounded-full bg-cream-200 overflow-x-auto">
                                             <div className="h-full rounded-full bg-wine-600 transition-all" style={{ width: `${glassRatio}%` }} />
                                         </div>
                                     </div>

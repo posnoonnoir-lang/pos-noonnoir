@@ -139,7 +139,7 @@ export default function WineGuideClient({ initial }: { initial: WineGuideInitial
 
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -147,7 +147,7 @@ export default function WineGuideClient({ initial }: { initial: WineGuideInitial
                         <Wine className="h-5 w-5 text-wine-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Wine Guide Setup</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Wine Guide Setup</h1>
                         <p className="text-sm text-cream-500">Quản lý hướng dẫn phục vụ, tasting notes, food pairing cho nhân viên</p>
                     </div>
                 </div>

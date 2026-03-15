@@ -103,7 +103,7 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
     const monthLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`
 
     return (
-        <div className="min-h-screen bg-cream-50 p-6 space-y-5">
+        <div className="min-h-screen bg-cream-50 p-4 lg:p-6 space-y-5">
             {/* Header */}
             <div className="flex items-center justify-between animate-fade-in-up">
                 <div className="flex items-center gap-3">
@@ -111,7 +111,7 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
                         <DollarSign className="h-5 w-5 text-wine-700" />
                     </div>
                     <div>
-                        <h1 className="font-display text-2xl font-bold text-green-900">Tài chính</h1>
+                        <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Tài chính</h1>
                         <p className="text-sm text-cream-500">Giá vốn COGS, P&L & phân tích biên lợi nhuận — dữ liệu thực</p>
                     </div>
                 </div>
@@ -281,7 +281,7 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
                                             <span className="text-[10px] text-cream-500 truncate max-w-[160px]">{exp.category}</span>
                                             <span className="font-mono text-[10px] font-bold text-cream-600">₫{fmtK(exp.amount)} ({exp.percentage}%)</span>
                                         </div>
-                                        <div className="h-2 rounded-full bg-cream-200 overflow-hidden">
+                                        <div className="h-2 rounded-full bg-cream-200 overflow-x-auto">
                                             <div className="h-full rounded-full transition-all" style={{ width: `${exp.percentage}%`, backgroundColor: exp.color }} />
                                         </div>
                                     </div>
@@ -394,7 +394,7 @@ export function FinanceClient({ initial }: { initial: FinanceInitialData }) {
 
             {/* ═══════════ PRODUCT MARGIN ═══════════ */}
             {tab === "products" && (
-                <div className="rounded-xl border border-cream-200 bg-white overflow-hidden shadow-sm">
+                <div className="rounded-xl border border-cream-200 bg-white overflow-x-auto shadow-sm">
                     {productCOGS.length > 0 ? (
                         <table className="w-full">
                             <thead>
