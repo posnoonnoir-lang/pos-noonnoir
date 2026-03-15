@@ -431,7 +431,7 @@ export default function POSPage() {
     const [foodPairingProduct, setFoodPairingProduct] = useState<Product | null>(null)
 
     // V2: Push Sale sidebar
-    const [pushSidebarOpen, setPushSidebarOpen] = useState(true)
+    const [pushSidebarOpen, setPushSidebarOpen] = useState(false)
     const [pushSaleItems, setPushSaleItems] = useState<PushSaleItem[]>([])
 
     // Products & Categories from DB
@@ -1136,7 +1136,7 @@ export default function POSPage() {
 
                     {/* Payment mode indicator */}
                     <div className={cn(
-                        "rounded-md px-2 py-1 text-[9px] font-bold",
+                        "hidden sm:block rounded-md px-2 py-1 text-[9px] font-bold",
                         paymentMode === "PAY_FIRST"
                             ? "bg-amber-100 text-amber-700 border border-amber-200"
                             : "bg-green-50 text-green-600 border border-green-200"
@@ -1149,7 +1149,7 @@ export default function POSPage() {
                         <button
                             onClick={() => setTableModalOpen(true)}
                             className={cn(
-                                "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
+                                "flex items-center gap-1.5 lg:gap-2 rounded-lg border px-2 lg:px-3 py-1.5 text-xs font-medium transition-all",
                                 cart.selectedTable
                                     ? "border-green-600 bg-green-50 text-green-900"
                                     : "border-cream-400 bg-cream-200 text-cream-500 animate-pulse"
@@ -1159,7 +1159,7 @@ export default function POSPage() {
                             {cart.selectedTable ? (
                                 <>
                                     {cart.selectedTable.tableNumber}
-                                    <span className="text-cream-500">· {cart.selectedTable.seats} chỗ</span>
+                                    <span className="hidden lg:inline text-cream-500">· {cart.selectedTable.seats} chỗ</span>
                                 </>
                             ) : (
                                 "Chọn bàn..."
@@ -1171,7 +1171,7 @@ export default function POSPage() {
                     <button
                         onClick={() => setOpenTabModal(true)}
                         className={cn(
-                            "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
+                            "hidden lg:flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
                             activeTabs.length > 0
                                 ? "border-amber-500 bg-amber-50 text-amber-800"
                                 : "border-cream-300 bg-cream-50 text-cream-500 hover:border-green-600 hover:text-green-700"
@@ -1206,7 +1206,7 @@ export default function POSPage() {
                     <button
                         onClick={() => setShiftModalOpen(true)}
                         className={cn(
-                            "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all",
+                            "hidden sm:flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all",
                             currentShift
                                 ? "border-green-600 bg-green-50 text-green-800"
                                 : "border-red-300 bg-red-50 text-red-700 animate-pulse"
@@ -1224,7 +1224,7 @@ export default function POSPage() {
                     </button>
 
                     {/* Notification bell */}
-                    <div className="relative">
+                    <div className="relative hidden sm:block">
                         <button
                             onClick={() => setNotifOpen(!notifOpen)}
                             className="relative rounded-lg border border-cream-300 bg-cream-50 p-1.5 text-cream-500 hover:text-green-700 hover:border-green-600 transition-all"
@@ -1342,7 +1342,7 @@ export default function POSPage() {
                                         onClick={() => handleAddToCart(product)}
                                         onContextMenu={(e) => handleProductContextMenu(e, product)}
                                         className={cn(
-                                            "group relative flex flex-col rounded-xl border bg-cream-100 p-3 text-left transition-all hover:shadow-md hover:border-green-600 active:scale-[0.97]",
+                                            "group relative flex flex-col rounded-xl border bg-cream-100 p-2 lg:p-3 text-left transition-all hover:shadow-md hover:border-green-600 active:scale-[0.97]",
                                             is86 ? "border-red-300" :
                                                 inCart ? "border-green-600 ring-1 ring-green-600/30" : "border-cream-300"
                                         )}
@@ -1410,9 +1410,9 @@ export default function POSPage() {
                                                 {product.nameVi}
                                             </p>
                                         )}
-                                        {/* Wine info inline subtitle */}
+                                        {/* Wine info inline subtitle — hidden on mobile for compact view */}
                                         {(product.type === "WINE_BOTTLE" || product.type === "WINE_GLASS" || product.type === "WINE_TASTING") && (
-                                            <p className="mt-0.5 text-[10px] text-wine-600 line-clamp-1">
+                                            <p className="hidden lg:block mt-0.5 text-[10px] text-wine-600 line-clamp-1">
                                                 {product.alcoholPct && <span>🍷 {product.alcoholPct}%</span>}
                                                 {product.alcoholPct && (product.region || product.country) && <span> · </span>}
                                                 {product.region && <span>{product.region}</span>}
@@ -1427,8 +1427,7 @@ export default function POSPage() {
                                             </p>
                                         )}
 
-                                        {/* Price + Wine Guide button */}
-                                        <div className="mt-auto pt-2 flex items-center justify-between relative z-20">
+                                        <div className="mt-auto pt-1.5 lg:pt-2 flex items-center justify-between relative z-20">
                                             <div>
                                                 <span className="font-mono text-sm font-bold text-green-900">
                                                     ₫{formatPrice(displayPrice)}
@@ -1439,7 +1438,7 @@ export default function POSPage() {
                                             </div>
                                             {/* Wine Guide quick button */}
                                             {(product.type === "WINE_BOTTLE" || product.type === "WINE_GLASS" || product.type === "WINE_TASTING") && (
-                                                <>
+                                                <span className="hidden lg:contents">
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation()
@@ -1466,7 +1465,7 @@ export default function POSPage() {
                                                         <Sparkles className="h-3 w-3" />
                                                         <span className="text-[8px] font-bold">Gợi ý</span>
                                                     </button>
-                                                </>
+                                                </span>
                                             )}
                                             {/* Food Pairing button — for food/drink items */}
                                             {(product.type === "FOOD" || product.type === "DRINK" || product.type === "OTHER") && (
@@ -1475,7 +1474,7 @@ export default function POSPage() {
                                                         e.stopPropagation()
                                                         setFoodPairingProduct(product)
                                                     }}
-                                                    className="flex items-center gap-1 rounded-md bg-wine-50 border border-wine-200 px-1.5 py-0.5 text-wine-700 hover:bg-wine-100 hover:border-wine-400 transition-all"
+                                                    className="hidden lg:flex items-center gap-1 rounded-md bg-wine-50 border border-wine-200 px-1.5 py-0.5 text-wine-700 hover:bg-wine-100 hover:border-wine-400 transition-all"
                                                     title="Rượu hợp uống cùng"
                                                 >
                                                     <Wine className="h-3 w-3" />
@@ -1943,7 +1942,7 @@ export default function POSPage() {
 
             {/* ============ PUSH SALE SIDEBAR (V2 Feature 6) ============ */}
             <div className={cn(
-                "flex flex-col border-l border-cream-300 bg-cream-50 transition-all duration-300",
+                "hidden lg:flex flex-col border-l border-cream-300 bg-cream-50 transition-all duration-300",
                 pushSidebarOpen ? "w-[260px]" : "w-10"
             )}>
                 {/* Toggle */}
@@ -2792,7 +2791,7 @@ export default function POSPage() {
                 id="wine-guide-fab"
                 onClick={() => setShowWineGuidePopup(true)}
                 className={cn(
-                    "fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full shadow-lg transition-all duration-300",
+                    "hidden lg:fixed lg:flex bottom-5 right-5 z-40 items-center gap-2 rounded-full shadow-lg transition-all duration-300",
                     "bg-wine-700 text-cream-50 hover:bg-wine-800 hover:shadow-xl hover:scale-105 active:scale-95",
                     "px-4 py-2.5 border border-wine-600",
                     upcomingReservations.length > 0 && "bottom-20"
