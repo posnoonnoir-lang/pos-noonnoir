@@ -220,9 +220,26 @@ export async function verifyStaffPin(pin: string) {
         where: { pinCode: pin, isActive: true },
     })
     if (!staff) return null
+
+    // Set HTTP-only cookie for middleware validation
+    const cookieStore = await import("next/headers").then(m => m.cookies())
+    cookieStore.set("pos_auth", "true", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+        path: "/",
+    })
+
     return {
         id: staff.id,
         fullName: staff.fullName,
         role: staff.role,
     }
+}
+
+export async function logoutStaff() {
+    const cookieStore = await import("next/headers").then(m => m.cookies())
+    cookieStore.delete("pos_auth")
+    return { success: true }
 }

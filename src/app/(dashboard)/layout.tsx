@@ -43,6 +43,7 @@ import { PageTransition } from "@/components/page-transition"
 import { GlobalPrefetcher } from "@/components/global-prefetcher"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { logoutStaff } from "@/actions/staff"
 
 // Map routes to prefetch cache keys
 const PREFETCH_KEYS: Record<string, string> = {
@@ -64,45 +65,33 @@ const navSections = [
     {
         label: "Bán hàng",
         items: [
-            { label: "POS Terminal", href: "/pos", icon: Wine },
-            { label: "Kitchen Display", href: "/pos/kitchen", icon: ChefHat },
-            { label: "Đơn hàng", href: "/pos/orders", icon: ClipboardList },
-            { label: "Quản lý Bàn", href: "/dashboard/tables", icon: Armchair },
+            { label: "POS", href: "/pos", icon: Wine },
+            { label: "Bàn & Sơ đồ", href: "/dashboard/tables", icon: Armchair },
+            { label: "Đặt bàn", href: "/dashboard/reservations", icon: CalendarDays },
+            { label: "Đánh giá KH", href: "/dashboard/feedback", icon: MessageCircle },
         ],
     },
     {
-        label: "Kho & Nhập hàng",
+        label: "Hàng hoá",
         items: [
-            { label: "Kho hàng", href: "/dashboard/inventory", icon: Package },
-            { label: "Mua hàng", href: "/dashboard/procurement", icon: Truck },
-            { label: "Ký gửi", href: "/dashboard/consignment", icon: Handshake },
-            { label: "Cảnh báo tồn", href: "/dashboard/alerts", icon: AlertTriangle },
-            { label: "Dự báo nhập", href: "/dashboard/forecast", icon: TrendingUp },
-            { label: "Hao hụt", href: "/dashboard/waste", icon: Trash2 },
+            { label: "Thực đơn", href: "/dashboard/menu/products", icon: UtensilsCrossed },
+            { label: "Công thức", href: "/dashboard/menu/recipes", icon: ChefHat },
+            { label: "Sổ tay Rượu", href: "/dashboard/wineguide", icon: BookOpen },
+            { label: "Tồn kho", href: "/dashboard/inventory", icon: Package },
+            { label: "Tài sản (Chai)", href: "/dashboard/bottle-tracking", icon: GlassWater },
+            { label: "Nhập & Ký gửi", href: "/dashboard/procurement", icon: Truck },
+            { label: "Lợi nhuận (Biên)", href: "/dashboard/kitchen", icon: Tag },
+            { label: "Lãng phí", href: "/dashboard/waste", icon: Trash2 },
+            { label: "Cảnh báo (Hạn)", href: "/dashboard/alerts", icon: AlertTriangle },
         ],
     },
     {
-        label: "Sản phẩm & Rượu",
-        items: [
-            { label: "Menu & Sản phẩm", href: "/dashboard/menu", icon: UtensilsCrossed },
-            { label: "Wine Guide", href: "/dashboard/wine-guide", icon: BookOpen },
-            { label: "Bán theo ly", href: "/dashboard/bottle-tracking", icon: GlassWater },
-        ],
-    },
-    {
-        label: "Khách & Marketing",
-        items: [
-            { label: "Khách hàng", href: "/dashboard/customers", icon: Heart },
-            { label: "Khuyến mãi", href: "/dashboard/promotions", icon: Tag },
-            { label: "Feedback", href: "/dashboard/feedback", icon: MessageCircle },
-        ],
-    },
-    {
-        label: "Nội bộ",
+        label: "Khác",
         items: [
             { label: "Nhân sự", href: "/dashboard/staff", icon: Users },
-            { label: "Đặt bàn", href: "/dashboard/reservations", icon: CalendarDays },
-            { label: "Báo cáo", href: "/dashboard/reports", icon: BarChart3 },
+            { label: "Khách hàng (CRM)", href: "/dashboard/customers", icon: Heart },
+            { label: "Nhà cung cấp", href: "/dashboard/suppliers", icon: Handshake },
+            { label: "Cài đặt", href: "/dashboard/settings", icon: Settings },
         ],
     },
 ]
@@ -123,8 +112,8 @@ export default function DashboardLayout({
 }) {
     const router = useRouter()
     const pathname = usePathname()
-    const { isAuthenticated, _hasHydrated, staff, logout } = useAuthStore()
     const { collapsed, toggle: toggleSidebar, mobileOpen, setMobileOpen } = useSidebarStore()
+    const { isAuthenticated, _hasHydrated, staff, logout } = useAuthStore()
     const isMobile = useIsMobile()
 
     useEffect(() => {
@@ -148,8 +137,9 @@ export default function DashboardLayout({
 
     if (!isAuthenticated) return null
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         logout()
+        await logoutStaff()
         router.replace("/login")
     }
 
