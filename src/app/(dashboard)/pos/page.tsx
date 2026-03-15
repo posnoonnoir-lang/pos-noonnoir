@@ -48,6 +48,7 @@ import {
     Utensils,
     Sparkles,
     LayoutDashboard,
+    Menu as MenuIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -56,6 +57,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useCartStore } from "@/stores/cart-store"
 import { useAuthStore } from "@/stores/auth-store"
+import { useSidebarStore } from "@/stores/sidebar-store"
 import { createOrder, processOrderWithCOGS, getActiveOrderByTable, getActiveOrders, addItemsToOrder, sendToKitchen as sendToKitchenAction, type PaymentMethod, type Order } from "@/actions/orders"
 import {
     searchCustomers,
@@ -1104,15 +1106,15 @@ export default function POSPage() {
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Top Bar */}
                 <div className="flex items-center gap-1.5 lg:gap-3 border-b border-cream-300 bg-cream-100 px-2 lg:px-4 py-2 lg:py-3 min-w-0 w-full overflow-x-auto scroll-hide-bar">
-                    {/* Mobile: Back to Dashboard */}
+                    {/* Mobile: Open Navigation Drawer */}
                     {isMobile && (
-                        <a
-                            href="/dashboard"
+                        <button
+                            onClick={() => useSidebarStore.getState().setMobileOpen(true)}
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-cream-300 bg-cream-50 text-green-900 hover:bg-green-900 hover:text-cream-50 transition-all shrink-0"
-                            title="Quay lại Dashboard"
+                            title="Menu"
                         >
-                            <LayoutDashboard className="h-4 w-4" />
-                        </a>
+                            <MenuIcon className="h-4 w-4" />
+                        </button>
                     )}
                     {/* Table / Takeaway toggle */}
                     <div className="flex items-center gap-1 rounded-lg border border-cream-300 bg-cream-50 p-0.5">
