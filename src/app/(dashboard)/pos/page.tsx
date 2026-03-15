@@ -47,6 +47,7 @@ import {
     ChevronUp,
     Utensils,
     Sparkles,
+    LayoutDashboard,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -1103,6 +1104,16 @@ export default function POSPage() {
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Top Bar */}
                 <div className="flex items-center gap-2 lg:gap-3 border-b border-cream-300 bg-cream-100 px-3 lg:px-4 py-2 lg:py-3 flex-wrap min-w-0">
+                    {/* Mobile: Back to Dashboard */}
+                    {isMobile && (
+                        <a
+                            href="/dashboard"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-cream-300 bg-cream-50 text-green-900 hover:bg-green-900 hover:text-cream-50 transition-all shrink-0"
+                            title="Quay lại Dashboard"
+                        >
+                            <LayoutDashboard className="h-4 w-4" />
+                        </a>
+                    )}
                     {/* Table / Takeaway toggle */}
                     <div className="flex items-center gap-1 rounded-lg border border-cream-300 bg-cream-50 p-0.5">
                         <button
