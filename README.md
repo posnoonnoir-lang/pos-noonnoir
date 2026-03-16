@@ -41,7 +41,7 @@ Hệ thống POS chuyên biệt cho Wine Bar, hỗ trợ bán ly thông minh, th
 | **ORM** | Prisma v7 (36 models, schema synced) | ✅ |
 | **UI** | shadcn/ui + Tailwind CSS v4 | ✅ |
 | **State** | Zustand (persist) | ✅ |
-| **Auth** | PIN Login (mock, Supabase planned) | ✅ |
+| **Auth** | PIN Login (bcrypt hash + RBAC + rate limiting) | ✅ |
 | **Icons** | Lucide React | ✅ |
 | **Charts** | CSS-only (no external library) | ✅ |
 | **Toast** | Sonner | ✅ |
@@ -70,6 +70,8 @@ npx next dev --port 3001
 
 Open [http://localhost:3001](http://localhost:3001) → Login PIN: **1234** (Owner)
 
+> **Security:** PINs are bcrypt-hashed. First login auto-migrates plaintext PINs. 5 failed attempts = 5 min lockout.
+
 > **Note:** Tất cả Server Actions đã kết nối Supabase qua Prisma ORM. Không còn mock data.
 
 ---
@@ -89,7 +91,8 @@ pos-noonnoir/
 │   │   ├── tables.ts          #   Table management + stats
 │   │   ├── orders.ts          #   Order lifecycle + COGS + addItemsToOrder
 │   │   ├── reports.ts         #   Analytics & dashboard data
-│   │   ├── staff.ts           #   Staff CRUD + PIN + updateStaff + detail
+│   │   ├── staff.ts           #   Staff CRUD + bcrypt PIN + updateStaff + detail
+│   │   ├── rbac.ts            # 🔐 RBAC config CRUD (roles × modules × permissions)
 │   │   ├── attendance.ts      # 🆕 Attendance check-in/out, history
 │   │   ├── payroll.ts         # 🆕 Monthly payroll calculation + CSV
 │   │   ├── schedule.ts        # 🆕 Weekly shift schedule management
@@ -119,6 +122,7 @@ pos-noonnoir/
 │   │   ├── analytics.ts       # 🆕 Zone heatmap, hourly heatmap, staff leaderboard
 │   │   ├── wine-advisor.ts    # 🆕 Smart wine recommendations + getAllWineStock()
 │   │   ├── kpi.ts             # 🆕 KPI targets system (metrics, targets, cascade, overview)
+│   │   ├── store-info.ts      # 🆕 Store info CRUD
 │   │   ├── pos-loader.ts      # ⚡ Consolidated POS SSR loader (1 call → all data)
 │   │   ├── dashboard-loader.ts # ⚡ Consolidated Dashboard SSR loader
 │   │   └── analytics-loader.ts # ⚡ Consolidated Analytics SSR loader (10 queries parallel)
@@ -163,13 +167,16 @@ pos-noonnoir/
 │   │   ├── pos/               # Receipt component
 │   │   └── ui/                # shadcn/ui base components
 │   ├── lib/
+│   │   ├── rbac-constants.ts  # 🔐 RBAC types, modules, default matrix
+│   │   ├── with-rbac.ts       # 🔐 Server-side RBAC guard (withRbac)
 │   │   ├── staff-constants.ts # Role/status label maps
 │   │   ├── customer-tiers.ts  # CustomerTier type + calculateTier
 │   │   ├── shift-types.ts     # Shared SHIFT_TYPES constant
 │   │   ├── parallel-limit.ts  # Parallel async helper
 │   │   └── utils.ts           # cn() utility
 │   ├── hooks/
-│   │   └── use-pos-shortcuts.tsx  # POS keyboard shortcuts (F1-F12)
+│   │   ├── use-pos-shortcuts.tsx  # POS keyboard shortcuts (F1-F12)
+│   │   └── use-rbac.ts            # 🔐 Client RBAC hook (nav filtering)
 │   ├── components/pwa/
 │   │   └── service-worker-registration.tsx  # PWA SW + offline queue
 │   └── stores/
@@ -259,12 +266,16 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | **Keyboard Shortcuts** 🆕 | POS `/pos` | F1-F12 category switch, Ctrl+F/B/P/H/K/D, Escape, Delete | ✅ Done |
 | **PWA Offline** 🆕 | Root layout | Service Worker, offline queue, auto-replay on reconnect, installable app | ✅ Done |
 | **Zone Heatmap** 🆕 | `/dashboard/analytics` | Zone × table revenue heatmap, 7-day × 14-hour hourly heatmap | ✅ Done |
+| **RBAC** 🔐 | `/dashboard/settings` | 16 modules × 6 roles × 5 permissions, interactive matrix UI, owner-only | ✅ Done |
+| **PIN Hashing** 🔐 | Auth system | bcrypt hash, auto-migrate plaintext, rate limiting (5 attempts → 5 min lockout) | ✅ Done |
+| **Server Action Guards** 🔐 | All modules | `withRbac()` on 30+ server actions (finance, staff, menu, inventory, KPI, procurement, waste, customers) | ✅ Done |
+| **Nav Filtering** 🔐 | Sidebar | Hide inaccessible menu items based on role permissions | ✅ Done |
 
 ### 📋 Planned (Phase 3+)
 
 | Module | Tính năng chính | Priority |
 |--------|----------------|:--------:|
-| **Supabase Auth** | Replace PIN mock → Supabase Auth with RLS | P1 |
+| **~~Supabase Auth~~** | ~~Replace PIN mock → Supabase Auth~~ (Replaced by RBAC + bcrypt PIN) | ✅ Done |
 | **Telegram Bot** | Low-rating alerts, oxidation alerts, shift reports | P2 |
 | **VNPay/MoMo** | Auto-confirm payment via bank webhook | P2 |
 | **GrabFood Webhook** | Receive orders from GrabFood | P3 |
@@ -292,12 +303,12 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | Field | Value |
 |-------|-------|
 | **Project** | POS Noonnoir Wine Bar |
-| **Version** | 14.0 |
+| **Version** | 15.0 |
 | **Created** | March 10, 2026 |
-| **Last Updated** | March 15, 2026 |
+| **Last Updated** | March 16, 2026 |
 | **Author** | Noonnoir Dev Team |
 | **Repository** | [github.com/posnoonnoir-lang/pos-noonnoir](https://github.com/posnoonnoir-lang/pos-noonnoir) |
-| **Status** | **📱 Mobile First & Next.js Security** — Full audit 24 pages responsive, POS mobile drawer, Next.js Middleware auth, P0 security passing. |
+| **Status** | **🔐 RBAC + Security Hardening** — Full RBAC (16 modules × 6 roles × 5 permissions), bcrypt PIN hash, rate limiting, 30+ server action guards, nav filtering. |
 
 ---
 
@@ -340,7 +351,8 @@ Tất cả tài liệu nằm trong folder [`../docs/`](../docs/)
 | 2026-03-14 | **v12.0** | **🏗️ Layout Unification + Navigation Redesign** — (1) **Unified Layout**: Xoá `(pos)` route group riêng, merge vào `(dashboard)`. Toàn bộ app dùng 1 layout duy nhất với collapsible sidebar. (2) **Persistent Sidebar**: `useSidebarStore` (Zustand + localStorage) — sidebar state giữ nguyên khi chuyển trang, reload. (3) **Navigation Reorganize**: 6 nhóm nghiệp vụ (Tổng quan, Bán hàng, Kho & Nhập hàng, Sản phẩm & Rượu, Khách & Marketing, Nội bộ). Di chuyển Alerts/Forecast/Waste từ "V2" → "Kho & Nhập hàng". Thêm Finance (P&L) vào sidebar. (4) **Settings Redesign**: Nav phẳng 11 items → 3 nhóm (Cửa hàng, Thanh toán & Tài chính, Hệ thống & Giao diện). (5) **Kitchen Display Unified**: Xoá bản dark cũ, thống nhất Kanban 3-column. (6) **Dashboard Pages Enhanced**: Alerts, Forecast, Waste — full-width 2-column layout + analytics sidebar. **0 TS errors. Git pushed.** |
 | 2026-03-14 | **v13.0** | **🎯 KPI System + Push Sale + Menu Perf** — (1) **KPI Targets System**: Schema `KpiMetric` + `KpiTarget` (36 models). 6 default metrics (doanh thu, đơn, khách, TB/đơn, chai wine, ly wine). Owner set chỉ tiêu tháng → auto cascade chia tuần (÷4~5). Dashboard `/dashboard/kpi` 3 tabs: Tổng quan (progress cards + 6-month history charts), Đặt chỉ tiêu (bulk input + cascade), Quản lý chỉ số (add/toggle/delete custom KPIs). (2) **KPI Toggle**: On/off trong Settings → Vận hành POS, persist via `SystemSetting`. (3) **Push Sale Fix**: Items giờ clickable → add product trực tiếp vào cart. Thêm nút "+ Giỏ" xanh bên cạnh "Giảm giá". Cursor pointer + hover shadow + active scale feedback. (4) **Menu Page Speed**: Thay redirect `/dashboard/menu` → `/dashboard/menu/categories` bằng direct SSR render (bỏ extra server roundtrip). **Schema: 36 models. 0 TS errors. Git pushed.** |
 | 2026-03-15 | **v14.0** | **📱 Mobile First & Next.js Security** — (1) **Mobile Responsive Audit**: 24 server/client pages verified. Fixes: POS sidebar drawer (hamburger menu), POS viewport constraint (S22 Ultra), 6 fixed modals → fluid w-full max-w, 15 page toolbars wrapped correctly (flex-wrap gap-2). Tab bars horizontally scrollable, touch-target CSS (44px min). (2) **Security Audit**: P0 priority fix — Added `src/middleware.ts` for route protection (/pos, /dashboard). Added HTTP-only server cookies on PIN authentication `verifyStaffPin` and `logoutStaff` action to sync state across client/server. Chặn hoàn toàn unauthenticated users. (3) **Performance Check**: 48% client / 52% server ratio, zero heavy library bundle, strict build checked. **Build: 0 TS errors. Deployed.** |
+| 2026-03-16 | **v15.0** | **🔐 RBAC & Security Hardening** — (1) **RBAC Settings UI**: Owner-only permission matrix — 16 modules × 6 roles × 5 permissions (view/create/edit/delete/approve). Interactive checkbox grid with role tabs, toggle-all per module, indeterminate states, summary cards, reset to default. Stored as JSON in `SystemSetting` table. (2) **Server-Side Guards**: `withRbac()` utility — checks `pos_auth` + `pos_staff_id` cookies, validates role permissions against RBAC config. OWNER always bypasses. Applied to 30+ server actions across 8 files: `finance.ts`, `staff.ts`, `menu.ts`, `customers.ts`, `inventory.ts`, `kpi.ts`, `procurement.ts`, `waste.ts`. (3) **Navigation Filtering**: `useRbac` hook maps routes → modules, hides inaccessible sidebar items per role. (4) **PIN Hashing (bcrypt)**: All PINs hashed with bcrypt (cost=10). `verifyStaffPin()` loads active staff, compares via `bcrypt.compare()`. **Auto-migration**: plaintext PINs auto-hash on first successful login. PIN uniqueness checked via hash comparison. (5) **Rate Limiting**: In-memory rate limiter — 5 failed PIN attempts → 5 minute lockout. User-friendly Vietnamese error messages. (6) **Architecture Refactor**: Extracted constants from `"use server"` `rbac.ts` → `lib/rbac-constants.ts` (Next.js only allows async function exports from server files). Discriminated union fix for `RbacGuardResult` type narrowing. **New files**: `src/lib/rbac-constants.ts`, `src/lib/with-rbac.ts`, `src/hooks/use-rbac.ts`, `src/actions/rbac.ts`. **Dep**: +bcryptjs. **TypeScript: 0 errors. Build: SUCCESS.** |
 
 ---
 
-*Last updated: March 15, 2026 — Mobile First & Next.js Security v14.0*
+*Last updated: March 16, 2026 — RBAC & Security Hardening v15.0*
