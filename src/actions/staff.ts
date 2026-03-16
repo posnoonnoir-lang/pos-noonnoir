@@ -221,15 +221,17 @@ export async function verifyStaffPin(pin: string) {
     })
     if (!staff) return null
 
-    // Set HTTP-only cookie for middleware validation
+    // Set HTTP-only cookies for middleware + RBAC validation
     const cookieStore = await import("next/headers").then(m => m.cookies())
-    cookieStore.set("pos_auth", "true", {
+    const cookieOpts = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        sameSite: "lax" as const,
         maxAge: 7 * 24 * 60 * 60, // 7 days
         path: "/",
-    })
+    }
+    cookieStore.set("pos_auth", "true", cookieOpts)
+    cookieStore.set("pos_staff_id", staff.id, cookieOpts)
 
     return {
         id: staff.id,
@@ -241,5 +243,6 @@ export async function verifyStaffPin(pin: string) {
 export async function logoutStaff() {
     const cookieStore = await import("next/headers").then(m => m.cookies())
     cookieStore.delete("pos_auth")
+    cookieStore.delete("pos_staff_id")
     return { success: true }
 }

@@ -43,6 +43,7 @@ import { PageTransition } from "@/components/page-transition"
 import { GlobalPrefetcher } from "@/components/global-prefetcher"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useRbac } from "@/hooks/use-rbac"
 import { logoutStaff } from "@/actions/staff"
 
 // Map routes to prefetch cache keys
@@ -56,42 +57,42 @@ const navSections = [
     {
         label: "Tổng quan",
         items: [
-            { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-            { label: "Phân tích", href: "/dashboard/analytics", icon: PieChart },
-            { label: "Tài chính (P&L)", href: "/dashboard/finance", icon: DollarSign },
-            { label: "Chỉ tiêu KPI", href: "/dashboard/kpi", icon: Target },
+            { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, rbac: "dashboard" },
+            { label: "Phân tích", href: "/dashboard/analytics", icon: PieChart, rbac: "analytics" },
+            { label: "Tài chính (P&L)", href: "/dashboard/finance", icon: DollarSign, rbac: "finance" },
+            { label: "Chỉ tiêu KPI", href: "/dashboard/kpi", icon: Target, rbac: "kpi" },
         ],
     },
     {
         label: "Bán hàng",
         items: [
-            { label: "POS", href: "/pos", icon: Wine },
-            { label: "Bàn & Sơ đồ", href: "/dashboard/tables", icon: Armchair },
-            { label: "Đặt bàn", href: "/dashboard/reservations", icon: CalendarDays },
-            { label: "Đánh giá KH", href: "/dashboard/feedback", icon: MessageCircle },
+            { label: "POS", href: "/pos", icon: Wine, rbac: "pos" },
+            { label: "Bàn & Sơ đồ", href: "/dashboard/tables", icon: Armchair, rbac: "pos" },
+            { label: "Đặt bàn", href: "/dashboard/reservations", icon: CalendarDays, rbac: "pos" },
+            { label: "Đánh giá KH", href: "/dashboard/feedback", icon: MessageCircle, rbac: "customers" },
         ],
     },
     {
         label: "Hàng hoá",
         items: [
-            { label: "Thực đơn", href: "/dashboard/menu/products", icon: UtensilsCrossed },
-            { label: "Công thức", href: "/dashboard/menu/recipes", icon: ChefHat },
-            { label: "Sổ tay Rượu", href: "/dashboard/wineguide", icon: BookOpen },
-            { label: "Tồn kho", href: "/dashboard/inventory", icon: Package },
-            { label: "Tài sản (Chai)", href: "/dashboard/bottle-tracking", icon: GlassWater },
-            { label: "Nhập & Ký gửi", href: "/dashboard/procurement", icon: Truck },
-            { label: "Lợi nhuận (Biên)", href: "/dashboard/kitchen", icon: Tag },
-            { label: "Lãng phí", href: "/dashboard/waste", icon: Trash2 },
-            { label: "Cảnh báo (Hạn)", href: "/dashboard/alerts", icon: AlertTriangle },
+            { label: "Thực đơn", href: "/dashboard/menu/products", icon: UtensilsCrossed, rbac: "menu" },
+            { label: "Công thức", href: "/dashboard/menu/recipes", icon: ChefHat, rbac: "menu" },
+            { label: "Sổ tay Rượu", href: "/dashboard/wineguide", icon: BookOpen, rbac: "menu" },
+            { label: "Tồn kho", href: "/dashboard/inventory", icon: Package, rbac: "inventory" },
+            { label: "Tài sản (Chai)", href: "/dashboard/bottle-tracking", icon: GlassWater, rbac: "inventory" },
+            { label: "Nhập & Ký gửi", href: "/dashboard/procurement", icon: Truck, rbac: "procurement" },
+            { label: "Lợi nhuận (Biên)", href: "/dashboard/kitchen", icon: Tag, rbac: "inventory" },
+            { label: "Lãng phí", href: "/dashboard/waste", icon: Trash2, rbac: "inventory" },
+            { label: "Cảnh báo (Hạn)", href: "/dashboard/alerts", icon: AlertTriangle, rbac: "inventory" },
         ],
     },
     {
         label: "Khác",
         items: [
-            { label: "Nhân sự", href: "/dashboard/staff", icon: Users },
-            { label: "Khách hàng (CRM)", href: "/dashboard/customers", icon: Heart },
-            { label: "Nhà cung cấp", href: "/dashboard/suppliers", icon: Handshake },
-            { label: "Cài đặt", href: "/dashboard/settings", icon: Settings },
+            { label: "Nhân sự", href: "/dashboard/staff", icon: Users, rbac: "staff" },
+            { label: "Khách hàng (CRM)", href: "/dashboard/customers", icon: Heart, rbac: "customers" },
+            { label: "Nhà cung cấp", href: "/dashboard/suppliers", icon: Handshake, rbac: "suppliers" },
+            { label: "Cài đặt", href: "/dashboard/settings", icon: Settings, rbac: "settings" },
         ],
     },
 ]
@@ -115,6 +116,7 @@ export default function DashboardLayout({
     const { collapsed, toggle: toggleSidebar, mobileOpen, setMobileOpen } = useSidebarStore()
     const { isAuthenticated, _hasHydrated, staff, logout } = useAuthStore()
     const isMobile = useIsMobile()
+    const { canAccess } = useRbac()
 
     useEffect(() => {
         if (_hasHydrated && !isAuthenticated) {
@@ -151,30 +153,93 @@ export default function DashboardLayout({
     // ===================== SIDEBAR NAV CONTENT (shared) =====================
     const renderNavContent = (forMobile: boolean) => (
         <nav className={cn("flex-1 overflow-y-auto px-2 py-3 space-y-4", forMobile && "scroll-hide-bar")}>
-            {navSections.map((section) => (
-                <div key={section.label}>
-                    {(forMobile || !collapsed) && (
-                        <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-green-400/60">
-                            {section.label}
-                        </p>
-                    )}
-                    {!forMobile && collapsed && <div className="mx-auto mb-1 w-6 border-t border-green-700/60" />}
-                    <div className="space-y-0.5">
-                        {section.items.map((item) => {
-                            const isActive =
-                                pathname === item.href ||
-                                (item.href !== "/dashboard" && pathname.startsWith(item.href))
-                            const Icon = item.icon
+            {navSections.map((section) => {
+                // Filter items by RBAC permissions
+                const visibleItems = section.items.filter(item => canAccess(item.rbac))
+                if (visibleItems.length === 0) return null
 
-                            // Mobile drawer: always show full labels
-                            if (forMobile) {
+                return (
+                    <div key={section.label}>
+                        {(forMobile || !collapsed) && (
+                            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-green-400/60">
+                                {section.label}
+                            </p>
+                        )}
+                        {!forMobile && collapsed && <div className="mx-auto mb-1 w-6 border-t border-green-700/60" />}
+                        <div className="space-y-0.5">
+                            {visibleItems.map((item) => {
+                                const isActive =
+                                    pathname === item.href ||
+                                    (item.href !== "/dashboard" && pathname.startsWith(item.href))
+                                const Icon = item.icon
+
+                                // Mobile drawer: always show full labels
+                                if (forMobile) {
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            prefetch={true}
+                                            className={cn(
+                                                "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-[13px] font-medium transition-all nav-link-smooth touch-target",
+                                                isActive
+                                                    ? "bg-green-700 text-cream-50 shadow-sm"
+                                                    : "text-green-300 hover:bg-green-800 hover:text-cream-50"
+                                            )}
+                                        >
+                                            {isActive && (
+                                                <span
+                                                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-cream-50"
+                                                    style={{ animation: "navIndicator 200ms var(--ease-out-expo) forwards" }}
+                                                />
+                                            )}
+                                            <Icon className={cn("h-4 w-4 shrink-0", isActive && "scale-110")} />
+                                            <span className="truncate">{item.label}</span>
+                                            {isActive && (
+                                                <ChevronRight className="ml-auto h-3.5 w-3.5 text-green-400 animate-fade-in" />
+                                            )}
+                                        </Link>
+                                    )
+                                }
+
+                                // Desktop collapsed: tooltip
+                                if (collapsed) {
+                                    return (
+                                        <Tooltip key={item.href}>
+                                            <TooltipTrigger
+                                                className={cn(
+                                                    "relative flex h-10 w-10 mx-auto items-center justify-center rounded-lg transition-all nav-link-smooth",
+                                                    isActive
+                                                        ? "bg-green-700 text-cream-50 shadow-sm"
+                                                        : "text-green-300 hover:bg-green-800 hover:text-cream-50"
+                                                )}
+                                                render={<Link href={item.href} prefetch={true} />}
+                                                onMouseEnter={() => {
+                                                    const key = PREFETCH_KEYS[item.href]
+                                                    if (key) usePrefetchStore.getState().prefetch(key)
+                                                }}
+                                            >
+                                                <Icon className={cn("h-4 w-4 shrink-0", isActive && "scale-110")} />
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right" className="bg-green-800 text-cream-50 border-green-700 text-xs">
+                                                {item.label}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    )
+                                }
+
+                                // Desktop expanded: full link
                                 return (
                                     <Link
                                         key={item.href}
                                         href={item.href}
                                         prefetch={true}
+                                        onMouseEnter={() => {
+                                            const key = PREFETCH_KEYS[item.href]
+                                            if (key) usePrefetchStore.getState().prefetch(key)
+                                        }}
                                         className={cn(
-                                            "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-[13px] font-medium transition-all nav-link-smooth touch-target",
+                                            "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all nav-link-smooth",
                                             isActive
                                                 ? "bg-green-700 text-cream-50 shadow-sm"
                                                 : "text-green-300 hover:bg-green-800 hover:text-cream-50"
@@ -186,75 +251,18 @@ export default function DashboardLayout({
                                                 style={{ animation: "navIndicator 200ms var(--ease-out-expo) forwards" }}
                                             />
                                         )}
-                                        <Icon className={cn("h-4 w-4 shrink-0", isActive && "scale-110")} />
+                                        <Icon className={cn("h-4 w-4 shrink-0 transition-transform duration-200", isActive && "scale-110")} />
                                         <span className="truncate">{item.label}</span>
                                         {isActive && (
                                             <ChevronRight className="ml-auto h-3.5 w-3.5 text-green-400 animate-fade-in" />
                                         )}
                                     </Link>
                                 )
-                            }
-
-                            // Desktop collapsed: tooltip
-                            if (collapsed) {
-                                return (
-                                    <Tooltip key={item.href}>
-                                        <TooltipTrigger
-                                            className={cn(
-                                                "relative flex h-10 w-10 mx-auto items-center justify-center rounded-lg transition-all nav-link-smooth",
-                                                isActive
-                                                    ? "bg-green-700 text-cream-50 shadow-sm"
-                                                    : "text-green-300 hover:bg-green-800 hover:text-cream-50"
-                                            )}
-                                            render={<Link href={item.href} prefetch={true} />}
-                                            onMouseEnter={() => {
-                                                const key = PREFETCH_KEYS[item.href]
-                                                if (key) usePrefetchStore.getState().prefetch(key)
-                                            }}
-                                        >
-                                            <Icon className={cn("h-4 w-4 shrink-0", isActive && "scale-110")} />
-                                        </TooltipTrigger>
-                                        <TooltipContent side="right" className="bg-green-800 text-cream-50 border-green-700 text-xs">
-                                            {item.label}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                )
-                            }
-
-                            // Desktop expanded: full link
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    prefetch={true}
-                                    onMouseEnter={() => {
-                                        const key = PREFETCH_KEYS[item.href]
-                                        if (key) usePrefetchStore.getState().prefetch(key)
-                                    }}
-                                    className={cn(
-                                        "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all nav-link-smooth",
-                                        isActive
-                                            ? "bg-green-700 text-cream-50 shadow-sm"
-                                            : "text-green-300 hover:bg-green-800 hover:text-cream-50"
-                                    )}
-                                >
-                                    {isActive && (
-                                        <span
-                                            className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-cream-50"
-                                            style={{ animation: "navIndicator 200ms var(--ease-out-expo) forwards" }}
-                                        />
-                                    )}
-                                    <Icon className={cn("h-4 w-4 shrink-0 transition-transform duration-200", isActive && "scale-110")} />
-                                    <span className="truncate">{item.label}</span>
-                                    {isActive && (
-                                        <ChevronRight className="ml-auto h-3.5 w-3.5 text-green-400 animate-fade-in" />
-                                    )}
-                                </Link>
-                            )
-                        })}
+                            })}
+                        </div>
                     </div>
-                </div>
-            ))}
+                )
+            })}
         </nav>
     )
 
