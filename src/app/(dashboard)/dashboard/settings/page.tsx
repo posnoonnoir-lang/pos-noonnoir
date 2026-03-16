@@ -27,6 +27,7 @@ import {
     Wallet,
     Briefcase,
     CreditCard,
+    AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -49,11 +50,24 @@ import { getHrConfig, updateHrConfig, type HrConfigData } from "@/actions/hr-con
 import { getPosConfig, updatePosConfig, type PosConfig, type PaymentMode } from "@/actions/pos-config"
 import { isKpiEnabled, setKpiEnabled } from "@/actions/kpi"
 import { ThemePicker } from "@/components/theme-switcher"
+import {
+    getRbacConfig, updateRbacConfig, resetRbacToDefault,
+    MODULES as RBAC_MODULES, ALL_ROLES, PERMISSION_LABELS,
+    type RbacConfig, type Permission,
+} from "@/actions/rbac"
+import { useAuthStore } from "@/stores/auth-store"
+import {
+    getStoreInfo, updateStoreInfo, type StoreInfo,
+    getReceiptConfig, updateReceiptConfig, type ReceiptConfig,
+    getDisplayConfig, updateDisplayConfig, type DisplayConfig,
+    getNotificationConfig, updateNotificationConfig, type NotificationConfig as NotifConfig,
+    getSystemConfig, updateSystemConfig, type SystemConfig,
+} from "@/actions/store-config"
 
 type TaxReportLine = Awaited<ReturnType<typeof getTaxReport>>[number]
 type TaxBreakdown = Awaited<ReturnType<typeof getTaxBreakdownByRate>>[number]
 
-type SettingSection = "store" | "tax" | "service-charge" | "payment" | "receipt" | "notification" | "display" | "operational" | "system" | "hr" | "setup"
+type SettingSection = "store" | "tax" | "service-charge" | "payment" | "receipt" | "notification" | "display" | "operational" | "system" | "hr" | "setup" | "rbac"
 
 type NavGroup = {
     label: string
@@ -84,20 +98,14 @@ const NAV_GROUPS: NavGroup[] = [
             { id: "display", label: "Giao diện", icon: Palette },
             { id: "notification", label: "Thông báo", icon: Bell },
             { id: "hr", label: "Cài đặt nhân sự", icon: Users },
-            { id: "system", label: "Hệ thống", icon: Shield },
+            { id: "rbac", label: "Phân quyền (RBAC)", icon: Shield },
+            { id: "system", label: "Hệ thống", icon: Settings },
         ],
     },
 ]
 
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState<SettingSection>("store")
-    const [saved, setSaved] = useState(false)
-
-    const handleSave = () => {
-        setSaved(true)
-        toast.success("Đã lưu cài đặt")
-        setTimeout(() => setSaved(false), 2000)
-    }
 
     return (
         <div className="min-h-screen bg-cream-50 p-4 lg:p-6">
@@ -109,21 +117,9 @@ export default function SettingsPage() {
                     </div>
                     <div>
                         <h1 className="font-display text-lg lg:text-2xl font-bold text-green-900">Cài đặt</h1>
-                        <p className="text-sm text-cream-500">Tuỳ chỉnh hệ thống POS</p>
+                        <p className="text-sm text-cream-500">Tuỳ chỉnh hệ thống POS — tự động lưu khi thay đổi</p>
                     </div>
                 </div>
-                {activeSection !== "tax" && (
-                    <Button
-                        onClick={handleSave}
-                        className={cn(
-                            "transition-all",
-                            saved ? "bg-green-600 text-white" : "bg-green-900 text-cream-50 hover:bg-green-800"
-                        )}
-                    >
-                        {saved ? <Check className="mr-1.5 h-4 w-4" /> : <Save className="mr-1.5 h-4 w-4" />}
-                        {saved ? "Đã lưu" : "Lưu thay đổi"}
-                    </Button>
-                )}
             </div>
 
             <div className="flex flex-col lg:grid lg:grid-cols-[220px,1fr] gap-4 lg:gap-6">
@@ -171,6 +167,7 @@ export default function SettingsPage() {
                     {activeSection === "display" && <DisplaySettings />}
                     {activeSection === "operational" && <OperationalSettings />}
                     {activeSection === "hr" && <HrSettings />}
+                    {activeSection === "rbac" && <RbacSettings />}
                     {activeSection === "system" && <SystemSettings />}
                 </div>
             </div>
@@ -285,6 +282,7 @@ function TaxSettings() {
     }
 
     const handleDeleteRate = async (id: string) => {
+        if (!window.confirm("Bạn chắc chắn muốn xoá thuế suất này? Thao tác này không thể hoàn tác.")) return
         await deleteTaxRate(id)
         toast.success("Đã xoá thuế suất")
         loadData()
@@ -695,38 +693,49 @@ function TaxReportView({
 // ============================================================
 
 function StoreSettings() {
-    const [name, setName] = useState("Noon & Noir")
-    const [tagline, setTagline] = useState("Wine Alley")
-    const [phone, setPhone] = useState("0901234567")
-    const [address, setAddress] = useState("123 Đường Rượu Vang, Quận 1, TP.HCM")
-    const [taxId, setTaxId] = useState("0123456789")
-    const [currency, setCurrency] = useState("VND")
+    const [info, setInfo] = useState<StoreInfo | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        getStoreInfo().then((data) => { setInfo(data); setLoading(false) })
+    }, [])
+
+    const handleSave = async (field: string, value: string) => {
+        if (!info) return
+        setSaving(true)
+        await updateStoreInfo({ [field]: value })
+        setSaving(false)
+        toast.success("Đã lưu")
+    }
+
+    if (loading || !info) return <div className="text-center py-12 text-cream-400 text-sm">Đang tải...</div>
 
     return (
         <>
             <SettingGroup title="Thông tin cửa hàng">
                 <SettingRow label="Tên quán" description="Hiển thị trên hoá đơn và ứng dụng">
-                    <Input value={name} onChange={(e) => setName(e.target.value)} className="w-48 h-8 text-xs border-cream-300" />
+                    <Input value={info.storeName} onChange={(e) => setInfo({ ...info, storeName: e.target.value })} onBlur={() => handleSave("storeName", info.storeName)} className="w-48 h-8 text-xs border-cream-300" />
                 </SettingRow>
                 <SettingRow label="Tagline" description="Slogan hoặc mô tả ngắn">
-                    <Input value={tagline} onChange={(e) => setTagline(e.target.value)} className="w-48 h-8 text-xs border-cream-300" />
+                    <Input value={info.tagline} onChange={(e) => setInfo({ ...info, tagline: e.target.value })} onBlur={() => handleSave("tagline", info.tagline)} className="w-48 h-8 text-xs border-cream-300" />
                 </SettingRow>
                 <SettingRow label="Số điện thoại">
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-48 h-8 text-xs border-cream-300" />
+                    <Input value={info.phone} onChange={(e) => setInfo({ ...info, phone: e.target.value })} onBlur={() => handleSave("phone", info.phone)} className="w-48 h-8 text-xs border-cream-300" />
                 </SettingRow>
                 <SettingRow label="Địa chỉ">
-                    <Input value={address} onChange={(e) => setAddress(e.target.value)} className="w-64 h-8 text-xs border-cream-300" />
+                    <Input value={info.address} onChange={(e) => setInfo({ ...info, address: e.target.value })} onBlur={() => handleSave("address", info.address)} className="w-64 h-8 text-xs border-cream-300" />
                 </SettingRow>
             </SettingGroup>
 
             <SettingGroup title="Thuế & Tài chính">
                 <SettingRow label="Mã số thuế">
-                    <Input value={taxId} onChange={(e) => setTaxId(e.target.value)} className="w-48 h-8 text-xs font-mono border-cream-300" />
+                    <Input value={info.taxId} onChange={(e) => setInfo({ ...info, taxId: e.target.value })} onBlur={() => handleSave("taxId", info.taxId)} className="w-48 h-8 text-xs font-mono border-cream-300" />
                 </SettingRow>
                 <SettingRow label="Đơn vị tiền tệ">
                     <select
-                        value={currency}
-                        onChange={(e) => setCurrency(e.target.value)}
+                        value={info.currency}
+                        onChange={(e) => { setInfo({ ...info, currency: e.target.value }); handleSave("currency", e.target.value) }}
                         className="w-48 h-8 rounded-md border border-cream-300 bg-cream-50 px-2 text-xs"
                     >
                         <option value="VND">VND (₫)</option>
@@ -737,36 +746,49 @@ function StoreSettings() {
 
             <SettingGroup title="Giờ hoạt động">
                 <SettingRow label="Giờ mở cửa">
-                    <Input type="time" defaultValue="10:00" className="w-32 h-8 text-xs border-cream-300" />
+                    <Input type="time" value={info.openTime} onChange={(e) => setInfo({ ...info, openTime: e.target.value })} onBlur={() => handleSave("openTime", info.openTime)} className="w-32 h-8 text-xs border-cream-300" />
                 </SettingRow>
                 <SettingRow label="Giờ đóng cửa">
-                    <Input type="time" defaultValue="00:00" className="w-32 h-8 text-xs border-cream-300" />
+                    <Input type="time" value={info.closeTime} onChange={(e) => setInfo({ ...info, closeTime: e.target.value })} onBlur={() => handleSave("closeTime", info.closeTime)} className="w-32 h-8 text-xs border-cream-300" />
                 </SettingRow>
             </SettingGroup>
+
+            {saving && <p className="text-center text-xs text-cream-400 mt-2 animate-pulse">Đang lưu...</p>}
         </>
     )
 }
 
 function ReceiptSettings() {
-    const [autoPrint, setAutoPrint] = useState(true)
-    const [showLogo, setShowLogo] = useState(true)
-    const [showFooter, setShowFooter] = useState(true)
-    const [footerText, setFooterText] = useState("Cảm ơn quý khách! ♥")
-    const [paperWidth, setPaperWidth] = useState("80")
+    const [cfg, setCfg] = useState<ReceiptConfig | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        getReceiptConfig().then((c) => { setCfg(c); setLoading(false) })
+    }, [])
+
+    const save = async (updates: Partial<ReceiptConfig>) => {
+        if (!cfg) return
+        const merged = { ...cfg, ...updates }
+        setCfg(merged)
+        await updateReceiptConfig(updates)
+        toast.success("Đã lưu cài đặt hoá đơn")
+    }
+
+    if (loading || !cfg) return <div className="text-center py-12 text-cream-400 text-sm">Đang tải...</div>
 
     return (
         <>
             <SettingGroup title="In hoá đơn">
                 <SettingRow label="Tự động in" description="In hoá đơn khi thanh toán thành công">
-                    <Toggle checked={autoPrint} onChange={setAutoPrint} />
+                    <Toggle checked={cfg.autoPrint} onChange={(v) => save({ autoPrint: v })} />
                 </SettingRow>
                 <SettingRow label="Hiện logo" description="Hiển thị logo Noon & Noir trên hoá đơn">
-                    <Toggle checked={showLogo} onChange={setShowLogo} />
+                    <Toggle checked={cfg.showLogo} onChange={(v) => save({ showLogo: v })} />
                 </SettingRow>
                 <SettingRow label="Khổ giấy" description="Kích thước cuộn giấy nhiệt">
                     <select
-                        value={paperWidth}
-                        onChange={(e) => setPaperWidth(e.target.value)}
+                        value={cfg.paperWidth}
+                        onChange={(e) => save({ paperWidth: e.target.value as "58" | "80" })}
                         className="w-32 h-8 rounded-md border border-cream-300 bg-cream-50 px-2 text-xs"
                     >
                         <option value="58">58mm</option>
@@ -777,10 +799,10 @@ function ReceiptSettings() {
 
             <SettingGroup title="Chân hoá đơn">
                 <SettingRow label="Hiện footer" description="Thêm thông điệp cuối hoá đơn">
-                    <Toggle checked={showFooter} onChange={setShowFooter} />
+                    <Toggle checked={cfg.showFooter} onChange={(v) => save({ showFooter: v })} />
                 </SettingRow>
                 <SettingRow label="Nội dung footer">
-                    <Input value={footerText} onChange={(e) => setFooterText(e.target.value)} className="w-48 h-8 text-xs border-cream-300" />
+                    <Input value={cfg.footerText} onChange={(e) => setCfg({ ...cfg, footerText: e.target.value })} onBlur={() => save({ footerText: cfg.footerText })} className="w-48 h-8 text-xs border-cream-300" />
                 </SettingRow>
             </SettingGroup>
         </>
@@ -788,32 +810,42 @@ function ReceiptSettings() {
 }
 
 function NotificationSettings() {
-    const [newOrder, setNewOrder] = useState(true)
-    const [lowStock, setLowStock] = useState(true)
-    const [kitchenReady, setKitchenReady] = useState(true)
-    const [dailyReport, setDailyReport] = useState(false)
-    const [sound, setSound] = useState(true)
+    const [cfg, setCfg] = useState<NotifConfig | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        getNotificationConfig().then((c) => { setCfg(c); setLoading(false) })
+    }, [])
+
+    const save = async (updates: Partial<NotifConfig>) => {
+        if (!cfg) return
+        setCfg({ ...cfg, ...updates })
+        await updateNotificationConfig(updates)
+        toast.success("Đã lưu cài đặt thông báo")
+    }
+
+    if (loading || !cfg) return <div className="text-center py-12 text-cream-400 text-sm">Đang tải...</div>
 
     return (
         <>
             <SettingGroup title="Thông báo đẩy">
                 <SettingRow label="Đơn hàng mới" description="Thông báo khi có đơn hàng mới tạo">
-                    <Toggle checked={newOrder} onChange={setNewOrder} />
+                    <Toggle checked={cfg.newOrder} onChange={(v) => save({ newOrder: v })} />
                 </SettingRow>
                 <SettingRow label="Tồn kho thấp" description="Cảnh báo khi sản phẩm sắp hết hàng">
-                    <Toggle checked={lowStock} onChange={setLowStock} />
+                    <Toggle checked={cfg.lowStock} onChange={(v) => save({ lowStock: v })} />
                 </SettingRow>
                 <SettingRow label="Bếp sẵn sàng" description="Thông báo khi món ăn đã xong">
-                    <Toggle checked={kitchenReady} onChange={setKitchenReady} />
+                    <Toggle checked={cfg.kitchenReady} onChange={(v) => save({ kitchenReady: v })} />
                 </SettingRow>
                 <SettingRow label="Báo cáo hàng ngày" description="Gửi tóm tắt doanh thu lúc đóng cửa">
-                    <Toggle checked={dailyReport} onChange={setDailyReport} />
+                    <Toggle checked={cfg.dailyReport} onChange={(v) => save({ dailyReport: v })} />
                 </SettingRow>
             </SettingGroup>
 
             <SettingGroup title="Âm thanh">
                 <SettingRow label="Hiệu ứng âm thanh" description="Phát âm thanh khi có thông báo">
-                    <Toggle checked={sound} onChange={setSound} />
+                    <Toggle checked={cfg.sound} onChange={(v) => save({ sound: v })} />
                 </SettingRow>
             </SettingGroup>
         </>
@@ -821,36 +853,44 @@ function NotificationSettings() {
 }
 
 function DisplaySettings() {
-    const [darkMode, setDarkMode] = useState(false)
-    const [compactMode, setCompactMode] = useState(false)
-    const [showImages, setShowImages] = useState(true)
-    const [language, setLanguage] = useState("vi")
-    const [gridCols, setGridCols] = useState("4")
+    const [cfg, setCfg] = useState<DisplayConfig | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        getDisplayConfig().then((c) => { setCfg(c); setLoading(false) })
+    }, [])
+
+    const save = async (updates: Partial<DisplayConfig>) => {
+        if (!cfg) return
+        setCfg({ ...cfg, ...updates })
+        await updateDisplayConfig(updates)
+        toast.success("Đã lưu cài đặt giao diện")
+    }
+
+    if (loading || !cfg) return <div className="text-center py-12 text-cream-400 text-sm">Đang tải...</div>
 
     return (
         <>
-            {/* Theme Picker */}
             <ThemePicker />
-
             <div className="my-5 border-t border-cream-300" />
 
             <SettingGroup title="Giao diện">
                 <SettingRow label="Chế độ tối" description="Sử dụng theme tối cho POS">
-                    <Toggle checked={darkMode} onChange={setDarkMode} />
+                    <Toggle checked={cfg.darkMode} onChange={(v) => save({ darkMode: v })} />
                 </SettingRow>
                 <SettingRow label="Chế độ compact" description="Giảm khoảng cách giữa các phần tử">
-                    <Toggle checked={compactMode} onChange={setCompactMode} />
+                    <Toggle checked={cfg.compactMode} onChange={(v) => save({ compactMode: v })} />
                 </SettingRow>
                 <SettingRow label="Hiện hình sản phẩm" description="Hiển thị ảnh thumbnail trong menu POS">
-                    <Toggle checked={showImages} onChange={setShowImages} />
+                    <Toggle checked={cfg.showImages} onChange={(v) => save({ showImages: v })} />
                 </SettingRow>
             </SettingGroup>
 
             <SettingGroup title="Bố cục POS">
                 <SettingRow label="Số cột sản phẩm" description="Số lượng cột hiển thị trong grid menu">
                     <select
-                        value={gridCols}
-                        onChange={(e) => setGridCols(e.target.value)}
+                        value={cfg.gridCols}
+                        onChange={(e) => save({ gridCols: e.target.value as "3" | "4" | "5" })}
                         className="w-32 h-8 rounded-md border border-cream-300 bg-cream-50 px-2 text-xs"
                     >
                         <option value="3">3 cột</option>
@@ -860,8 +900,8 @@ function DisplaySettings() {
                 </SettingRow>
                 <SettingRow label="Ngôn ngữ" description="Ngôn ngữ hiển thị ứng dụng">
                     <select
-                        value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
+                        value={cfg.language}
+                        onChange={(e) => save({ language: e.target.value as "vi" | "en" })}
                         className="w-32 h-8 rounded-md border border-cream-300 bg-cream-50 px-2 text-xs"
                     >
                         <option value="vi">Tiếng Việt</option>
@@ -874,16 +914,29 @@ function DisplaySettings() {
 }
 
 function SystemSettings() {
-    const [autoBackup, setAutoBackup] = useState(true)
-    const [sessionTimeout, setSessionTimeout] = useState("30")
+    const [cfg, setCfg] = useState<SystemConfig | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        getSystemConfig().then((c) => { setCfg(c); setLoading(false) })
+    }, [])
+
+    const save = async (updates: Partial<SystemConfig>) => {
+        if (!cfg) return
+        setCfg({ ...cfg, ...updates })
+        await updateSystemConfig(updates)
+        toast.success("Đã lưu cài đặt hệ thống")
+    }
+
+    if (loading || !cfg) return <div className="text-center py-12 text-cream-400 text-sm">Đang tải...</div>
 
     return (
         <>
             <SettingGroup title="Bảo mật">
                 <SettingRow label="Tự động khoá" description="Khoá phiên sau thời gian không hoạt động">
                     <select
-                        value={sessionTimeout}
-                        onChange={(e) => setSessionTimeout(e.target.value)}
+                        value={cfg.sessionTimeout}
+                        onChange={(e) => save({ sessionTimeout: e.target.value as SystemConfig["sessionTimeout"] })}
                         className="w-32 h-8 rounded-md border border-cream-300 bg-cream-50 px-2 text-xs"
                     >
                         <option value="15">15 phút</option>
@@ -896,7 +949,7 @@ function SystemSettings() {
 
             <SettingGroup title="Dữ liệu">
                 <SettingRow label="Tự động sao lưu" description="Sao lưu dữ liệu hàng ngày lúc 3:00 AM">
-                    <Toggle checked={autoBackup} onChange={setAutoBackup} />
+                    <Toggle checked={cfg.autoBackup} onChange={(v) => save({ autoBackup: v })} />
                 </SettingRow>
                 <SettingRow label="Database" description="Kết nối đến Supabase PostgreSQL">
                     <span className="rounded-full bg-green-100 px-2 py-0.5 text-[9px] font-bold text-green-700">
@@ -1767,7 +1820,18 @@ function SetupSettings() {
     return (
         <>
             <SettingGroup title="🏪 Chế độ thanh toán POS">
-                <p className="text-[10px] text-cream-500 mb-4">Chọn quy trình thanh toán phù hợp với mô hình kinh doanh của bạn. Có thể đổi lại bất cứ lúc nào.</p>
+                <p className="text-[10px] text-cream-500 mb-4">Chọn quy trình thanh toán phù hợp với mô hình kinh doanh. Thay đổi sẽ áp dụng cho các đơn hàng mới.</p>
+
+                {/* Warning banner */}
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 mb-4">
+                    <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-[10px] font-semibold text-amber-800">⚠️ Cài đặt quan trọng</p>
+                            <p className="text-[10px] text-amber-700 mt-0.5">Đây là cài đặt cấu hình ban đầu. Việc thay đổi giữa chừng có thể gây nhầm lẫn cho nhân viên và ảnh hưởng đến quy trình vận hành.</p>
+                        </div>
+                    </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                     {/* PAY AFTER */}
@@ -1885,6 +1949,292 @@ function SetupSettings() {
                         </>
                     )}
                 </ul>
+            </div>
+
+            {saving && <p className="text-center text-xs text-cream-400 mt-3 animate-pulse">Đang lưu...</p>}
+        </>
+    )
+}
+
+// ============================================================
+// RBAC — Role-Based Access Control Settings
+// ============================================================
+
+const ROLE_LABELS_MAP: Record<string, string> = {
+    OWNER: "Chủ quán",
+    MANAGER: "Quản lý",
+    CASHIER: "Thu ngân",
+    BARTENDER: "Bartender",
+    WAITER: "Phục vụ",
+    KITCHEN: "Bếp",
+}
+
+const ROLE_COLORS_MAP: Record<string, string> = {
+    OWNER: "bg-wine-100 text-wine-700",
+    MANAGER: "bg-blue-100 text-blue-700",
+    CASHIER: "bg-emerald-100 text-emerald-700",
+    BARTENDER: "bg-amber-100 text-amber-700",
+    WAITER: "bg-purple-100 text-purple-700",
+    KITCHEN: "bg-orange-100 text-orange-700",
+}
+
+function RbacSettings() {
+    const [config, setConfig] = useState<RbacConfig | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [selectedRole, setSelectedRole] = useState<string>("MANAGER")
+    const staff = useAuthStore(s => s.staff)
+    const isOwner = staff?.role === "OWNER"
+
+    useEffect(() => {
+        getRbacConfig().then((c) => { setConfig(c); setLoading(false) })
+    }, [])
+
+    const handleToggle = async (
+        role: string, moduleId: string, perm: Permission, checked: boolean
+    ) => {
+        if (!config || role === "OWNER") return // OWNER always has all permissions
+        setSaving(true)
+
+        const updated = { ...config }
+        if (!updated.roles[role]) updated.roles[role] = {}
+        if (!updated.roles[role][moduleId]) updated.roles[role][moduleId] = []
+
+        if (checked) {
+            if (!updated.roles[role][moduleId].includes(perm)) {
+                updated.roles[role][moduleId] = [...updated.roles[role][moduleId], perm]
+            }
+        } else {
+            updated.roles[role][moduleId] = updated.roles[role][moduleId].filter(p => p !== perm)
+        }
+
+        setConfig(updated)
+        await updateRbacConfig(updated)
+        setSaving(false)
+        toast.success("Đã cập nhật quyền")
+    }
+
+    const handleToggleModule = async (role: string, moduleId: string, checked: boolean) => {
+        if (!config || role === "OWNER") return
+        setSaving(true)
+
+        const module = RBAC_MODULES.find(m => m.moduleId === moduleId)
+        if (!module) return
+
+        const updated = { ...config }
+        if (!updated.roles[role]) updated.roles[role] = {}
+        updated.roles[role][moduleId] = checked ? [...module.permissions] : []
+
+        setConfig(updated)
+        await updateRbacConfig(updated)
+        setSaving(false)
+        toast.success(checked ? "Đã bật tất cả quyền" : "Đã tắt tất cả quyền")
+    }
+
+    const handleReset = async () => {
+        if (!window.confirm("Khôi phục về quyền mặc định? Tất cả tuỳ chỉnh sẽ bị mất.")) return
+        setSaving(true)
+        await resetRbacToDefault()
+        const fresh = await getRbacConfig()
+        setConfig(fresh)
+        setSaving(false)
+        toast.success("Đã khôi phục quyền mặc định")
+    }
+
+    if (loading || !config) {
+        return <div className="text-center py-12 text-cream-400 text-sm">Đang tải...</div>
+    }
+
+    if (!isOwner) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Shield className="h-12 w-12 text-cream-300 mb-3" />
+                <h3 className="font-display text-sm font-bold text-green-900 mb-1">Không có quyền truy cập</h3>
+                <p className="text-xs text-cream-400">Chỉ Chủ quán (Owner) mới được cấu hình phân quyền.</p>
+            </div>
+        )
+    }
+
+    const currentRolePerms = config.roles[selectedRole] ?? {}
+
+    return (
+        <>
+            {/* Header */}
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-5">
+                <div>
+                    <h2 className="font-display text-base font-bold text-green-900 flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Phân quyền (RBAC)
+                    </h2>
+                    <p className="text-[10px] text-cream-400 mt-0.5">
+                        Cấu hình quyền truy cập cho từng vai trò. Owner luôn có toàn quyền.
+                    </p>
+                </div>
+                <button
+                    onClick={handleReset}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cream-300 text-[10px] font-medium text-cream-500 hover:bg-cream-200 hover:text-red-600 transition-all"
+                >
+                    <AlertTriangle className="h-3 w-3" />
+                    Khôi phục mặc định
+                </button>
+            </div>
+
+            {/* Role selector tabs */}
+            <div className="flex gap-1.5 mb-5 overflow-x-auto scroll-hide-bar pb-1">
+                {ALL_ROLES.filter(r => r !== "OWNER").map(role => (
+                    <button
+                        key={role}
+                        onClick={() => setSelectedRole(role)}
+                        className={cn(
+                            "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all",
+                            selectedRole === role
+                                ? "bg-green-900 text-cream-50 shadow-sm"
+                                : cn("border border-cream-200 hover:bg-cream-200", ROLE_COLORS_MAP[role])
+                        )}
+                    >
+                        {ROLE_LABELS_MAP[role]}
+                    </button>
+                ))}
+            </div>
+
+            {/* Info */}
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-2.5 mb-4">
+                <p className="text-[10px] text-blue-700">
+                    <strong>Đang chỉnh quyền cho:</strong>{" "}
+                    <span className={cn("inline-flex px-1.5 py-0.5 rounded-full text-[9px] font-bold", ROLE_COLORS_MAP[selectedRole])}>
+                        {ROLE_LABELS_MAP[selectedRole]}
+                    </span>
+                    {" "}— Tick ✅ để bật, bỏ tick để tắt quyền.
+                </p>
+            </div>
+
+            {/* Permission Matrix table */}
+            <div className="rounded-xl border border-cream-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="bg-cream-200/60">
+                                <th className="px-3 py-2.5 text-left font-semibold text-green-900 min-w-[180px]">Module</th>
+                                <th className="px-2 py-2.5 text-center font-semibold text-green-900 w-10">Tất cả</th>
+                                {["view", "create", "edit", "delete", "approve"].map(p => (
+                                    <th key={p} className="px-2 py-2.5 text-center font-semibold text-green-900 w-12">
+                                        {PERMISSION_LABELS[p as Permission]}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-cream-200">
+                            {RBAC_MODULES.map((mod) => {
+                                const roleModPerms = currentRolePerms[mod.moduleId] ?? []
+                                const allChecked = mod.permissions.every(p => roleModPerms.includes(p))
+                                const someChecked = mod.permissions.some(p => roleModPerms.includes(p))
+
+                                return (
+                                    <tr key={mod.moduleId} className="hover:bg-cream-50/80 transition-colors">
+                                        <td className="px-3 py-2.5">
+                                            <span className="font-medium text-green-900">{mod.label}</span>
+                                        </td>
+                                        {/* Toggle ALL for this module */}
+                                        <td className="px-2 py-2.5 text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={allChecked}
+                                                ref={(el) => { if (el) el.indeterminate = someChecked && !allChecked }}
+                                                onChange={(e) => handleToggleModule(selectedRole, mod.moduleId, e.target.checked)}
+                                                className="h-3.5 w-3.5 rounded border-cream-300 text-green-700 focus:ring-green-500 cursor-pointer accent-green-700"
+                                            />
+                                        </td>
+                                        {/* Individual permissions */}
+                                        {(["view", "create", "edit", "delete", "approve"] as Permission[]).map(perm => {
+                                            const available = mod.permissions.includes(perm)
+                                            const checked = roleModPerms.includes(perm)
+
+                                            if (!available) {
+                                                return (
+                                                    <td key={perm} className="px-2 py-2.5 text-center">
+                                                        <span className="text-cream-300">—</span>
+                                                    </td>
+                                                )
+                                            }
+
+                                            return (
+                                                <td key={perm} className="px-2 py-2.5 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={(e) => handleToggle(selectedRole, mod.moduleId, perm, e.target.checked)}
+                                                        className="h-3.5 w-3.5 rounded border-cream-300 text-green-700 focus:ring-green-500 cursor-pointer accent-green-700"
+                                                    />
+                                                </td>
+                                            )
+                                        })}
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Legend */}
+            <div className="mt-4 flex flex-wrap gap-3">
+                {(["view", "create", "edit", "delete", "approve"] as Permission[]).map(p => (
+                    <div key={p} className="flex items-center gap-1 text-[10px] text-cream-500">
+                        <span className="font-bold text-green-800">{PERMISSION_LABELS[p]}</span>
+                        <span>—</span>
+                        <span>
+                            {p === "view" && "Xem danh sách và chi tiết"}
+                            {p === "create" && "Tạo mới bản ghi"}
+                            {p === "edit" && "Chỉnh sửa bản ghi"}
+                            {p === "delete" && "Xoá bản ghi"}
+                            {p === "approve" && "Duyệt/xác nhận action"}
+                        </span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Summary cards — all roles overview */}
+            <div className="mt-6">
+                <SettingGroup title="Tổng quan quyền — Tất cả vai trò">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                        {ALL_ROLES.map(role => {
+                            const perms = config.roles[role] ?? {}
+                            const moduleCount = Object.values(perms).filter(p => p.length > 0).length
+                            const totalPerms = Object.values(perms).reduce((s, p) => s + p.length, 0)
+
+                            return (
+                                <button
+                                    key={role}
+                                    onClick={() => { if (role !== "OWNER") setSelectedRole(role) }}
+                                    className={cn(
+                                        "rounded-lg border p-3 text-left transition-all hover:shadow-sm",
+                                        role === "OWNER"
+                                            ? "border-wine-200 bg-wine-50/50"
+                                            : selectedRole === role
+                                                ? "border-green-400 bg-green-50 ring-1 ring-green-300"
+                                                : "border-cream-200 bg-cream-50 hover:border-cream-300"
+                                    )}
+                                >
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        <span className={cn("inline-flex px-1.5 py-0.5 rounded-full text-[9px] font-bold", ROLE_COLORS_MAP[role])}>
+                                            {ROLE_LABELS_MAP[role]}
+                                        </span>
+                                        {role === "OWNER" && (
+                                            <span className="text-[8px] text-wine-500 font-medium">TOÀN QUYỀN</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-lg font-bold text-green-900">{moduleCount}</span>
+                                        <span className="text-[10px] text-cream-400">modules</span>
+                                        <span className="text-[10px] text-cream-300">·</span>
+                                        <span className="text-sm font-bold text-green-700">{totalPerms}</span>
+                                        <span className="text-[10px] text-cream-400">quyền</span>
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </SettingGroup>
             </div>
 
             {saving && <p className="text-center text-xs text-cream-400 mt-3 animate-pulse">Đang lưu...</p>}

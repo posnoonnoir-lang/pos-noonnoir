@@ -1,8 +1,11 @@
 "use server"
 
+import { prisma } from "@/lib/prisma"
+import { revalidatePath } from "next/cache"
+
 // ============================================================
 // QR PAYMENT — VietQR integration
-// Bank config stored in-memory (could be StoreSettings)
+// Bank config persisted in SystemSetting (key: "bank_config")
 // QR generation is real (uses VietQR API)
 // ============================================================
 
@@ -17,20 +20,28 @@ export type QRPaymentRequest = {
     createdAt: Date; expiresAt: Date; confirmedAt: Date | null
 }
 
-const BANK_CONFIG: QRPaymentConfig = {
+const DEFAULT_BANK: QRPaymentConfig = {
     bankId: "970422", bankName: "MB Bank", bankLogo: "🏦",
     accountNumber: "0388899999", accountName: "NOON AND NOIR CO LTD", template: "compact2",
 }
 
+const BANK_KEY = "bank_config"
 const QR_PAYMENTS: QRPaymentRequest[] = []
 
-export async function getBankConfig(): Promise<QRPaymentConfig> { return { ...BANK_CONFIG } }
+export async function getBankConfig(): Promise<QRPaymentConfig> {
+    try {
+        const record = await prisma.systemSetting.findUnique({ where: { key: BANK_KEY } })
+        if (record?.value) return { ...DEFAULT_BANK, ...(record.value as object) } as QRPaymentConfig
+    } catch { /* fallback */ }
+    return { ...DEFAULT_BANK }
+}
 
 export async function generateQRPayment(params: {
     orderId: string; amount: number; description: string
 }): Promise<{ success: boolean; data?: QRPaymentRequest }> {
+    const config = await getBankConfig()
     const addInfo = encodeURIComponent(params.description)
-    const qrUrl = `https://img.vietqr.io/image/${BANK_CONFIG.bankId}-${BANK_CONFIG.accountNumber}-${BANK_CONFIG.template}.png?amount=${params.amount}&addInfo=${addInfo}&accountName=${encodeURIComponent(BANK_CONFIG.accountName)}`
+    const qrUrl = `https://img.vietqr.io/image/${config.bankId}-${config.accountNumber}-${config.template}.png?amount=${params.amount}&addInfo=${addInfo}&accountName=${encodeURIComponent(config.accountName)}`
 
     const payment: QRPaymentRequest = {
         id: `qr-${Date.now()}`, orderId: params.orderId, amount: params.amount,
@@ -66,6 +77,15 @@ export async function cancelQRPayment(paymentId: string): Promise<{ success: boo
 }
 
 export async function updateBankConfig(config: Partial<QRPaymentConfig>): Promise<{ success: boolean }> {
-    Object.assign(BANK_CONFIG, config)
-    return { success: true }
+    try {
+        const current = await getBankConfig()
+        const merged = JSON.parse(JSON.stringify({ ...current, ...config }))
+        await prisma.systemSetting.upsert({
+            where: { key: BANK_KEY },
+            create: { key: BANK_KEY, value: merged },
+            update: { value: merged },
+        })
+        revalidatePath("/dashboard/settings")
+        return { success: true }
+    } catch { return { success: false } }
 }

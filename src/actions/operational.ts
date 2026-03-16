@@ -113,7 +113,7 @@ export async function get86ProductIds(): Promise<string[]> {
 }
 
 // ============================================================
-// 3. SERVICE CHARGE — StoreSettings JSON
+// 3. SERVICE CHARGE — SystemSetting JSON (persisted)
 // ============================================================
 
 export type ServiceChargeConfig = {
@@ -122,20 +122,33 @@ export type ServiceChargeConfig = {
 }
 
 const DEFAULT_SC: ServiceChargeConfig = { enabled: true, rate: 0.05, label: "Phí dịch vụ", applyTo: "DINE_IN_ONLY", maxAmount: null }
+const SC_KEY = "service_charge_config"
 
 export async function getServiceChargeConfig(): Promise<ServiceChargeConfig> {
+    try {
+        const record = await prisma.systemSetting.findUnique({ where: { key: SC_KEY } })
+        if (record?.value) return { ...DEFAULT_SC, ...(record.value as object) } as ServiceChargeConfig
+    } catch { /* fallback */ }
     return { ...DEFAULT_SC }
 }
 
 export async function updateServiceChargeConfig(config: Partial<ServiceChargeConfig>): Promise<{ success: boolean }> {
-    Object.assign(DEFAULT_SC, config)
-    return { success: true }
+    try {
+        const current = await getServiceChargeConfig()
+        const merged = JSON.parse(JSON.stringify({ ...current, ...config }))
+        await prisma.systemSetting.upsert({
+            where: { key: SC_KEY },
+            create: { key: SC_KEY, value: merged },
+            update: { value: merged },
+        })
+        return { success: true }
+    } catch { return { success: false } }
 }
 
 export async function calculateServiceCharge(
     subtotal: number, orderType: "DINE_IN" | "TAKEAWAY"
 ): Promise<{ amount: number; rate: number; label: string }> {
-    const config = DEFAULT_SC
+    const config = await getServiceChargeConfig()
     if (!config.enabled) return { amount: 0, rate: 0, label: config.label }
     if (config.applyTo === "DINE_IN_ONLY" && orderType !== "DINE_IN") return { amount: 0, rate: 0, label: config.label }
 
