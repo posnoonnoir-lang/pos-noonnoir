@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { withRbac } from "@/lib/with-rbac"
 
 // ============================================================
 // INVENTORY — Stock movements, ingredients, wine bottles
@@ -100,6 +101,9 @@ export async function createStockMovement(data: {
     reason?: string
     createdBy?: string
 }) {
+    const guard = await withRbac("inventory", "create")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         await prisma.stockMovement.create({
             data: {
@@ -122,6 +126,9 @@ export async function createStockMovement(data: {
 export async function createIngredient(data: {
     name: string; unit: string; currentStock: number; minStock: number; costPerUnit: number
 }) {
+    const guard = await withRbac("inventory", "create")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         const ingredient = await prisma.ingredient.create({ data })
         revalidatePath("/dashboard/inventory")
@@ -132,6 +139,9 @@ export async function createIngredient(data: {
 }
 
 export async function updateIngredientStock(id: string, newStock: number) {
+    const guard = await withRbac("inventory", "edit")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         await prisma.ingredient.update({ where: { id }, data: { currentStock: newStock } })
         revalidatePath("/dashboard/inventory")

@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import type { KpiPeriod } from "@prisma/client"
+import { withRbac } from "@/lib/with-rbac"
 
 // ============================================================
 // KPI SYSTEM — Multi-level targets (Month → Week → Shift)
@@ -66,6 +67,9 @@ export async function getKpiMetrics(): Promise<KpiMetricData[]> {
 export async function createKpiMetric(data: {
     code: string; name: string; unit: string; icon: string
 }): Promise<{ success: boolean; error?: string }> {
+    const guard = await withRbac("kpi", "create")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         const count = await prisma.kpiMetric.count()
         await prisma.kpiMetric.create({
@@ -78,10 +82,16 @@ export async function createKpiMetric(data: {
 }
 
 export async function toggleKpiMetric(id: string, isActive: boolean): Promise<void> {
+    const guard = await withRbac("kpi", "edit")
+    if (!guard.ok) return
+
     await prisma.kpiMetric.update({ where: { id }, data: { isActive } })
 }
 
 export async function deleteKpiMetric(id: string): Promise<{ success: boolean; error?: string }> {
+    const guard = await withRbac("kpi", "edit")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     const metric = await prisma.kpiMetric.findUnique({ where: { id } })
     if (metric?.isDefault) return { success: false, error: "Không thể xóa chỉ số mặc định" }
     await prisma.kpiTarget.deleteMany({ where: { metricId: id } })
@@ -119,6 +129,9 @@ export async function upsertTarget(data: {
     month?: number; week?: number; shiftId?: string
     targetValue: number; setBy: string; notes?: string
 }): Promise<{ success: boolean }> {
+    const guard = await withRbac("kpi", "edit")
+    if (!guard.ok) return { success: false }
+
     await prisma.kpiTarget.upsert({
         where: {
             metricId_period_year_month_week_shiftId: {

@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import type { StaffRole } from "@prisma/client"
 import { withRbac } from "@/lib/with-rbac"
+import bcrypt from "bcryptjs"
+
+// Rate limiting for PIN verification (brute-force protection)
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
+const MAX_ATTEMPTS = 5
+const LOCKOUT_MS = 5 * 60 * 1000 // 5 minutes
 
 export type { StaffRole } from "@prisma/client"
 
@@ -161,14 +167,20 @@ export async function createStaff(data: {
     const guard = await withRbac("staff", "create")
     if (!guard.ok) return { success: false, error: guard.error }
 
-    const existing = await prisma.staff.findFirst({ where: { pinCode: data.pin } })
-    if (existing) return { success: false, error: "Mã PIN đã được sử dụng" }
+    // Check PIN uniqueness by comparing against all active staff
+    const allStaff = await prisma.staff.findMany({ where: { isActive: true }, select: { pinCode: true } })
+    for (const s of allStaff) {
+        if (await bcrypt.compare(data.pin, s.pinCode)) {
+            return { success: false, error: "Mã PIN đã được sử dụng" }
+        }
+    }
 
     try {
+        const hashedPin = await bcrypt.hash(data.pin, 10)
         const staff = await prisma.staff.create({
             data: {
                 fullName: data.fullName,
-                pinCode: data.pin,
+                pinCode: hashedPin,
                 role: data.role,
                 phone: data.phone,
                 email: data.email,
@@ -220,7 +232,8 @@ export async function resetStaffPin(id: string, newPin: string) {
         return { success: false, error: "PIN phải là 4 chữ số" }
     }
     try {
-        await prisma.staff.update({ where: { id }, data: { pinCode: newPin } })
+        const hashedPin = await bcrypt.hash(newPin, 10)
+        await prisma.staff.update({ where: { id }, data: { pinCode: hashedPin } })
         revalidatePath("/dashboard/staff")
         return { success: true }
     } catch {
@@ -229,10 +242,54 @@ export async function resetStaffPin(id: string, newPin: string) {
 }
 
 export async function verifyStaffPin(pin: string) {
-    const staff = await prisma.staff.findFirst({
-        where: { pinCode: pin, isActive: true },
+    // Rate limiting check
+    const clientKey = "global" // In production, use IP/device fingerprint
+    const attempts = loginAttempts.get(clientKey)
+    if (attempts) {
+        const timeSinceLast = Date.now() - attempts.lastAttempt
+        if (attempts.count >= MAX_ATTEMPTS && timeSinceLast < LOCKOUT_MS) {
+            const remainingMin = Math.ceil((LOCKOUT_MS - timeSinceLast) / 60000)
+            return { error: `Quá nhiều lần thử. Vui lòng đợi ${remainingMin} phút.` } as const
+        }
+        // Reset if lockout expired
+        if (timeSinceLast >= LOCKOUT_MS) {
+            loginAttempts.delete(clientKey)
+        }
+    }
+
+    // Load all active staff and compare PIN hashes
+    const allStaff = await prisma.staff.findMany({
+        where: { isActive: true },
+        select: { id: true, fullName: true, role: true, pinCode: true },
     })
-    if (!staff) return null
+
+    let matchedStaff: typeof allStaff[0] | null = null
+    for (const s of allStaff) {
+        // Support both hashed and legacy plaintext PINs
+        const isHashed = s.pinCode.startsWith("$2")
+        const isMatch = isHashed
+            ? await bcrypt.compare(pin, s.pinCode)
+            : s.pinCode === pin
+        if (isMatch) {
+            matchedStaff = s
+            // If plaintext match, auto-migrate to hashed
+            if (!isHashed) {
+                const hashed = await bcrypt.hash(pin, 10)
+                await prisma.staff.update({ where: { id: s.id }, data: { pinCode: hashed } })
+            }
+            break
+        }
+    }
+
+    if (!matchedStaff) {
+        // Record failed attempt
+        const current = loginAttempts.get(clientKey) ?? { count: 0, lastAttempt: 0 }
+        loginAttempts.set(clientKey, { count: current.count + 1, lastAttempt: Date.now() })
+        return null
+    }
+
+    // Reset attempts on success
+    loginAttempts.delete(clientKey)
 
     // Set HTTP-only cookies for middleware + RBAC validation
     const cookieStore = await import("next/headers").then(m => m.cookies())
@@ -244,12 +301,12 @@ export async function verifyStaffPin(pin: string) {
         path: "/",
     }
     cookieStore.set("pos_auth", "true", cookieOpts)
-    cookieStore.set("pos_staff_id", staff.id, cookieOpts)
+    cookieStore.set("pos_staff_id", matchedStaff.id, cookieOpts)
 
     return {
-        id: staff.id,
-        fullName: staff.fullName,
-        role: staff.role,
+        id: matchedStaff.id,
+        fullName: matchedStaff.fullName,
+        role: matchedStaff.role,
     }
 }
 

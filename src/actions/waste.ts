@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { withRbac } from "@/lib/with-rbac"
 
 // ============================================================
 // WASTE / SPOILAGE TRACKING — FR-3.7
@@ -45,6 +46,9 @@ export async function recordWaste(params: {
     reason: string
     staffId: string
 }): Promise<{ success: boolean; error?: string }> {
+    const guard = await withRbac("inventory", "create")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         let unitCost = 0
         let productName: string | null = null

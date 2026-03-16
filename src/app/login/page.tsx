@@ -33,15 +33,21 @@ export default function LoginPage() {
         setIsLoading(true)
 
         try {
-            const staff = await verifyStaffPin(enteredPin)
+            const result = await verifyStaffPin(enteredPin)
 
-            if (staff) {
+            if (result && 'error' in result) {
+                // Rate limited
+                setShake(true)
+                setPin("")
+                toast.error(result.error)
+                setTimeout(() => setShake(false), 500)
+            } else if (result && 'id' in result) {
                 login({
-                    id: staff.id,
-                    fullName: staff.fullName,
-                    role: staff.role,
+                    id: result.id,
+                    fullName: result.fullName,
+                    role: result.role,
                 })
-                toast.success(`Xin chào, ${staff.fullName}!`)
+                toast.success(`Xin chào, ${result.fullName}!`)
                 router.replace("/pos")
             } else {
                 setShake(true)

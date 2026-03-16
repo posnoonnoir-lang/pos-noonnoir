@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { withRbac } from "@/lib/with-rbac"
 
 // ============================================================
 // PROCUREMENT — Supplier CRUD + Purchase Receipts (Nhập hàng)
@@ -41,6 +42,9 @@ export async function createSupplier(data: {
     taxCode?: string
     category?: string
 }) {
+    const guard = await withRbac("suppliers", "create")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         const supplier = await prisma.supplier.create({
             data: { ...data, contactName: data.contactName ?? data.contactPerson },
@@ -55,6 +59,9 @@ export async function createSupplier(data: {
 export async function updateSupplier(id: string, data: Partial<{
     name: string; contactName: string; phone: string; email: string; address: string
 }>) {
+    const guard = await withRbac("suppliers", "edit")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         await prisma.supplier.update({ where: { id }, data })
         revalidatePath("/dashboard/procurement")
@@ -65,6 +72,9 @@ export async function updateSupplier(id: string, data: Partial<{
 }
 
 export async function deleteSupplier(id: string) {
+    const guard = await withRbac("suppliers", "delete")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     const hasConsignments = await prisma.consignment.count({ where: { supplierId: id } })
     if (hasConsignments > 0) return { success: false, error: "NCC có lô ký gửi, không thể xóa" }
     try {
@@ -97,6 +107,9 @@ export async function createPurchaseReceipt(data: {
     items: PurchaseReceiptItem[]
     notes?: string
 }) {
+    const guard = await withRbac("procurement", "create")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     if (!data.items.length) return { success: false, error: "Không có sản phẩm" }
 
     // Generate receipt number
