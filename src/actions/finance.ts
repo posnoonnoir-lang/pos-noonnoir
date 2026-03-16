@@ -3,12 +3,16 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import type { TransactionType } from "@prisma/client"
+import { withRbac } from "@/lib/with-rbac"
 
 // ============================================================
 // FINANCE — Fund Transactions + Debt Records + REAL COGS
 // ============================================================
 
 export async function getFundTransactions(params?: { startDate?: Date; endDate?: Date; type?: TransactionType }) {
+    const guard = await withRbac("finance", "view")
+    if (!guard.ok) return []
+
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
@@ -44,6 +48,8 @@ export async function createFundTransaction(data: {
     orderId?: string
 }) {
     try {
+        const guard = await withRbac("finance", "edit")
+        if (!guard.ok) return { success: false, error: guard.error }
         const txn = await prisma.fundTransaction.create({
             data: {
                 transactionType: data.type,
@@ -87,6 +93,8 @@ export async function createDebtRecord(data: {
     dueDate?: Date
 }) {
     try {
+        const guard = await withRbac("finance", "edit")
+        if (!guard.ok) return { success: false, error: guard.error }
         const debt = await prisma.debtRecord.create({
             data: {
                 debtType: data.type,
@@ -105,6 +113,9 @@ export async function createDebtRecord(data: {
 
 export async function payDebt(debtId: string, amount: number) {
     try {
+        const guard = await withRbac("finance", "edit")
+        if (!guard.ok) return { success: false, error: guard.error }
+
         const debt = await prisma.debtRecord.findUnique({ where: { id: debtId } })
         if (!debt) return { success: false }
 
@@ -374,6 +385,9 @@ export async function getCOGSByProduct() {
  * Finance Summary — REAL data from Orders, FundTransactions, Equipment
  */
 export async function getFinanceSummary(): Promise<FinanceSummary> {
+    const guard = await withRbac("finance", "view")
+    if (!guard.ok) return { todayRevenue: 0, todayExpenses: 0, todayCOGS: 0, todayProfit: 0, totalRevenue: 0, totalCOGS: 0, grossProfit: 0, grossMargin: 0, operatingExpenses: 0, depreciationExpense: 0, netProfit: 0, netMargin: 0, monthRevenue: 0, monthExpenses: 0, monthCOGS: 0, monthProfit: 0, totalPayable: 0, totalReceivable: 0 }
+
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
 

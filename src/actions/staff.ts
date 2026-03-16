@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import type { StaffRole } from "@prisma/client"
+import { withRbac } from "@/lib/with-rbac"
 
 export type { StaffRole } from "@prisma/client"
 
@@ -157,6 +158,9 @@ export async function createStaff(data: {
     email?: string
     baseSalary?: number
 }) {
+    const guard = await withRbac("staff", "create")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     const existing = await prisma.staff.findFirst({ where: { pinCode: data.pin } })
     if (existing) return { success: false, error: "Mã PIN đã được sử dụng" }
 
@@ -182,6 +186,9 @@ export async function updateStaff(
     id: string,
     data: Partial<{ fullName: string; role: StaffRole; phone: string; email: string; baseSalary: number }>
 ) {
+    const guard = await withRbac("staff", "edit")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         await prisma.staff.update({ where: { id }, data })
         revalidatePath("/dashboard/staff")
@@ -192,6 +199,9 @@ export async function updateStaff(
 }
 
 export async function updateStaffStatus(id: string, status: boolean | string) {
+    const guard = await withRbac("staff", "edit")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     const isActive = typeof status === "boolean" ? status : status === "ACTIVE"
     try {
         await prisma.staff.update({ where: { id }, data: { isActive } })
@@ -203,6 +213,9 @@ export async function updateStaffStatus(id: string, status: boolean | string) {
 }
 
 export async function resetStaffPin(id: string, newPin: string) {
+    const guard = await withRbac("staff", "edit")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
         return { success: false, error: "PIN phải là 4 chữ số" }
     }

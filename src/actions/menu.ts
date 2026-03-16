@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import type { ActionResult, Category, Product, CategoryFormData, ProductFormData } from "@/types"
 import type { Prisma } from "@prisma/client"
 import { serializeProduct } from "@/lib/product-serializer"
+import { withRbac } from "@/lib/with-rbac"
 
 // ============================================================
 // CATEGORY ACTIONS
@@ -19,6 +20,9 @@ export async function getCategories(): Promise<Category[]> {
 }
 
 export async function createCategory(data: CategoryFormData): Promise<ActionResult<Category>> {
+    const guard = await withRbac("menu", "create")
+    if (!guard.ok) return { success: false, error: { code: "ERR_FORBIDDEN", message: guard.error } }
+
     try {
         const count = await prisma.category.count()
         const cat = await prisma.category.create({
@@ -39,6 +43,9 @@ export async function createCategory(data: CategoryFormData): Promise<ActionResu
 }
 
 export async function updateCategory(id: string, data: Partial<CategoryFormData>): Promise<ActionResult<Category>> {
+    const guard = await withRbac("menu", "edit")
+    if (!guard.ok) return { success: false, error: { code: "ERR_FORBIDDEN", message: guard.error } }
+
     try {
         const cat = await prisma.category.update({
             where: { id },
@@ -59,6 +66,9 @@ export async function updateCategory(id: string, data: Partial<CategoryFormData>
 }
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
+    const guard = await withRbac("menu", "delete")
+    if (!guard.ok) return { success: false, error: { code: "ERR_FORBIDDEN", message: guard.error } }
+
     const hasProducts = await prisma.product.count({ where: { categoryId: id } })
     if (hasProducts > 0) {
         return { success: false, error: { code: "ERR_VALIDATION", message: "Không thể xóa danh mục có sản phẩm" } }
@@ -128,6 +138,9 @@ export async function getProductById(id: string): Promise<ActionResult<Product>>
 }
 
 export async function createProduct(data: ProductFormData): Promise<ActionResult<Product>> {
+    const guard = await withRbac("menu", "create")
+    if (!guard.ok) return { success: false, error: { code: "ERR_FORBIDDEN", message: guard.error } }
+
     try {
         const count = await prisma.product.count()
         const product = await prisma.product.create({
@@ -171,6 +184,9 @@ export async function createProduct(data: ProductFormData): Promise<ActionResult
 }
 
 export async function updateProduct(id: string, data: Partial<ProductFormData>): Promise<ActionResult<Product>> {
+    const guard = await withRbac("menu", "edit")
+    if (!guard.ok) return { success: false, error: { code: "ERR_FORBIDDEN", message: guard.error } }
+
     try {
         const product = await prisma.product.update({
             where: { id },
@@ -185,6 +201,9 @@ export async function updateProduct(id: string, data: Partial<ProductFormData>):
 }
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
+    const guard = await withRbac("menu", "delete")
+    if (!guard.ok) return { success: false, error: { code: "ERR_FORBIDDEN", message: guard.error } }
+
     try {
         await prisma.product.update({ where: { id }, data: { isActive: false } })
         revalidatePath("/dashboard/menu")

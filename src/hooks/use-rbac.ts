@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useAuthStore } from "@/stores/auth-store"
-import { getRbacConfig, type RbacConfig } from "@/actions/rbac"
+import { getRbacConfig } from "@/actions/rbac"
+import type { RbacConfig } from "@/lib/rbac-constants"
 
 // Route → RBAC module mapping
 const ROUTE_MODULE_MAP: Record<string, string> = {

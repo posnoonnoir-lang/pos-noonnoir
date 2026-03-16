@@ -1,8 +1,9 @@
-"use server"
+// Server-side RBAC guard utility (imported by server action files)
 
 import { cookies } from "next/headers"
 import { prisma } from "@/lib/prisma"
-import { getRbacConfig, type Permission } from "@/actions/rbac"
+import { getRbacConfig } from "@/actions/rbac"
+import type { Permission } from "@/lib/rbac-constants"
 
 /**
  * Server-side RBAC guard for Server Actions.
@@ -17,8 +18,8 @@ import { getRbacConfig, type Permission } from "@/actions/rbac"
  */
 
 type RbacGuardResult =
-    | { ok: true; staffId: string; role: string }
-    | { ok: false; error: string }
+    | { ok: true; staffId: string; role: string; error?: undefined }
+    | { ok: false; error: string; staffId?: undefined; role?: undefined }
 
 export async function withRbac(
     moduleId: string,

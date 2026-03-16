@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { calculateTier, type CustomerTier } from "@/lib/customer-tiers"
+import { withRbac } from "@/lib/with-rbac"
 
 // ============================================================
 // CRM & CUSTOMER MANAGEMENT — Enhanced
@@ -188,6 +189,9 @@ export async function createCustomer(params: {
     notes?: string
     winePreferences?: string[]
 }) {
+    const guard = await withRbac("customers", "create")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         const customer = await prisma.customer.create({
             data: {
@@ -210,6 +214,9 @@ export async function createCustomer(params: {
 }
 
 export async function updateCustomerNotes(id: string, notes: string) {
+    const guard = await withRbac("customers", "edit")
+    if (!guard.ok) return { success: false, error: guard.error }
+
     try {
         await prisma.customer.update({ where: { id }, data: { notes } })
         revalidatePath("/dashboard/customers")

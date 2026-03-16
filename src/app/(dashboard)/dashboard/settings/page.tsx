@@ -52,9 +52,11 @@ import { isKpiEnabled, setKpiEnabled } from "@/actions/kpi"
 import { ThemePicker } from "@/components/theme-switcher"
 import {
     getRbacConfig, updateRbacConfig, resetRbacToDefault,
+} from "@/actions/rbac"
+import {
     MODULES as RBAC_MODULES, ALL_ROLES, PERMISSION_LABELS,
     type RbacConfig, type Permission,
-} from "@/actions/rbac"
+} from "@/lib/rbac-constants"
 import { useAuthStore } from "@/stores/auth-store"
 import {
     getStoreInfo, updateStoreInfo, type StoreInfo,
