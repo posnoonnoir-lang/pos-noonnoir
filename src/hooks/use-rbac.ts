@@ -24,7 +24,7 @@ const ROUTE_MODULE_MAP: Record<string, string> = {
     "/dashboard/inventory": "inventory",
     "/dashboard/bottle-tracking": "inventory",
     "/dashboard/procurement": "procurement",
-    "/dashboard/kitchen": "inventory",
+    "/dashboard/margins": "inventory",
     "/dashboard/waste": "inventory",
     "/dashboard/alerts": "inventory",
     "/dashboard/staff": "staff",

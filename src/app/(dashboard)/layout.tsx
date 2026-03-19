@@ -81,7 +81,7 @@ const navSections = [
             { label: "Tồn kho", href: "/dashboard/inventory", icon: Package, rbac: "inventory" },
             { label: "Tài sản (Chai)", href: "/dashboard/bottle-tracking", icon: GlassWater, rbac: "inventory" },
             { label: "Nhập & Ký gửi", href: "/dashboard/procurement", icon: Truck, rbac: "procurement" },
-            { label: "Lợi nhuận (Biên)", href: "/dashboard/kitchen", icon: Tag, rbac: "inventory" },
+            { label: "Lợi nhuận (Biên)", href: "/dashboard/margins", icon: Tag, rbac: "inventory" },
             { label: "Lãng phí", href: "/dashboard/waste", icon: Trash2, rbac: "inventory" },
             { label: "Cảnh báo (Hạn)", href: "/dashboard/alerts", icon: AlertTriangle, rbac: "inventory" },
         ],
