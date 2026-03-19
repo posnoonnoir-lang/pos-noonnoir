@@ -77,7 +77,7 @@ const navSections = [
         items: [
             { label: "Thực đơn", href: "/dashboard/menu/products", icon: UtensilsCrossed, rbac: "menu" },
             { label: "Công thức", href: "/dashboard/menu/recipes", icon: ChefHat, rbac: "menu" },
-            { label: "Sổ tay Rượu", href: "/dashboard/wineguide", icon: BookOpen, rbac: "menu" },
+            { label: "Sổ tay Rượu", href: "/dashboard/wine-guide", icon: BookOpen, rbac: "menu" },
             { label: "Tồn kho", href: "/dashboard/inventory", icon: Package, rbac: "inventory" },
             { label: "Tài sản (Chai)", href: "/dashboard/bottle-tracking", icon: GlassWater, rbac: "inventory" },
             { label: "Nhập & Ký gửi", href: "/dashboard/procurement", icon: Truck, rbac: "procurement" },

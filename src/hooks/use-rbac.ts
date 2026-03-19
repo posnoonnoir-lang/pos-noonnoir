@@ -20,7 +20,7 @@ const ROUTE_MODULE_MAP: Record<string, string> = {
     "/dashboard/menu/products": "menu",
     "/dashboard/menu/categories": "menu",
     "/dashboard/menu/recipes": "menu",
-    "/dashboard/wineguide": "menu",
+    "/dashboard/wine-guide": "menu",
     "/dashboard/inventory": "inventory",
     "/dashboard/bottle-tracking": "inventory",
     "/dashboard/procurement": "procurement",
