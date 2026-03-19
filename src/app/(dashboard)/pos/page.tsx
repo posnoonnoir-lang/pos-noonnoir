@@ -1180,11 +1180,11 @@ export default function POSPage() {
                         </button>
                     )}
 
-                    {/* Open Tabs indicator */}
+                    {/* Open Tabs indicator — only show from xl (≥1280px with narrow sidebar) */}
                     <button
                         onClick={() => setOpenTabModal(true)}
                         className={cn(
-                            "hidden lg:flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
+                            "hidden xl:flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
                             activeTabs.length > 0
                                 ? "border-amber-500 bg-amber-50 text-amber-800"
                                 : "border-cream-300 bg-cream-50 text-cream-500 hover:border-green-600 hover:text-green-700"
@@ -1215,11 +1215,11 @@ export default function POSPage() {
                         />
                     </div>
 
-                    {/* Shift indicator */}
+                    {/* Shift indicator — show from lg, but hide label text on lg to save space */}
                     <button
                         onClick={() => setShiftModalOpen(true)}
                         className={cn(
-                            "hidden sm:flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all",
+                            "hidden lg:flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all",
                             currentShift
                                 ? "border-green-600 bg-green-50 text-green-800"
                                 : "border-red-300 bg-red-50 text-red-700 animate-pulse"
@@ -1229,7 +1229,7 @@ export default function POSPage() {
                         {currentShift ? (
                             <>
                                 <span className="font-mono">{shiftElapsed}</span>
-                                <span className="hidden xl:inline text-[10px] text-green-600">· ₫{formatPrice(currentShift.totalSales)}</span>
+                                <span className="hidden 2xl:inline text-[10px] text-green-600">· ₫{formatPrice(currentShift.totalSales)}</span>
                             </>
                         ) : (
                             "Mở ca"
@@ -1337,7 +1337,7 @@ export default function POSPage() {
                             <p className="text-sm text-cream-400">Không có sản phẩm</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 gap-2 lg:gap-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                        <div className="grid grid-cols-2 gap-2 lg:gap-3 xl:grid-cols-3 2xl:grid-cols-4">
                             {filteredProducts.map((product) => {
                                 const displayPrice =
                                     product.isByGlass && product.glassPrice
@@ -1449,9 +1449,9 @@ export default function POSPage() {
                                                     <span className="ml-1 text-[10px] text-cream-400">/ly</span>
                                                 )}
                                             </div>
-                                            {/* Wine Guide quick button */}
+                                            {/* Wine Guide quick button — only xl+ to avoid overlap on lg/1280px laptops */}
                                             {(product.type === "WINE_BOTTLE" || product.type === "WINE_GLASS" || product.type === "WINE_TASTING") && (
-                                                <span className="hidden lg:contents">
+                                                <span className="hidden xl:contents">
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation()
@@ -1480,14 +1480,14 @@ export default function POSPage() {
                                                     </button>
                                                 </span>
                                             )}
-                                            {/* Food Pairing button — for food/drink items */}
+                                            {/* Food Pairing button — only xl+ to avoid overlap on lg/1280px laptops */}
                                             {(product.type === "FOOD" || product.type === "DRINK" || product.type === "OTHER") && (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation()
                                                         setFoodPairingProduct(product)
                                                     }}
-                                                    className="hidden lg:flex items-center gap-1 rounded-md bg-wine-50 border border-wine-200 px-1.5 py-0.5 text-wine-700 hover:bg-wine-100 hover:border-wine-400 transition-all"
+                                                    className="hidden xl:flex items-center gap-1 rounded-md bg-wine-50 border border-wine-200 px-1.5 py-0.5 text-wine-700 hover:bg-wine-100 hover:border-wine-400 transition-all"
                                                     title="Rượu hợp uống cùng"
                                                 >
                                                     <Wine className="h-3 w-3" />
