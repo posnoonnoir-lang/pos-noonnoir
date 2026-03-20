@@ -77,7 +77,21 @@ export default function SuppliersClient({ initial }: Props) {
             } else {
                 const result = await createSupplier(form)
                 if (result.success && result.data) {
-                    setSuppliers((prev) => [...prev, result.data as Supplier])
+                    const d = result.data as Record<string, unknown>
+                    const newSupplier: Supplier = {
+                        id: d.id as string,
+                        name: d.name as string,
+                        contactPerson: (d.contactName as string) ?? (d.contactPerson as string) ?? null,
+                        phone: (d.phone as string) ?? null,
+                        email: (d.email as string) ?? null,
+                        address: (d.address as string) ?? null,
+                        taxCode: (d.taxCode as string) ?? null,
+                        bankAccount: (d.bankAccount as string) ?? null,
+                        bankName: (d.bankName as string) ?? null,
+                        notes: (d.notes as string) ?? null,
+                        isActive: (d.isActive as boolean) ?? true,
+                    }
+                    setSuppliers((prev) => [...prev, newSupplier])
                     toast.success("Đã thêm NCC mới")
                 }
             }

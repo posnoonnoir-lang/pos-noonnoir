@@ -22,9 +22,14 @@ export async function getSuppliers() {
         id: s.id,
         name: s.name,
         contactName: s.contactName,
+        contactPerson: s.contactName,
         phone: s.phone,
         email: s.email,
         address: s.address,
+        taxCode: null as string | null,
+        bankAccount: null as string | null,
+        bankName: null as string | null,
+        notes: null as string | null,
         isActive: s.isActive,
         totalConsignments: s._count.consignments,
         totalPurchases: s._count.stockMovements,
@@ -57,13 +62,24 @@ export async function createSupplier(data: {
 }
 
 export async function updateSupplier(id: string, data: Partial<{
-    name: string; contactName: string; phone: string; email: string; address: string
+    name: string; contactName: string; contactPerson: string; phone: string; email: string; address: string
+    taxCode: string; bankAccount: string; bankName: string; notes: string
 }>) {
     const guard = await withRbac("suppliers", "edit")
     if (!guard.ok) return { success: false, error: guard.error }
 
+    // Map client fields to DB columns (contactPerson → contactName)
+    // Strip fields not in schema: taxCode, bankAccount, bankName, notes
+    const dbData: Record<string, unknown> = {}
+    if (data.name !== undefined) dbData.name = data.name
+    if (data.contactPerson !== undefined) dbData.contactName = data.contactPerson
+    else if (data.contactName !== undefined) dbData.contactName = data.contactName
+    if (data.phone !== undefined) dbData.phone = data.phone
+    if (data.email !== undefined) dbData.email = data.email
+    if (data.address !== undefined) dbData.address = data.address
+
     try {
-        await prisma.supplier.update({ where: { id }, data })
+        await prisma.supplier.update({ where: { id }, data: dbData })
         revalidatePath("/dashboard/procurement")
         return { success: true }
     } catch {
